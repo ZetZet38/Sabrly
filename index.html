@@ -660,7 +660,7 @@ function vHeute(){
   // one situation box at most
   if(sel===t)h+=situationBox(t);
   // mood
-  if(!fut)h+=`<div class="card glass"><h2 style="font-size:17px">${sel===t?'Wie fühlst du dich?':'Stimmung an dem Tag'}</h2>
+  if(!fut)h+=`<div class="card glass" id="moodcard"><h2 style="font-size:17px">${sel===t?'Wie fühlst du dich?':'Stimmung an dem Tag'}</h2>
       <div class="mood${e.mood?' set':''}">${MOODS.map((m,i)=>`<button type="button" class="${e.mood===i+1?'on':''}" data-a="mood" data-d="${sel}" data-v="${i+1}" aria-label="Stimmung ${i+1} von 5" aria-pressed="${e.mood===i+1}">${m}</button>`).join('')}</div></div>`;
   // Tagesablauf
   const tl=timeline(sel);
@@ -1115,7 +1115,18 @@ window.addEventListener('pagehide',()=>{saveLocal();if(pendingKeys().length)flus
 window.addEventListener('online',()=>{if(USER&&cloudReady){if(pendingKeys().length)flush();else if(SYNC==='offline'||SYNC==='slow')setSync(outstanding?'saving':'cloud')}});
 window.addEventListener('offline',()=>{if(USER&&(SYNC==='saving'||SYNC==='cloud')&&outstanding)setSync('offline')});
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
-boot();
+/* ---------- links from the widget's "Sabrly öffnen": #aufgaben, #statistik, #heute, #mood ---------- */
+let LINK=null;
+function parseLink(){const h=decodeURIComponent((location.hash||'').slice(1)).trim();return h?h.split('=')[0]:null}
+function runLink(){
+  if(!LINK)return;const k=LINK;LINK=null;
+  try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  UI.page=null;UI.stack=[];UI.sel=null;UI.tab=k==='aufgaben'?'aufgaben':k==='statistik'?'statistik':'heute';
+  render('enter');window.scrollTo(0,0);
+  if(k==='mood')setTimeout(()=>{const m=document.getElementById('moodcard');if(m)m.scrollIntoView({behavior:'smooth',block:'center'})},80)}
+LINK=parseLink();
+window.addEventListener('hashchange',()=>{const l=parseLink();if(l){LINK=l;runLink()}});
+boot().then(runLink);
 </script>
 </body>
 </html>
