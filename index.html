@@ -193,7 +193,7 @@ h2{font-size:23px;font-weight:700;letter-spacing:-.015em;margin:0;text-wrap:bala
 .sitgrid.off{opacity:.45}
 
 /* Mood */
-.mood{display:flex;justify-content:space-between;gap:6px;margin-top:10px}
+.mood{display:flex;justify-content:space-between;gap:6px;margin-top:2px}
 .mood button{flex:1;max-width:46px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font-size:21px;background:rgba(255,255,255,.05);border:1px solid var(--line);transition:transform .2s var(--spring),opacity .2s,background .2s}
 .mood.set button{opacity:.42}
 .mood button.on{opacity:1;background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:var(--accent);transform:scale(1.08);animation:pop .3s var(--spring)}
@@ -685,8 +685,6 @@ function vHeute(){
   // one situation box at most
   if(sel===t)h+=situationBox(t);
   // mood
-  if(!fut)h+=`<div class="card glass" id="moodcard"><h2 style="font-size:17px">${sel===t?'Wie fühlst du dich?':'Stimmung an dem Tag'}</h2>
-      <div class="mood${e.mood?' set':''}">${MOODS.map((m,i)=>`<button type="button" class="${e.mood===i+1?'on':''}" data-a="mood" data-d="${sel}" data-v="${i+1}" aria-label="Stimmung ${i+1} von 5" aria-pressed="${e.mood===i+1}">${m}</button>`).join('')}</div></div>`;
   // habits
   const hs=active(sel),open=hs.filter(x=>!isDone(x,sel)).length;
   h+=`<section class="sec hl"><div class="sec-h"><div class="row"><h2>Habits</h2><span class="pill num" style="font-size:14px">${fut?hs.length+' geplant':open+' offen'}</span></div><div class="right">${hs.length?`<button type="button" class="mini" data-a="hnew" aria-label="Habit erstellen">+</button>`:''}<button type="button" class="link" data-a="tab" data-t="habits">Alle ›</button></div></div>`;
@@ -696,7 +694,10 @@ function vHeute(){
   const td=dayTodos(sel),openTd=td.filter(x=>!x.done).length;
   h+=`<section class="sec hl"><div class="sec-h"><div class="row"><h2>Aufgaben</h2><span class="pill num" style="font-size:14px">${openTd} offen</span></div><div class="right">${td.length?`<button type="button" class="mini" data-a="tnew" data-d="${sel===t?'':sel}" aria-label="Aufgabe hinzufügen">+</button>`:''}<button type="button" class="link" data-a="tab" data-t="aufgaben">Alle ›</button></div></div>${td.length?td.map(x=>todoRow(x,fut)).join(''):`<button type="button" class="addrow glass press" data-a="tnew" data-d="${sel===t?'':sel}"><span class="emo">📝</span>${sel===t?'Aufgabe hinzufügen':'Aufgabe für '+esc(dayTitle(sel))}<span class="plusic">+</span></button>`}</section>`;
   // Rückblick
-  if(!fut)h+=`<section class="sec"><h2>Rückblick</h2><div class="card glass stack" style="gap:6px"><span class="label">Was war ${sel===t?'heute':'an dem Tag'} okay?</span><input class="field" id="f-okay" data-f="okay" data-d="${sel}" value="${esc(e.okay||'')}" placeholder="Ein Satz reicht" autocomplete="off" enterkeyhint="done"><span class="saved" data-saved="okay"></span></div></section>`;
+  // Rückblick: Stimmung + ein Satz zum Tag
+  if(!fut)h+=`<section class="sec"><h2>Rückblick</h2><div class="card glass stack" id="moodcard" style="gap:10px;position:relative"><span class="label">Wie war ${sel===t?'dein':'der'} Tag?</span>
+      <div class="mood${e.mood?' set':''}">${MOODS.map((m,i)=>`<button type="button" class="${e.mood===i+1?'on':''}" data-a="mood" data-d="${sel}" data-v="${i+1}" aria-label="Stimmung ${i+1} von 5" aria-pressed="${e.mood===i+1}">${m}</button>`).join('')}</div>
+      <input class="field" id="f-okay" data-f="okay" data-d="${sel}" value="${esc(e.okay||'')}" placeholder="Ein Satz dazu (optional)" autocomplete="off" enterkeyhint="done"><span class="saved" data-saved="okay" style="position:absolute;top:16px;right:18px;min-height:0"></span></div></section>`;
   // Notizen
   const notes=Array.isArray(e.n)?e.n:[];
   h+=`<section class="sec"><div class="sec-h"><h2>Notizen</h2>${notes.length?`<span class="pill num" style="font-size:14px">${notes.length}</span>`:''}</div><div class="card glass" style="padding:10px 16px 12px">
