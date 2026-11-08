@@ -224,6 +224,31 @@ h2{font-size:23px;font-weight:700;letter-spacing:-.015em;margin:0;text-wrap:bala
 .chip{border-radius:11px;padding:8px 4px;font-size:12.5px;font-weight:600;text-align:center;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted);transition:background .2s,border-color .2s,transform .15s}
 .chip:not(:disabled):active{transform:scale(.94)}
 .chip.on{background:color-mix(in srgb,var(--accent) 20%,transparent);border-color:color-mix(in srgb,var(--accent) 70%,transparent);color:var(--fg)}
+.chip{position:relative;overflow:hidden;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.chip .pb{position:absolute;left:0;bottom:0;height:3px;background:#E3BE76;border-radius:0 3px 3px 0}
+.chip .pe{position:absolute;top:1px;right:4px;font-size:9px;font-style:normal;color:#E3BE76}
+.chip.plock{opacity:.38}
+.chip.pmiss{border-color:color-mix(in srgb,var(--crit) 45%,var(--line));color:color-mix(in srgb,var(--crit) 70%,var(--muted))}
+.pstat{font-size:12.5px;font-weight:600;color:#E3BE76;margin-top:-2px}
+.link.pyest{align-self:flex-start;font-size:13px;margin-top:-4px}
+.ring.hasg b{font-size:13px}
+.ptimes{display:grid;grid-template-columns:repeat(auto-fit,minmax(48px,1fr));gap:6px}
+.ptimes span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:10px;background:rgba(255,255,255,.04)}
+.ptimes small{font-size:10.5px;color:var(--muted);font-weight:600}
+.ptimes b{font-size:14px}
+.pval{font-size:15px;margin-top:2px;overflow-wrap:anywhere}
+.plist{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow:auto}
+.pcity{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line);text-align:left}
+.pcity b{font-size:15px}.pcity span{font-size:12px;color:var(--muted)}
+.pprev{font-size:15px}.pprev b{color:#E3BE76;font-size:20px;margin-left:6px}
+.pbars{display:flex;gap:8px;align-items:flex-end}
+.pbcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.pbt{width:100%;max-width:26px;height:64px;border-radius:7px;background:rgba(227,190,118,.12);display:flex;align-items:flex-end;overflow:hidden}
+.pbt i{display:block;width:100%;background:#E3BE76;border-radius:7px}
+.pbcol small{font-size:11px;color:var(--muted)}
+.fold{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left}
+.fold .chev{width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);margin-left:2px;transition:transform .2s;flex:none}
+.fold[aria-expanded="true"] .chev{transform:rotate(45deg)}
 .counter{display:flex;align-items:center;gap:8px}
 .cbtn{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--line);font-size:20px;display:grid;place-items:center;transition:transform .15s}
 .cbtn:not(:disabled):active{transform:scale(.9)}
@@ -479,7 +504,7 @@ function defaultState(){const t=iso(new Date());return{v:3,
   habits:[
     {id:'h-beten',name:'Beten',emoji:'🤲',freq:'daily',target:5,labels:['Fajr','Dhuhr','Asr','Maghrib','Isha'],days:ALLDAYS.slice(),time:'',created:t,archived:false},
     {id:'h-lesen',name:'1 Seite lesen',emoji:'📚',freq:'daily',target:1,labels:[],days:ALLDAYS.slice(),time:'',created:t,archived:false}],
-  todos:[],quotes:[],plan:{text:'',days:{}},settings:{dayStart:0,v2:true,userName:'',trackerName:'',sit:{on:true,txt:{}}}}}
+  todos:[],quotes:[],plan:{text:'',days:{}},settings:{dayStart:0,v2:true,userName:'',trackerName:'',sit:{on:true,txt:{}},prayer:{on:false,habit:'',city:null,travel:null,buf:30,notify:true,since:''}}}}
 function normHabit(h){h=h||{};const days=Array.isArray(h.days)&&h.days.length?[...new Set(h.days.map(Number).filter(n=>n>=0&&n<7))].sort():ALLDAYS.slice();
   return{id:h.id||'h-'+newId(),name:String(h.name||'Habit'),emoji:h.emoji||'✅',freq:h.freq==='weekly'?'weekly':'daily',target:Math.max(1,+h.target||1),
     labels:Array.isArray(h.labels)?h.labels.map(String):[],days,time:validTime(h.time),created:h.created||iso(new Date()),archived:!!h.archived}}
@@ -507,7 +532,8 @@ const QSUG=['Um die Dinge zu kriegen, die ich nie hatte, muss ich Dinge tun, die
 let S=defaultState(),LOGS={};
 const UI={qOff:{},qType:'satz',qDraft:{t:'',src:''},tab:'heute',sel:null,prio:null,showDone:false,showArch:false,statW:null,statM:null,calM:null,page:null,stack:[]};
 
-const today=()=>iso(new Date(Date.now()-(S.settings.dayStart||0)*3600e3));
+const NOW=()=>window.__now?window.__now():Date.now(); // __now: nur für Tests
+const today=()=>iso(new Date(NOW()-(S.settings.dayStart||0)*3600e3));
 const isFut=d=>d>today();
 const dayGet=d=>LOGS[mkey(d)]?.days?.[d]||null;
 function dayEnsure(d){const k=mkey(d);if(!LOGS[k]||typeof LOGS[k]!=='object')LOGS[k]={days:{}};if(!LOGS[k].days)LOGS[k].days={};if(!LOGS[k].days[d])LOGS[k].days[d]={};return LOGS[k].days[d]}
@@ -653,7 +679,7 @@ function editing(){const a=document.activeElement;return a&&$('#view').contains(
 function renderIdle(){if(editing()||sw||openSw){pendingRender=true;return}render()}
 document.addEventListener('focusout',()=>setTimeout(()=>{if(pendingRender&&!editing()&&!openSw&&!sw)render()},0));
 function render(anim){
-  pendingRender=false;openSw=null;
+  pendingRender=false;openSw=null;if(MODE!=='auth'&&S.settings.prayer&&S.settings.prayer.on)loadPrayerCities();
   document.body.classList.toggle('authmode',MODE==='auth');
   if(MODE==='auth'){const view=$('#view');view.innerHTML=vAuth();if(anim){view.classList.remove('enter','push');void view.offsetWidth;view.classList.add('enter')}document.body.classList.remove('paged');return}
   const v=UI.page?PAGES[UI.page.t]:({heute:vHeute,habits:vHabits,aufgaben:vAufgaben,statistik:vStats,mehr:vMehr}[UI.tab]||vHeute);
@@ -662,7 +688,9 @@ function render(anim){
   document.body.classList.toggle('paged',!!UI.page);
   document.querySelectorAll('.tab').forEach(t=>{t.classList.toggle('on',t.dataset.t===UI.tab);t.setAttribute('aria-current',t.dataset.t===UI.tab?'page':'false')});
 }
-function ring(p,size=56){const r=size/2-5,c=2*Math.PI*r;return `<div class="ring" style="width:${size}px;height:${size}px"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7CF0C8"/><stop offset="1" stop-color="#2FB98C"/></linearGradient></defs><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="url(#rg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-p)}" transform="rotate(-90 ${size/2} ${size/2})"/></svg><b>${Math.round(p*100)}</b></div>`}
+function ring(p,size=56,g=null){const r=size/2-5,c=2*Math.PI*r,r2=r-7,c2=2*Math.PI*r2,m=size/2;
+  const gold=g==null?'':`<circle cx="${m}" cy="${m}" r="${r2}" fill="none" stroke="rgba(227,190,118,.16)" stroke-width="3"/><circle class="gring" cx="${m}" cy="${m}" r="${r2}" fill="none" stroke="${GOLD}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${c2}" stroke-dashoffset="${c2*(1-g)}" transform="rotate(-90 ${m} ${m})"/>`;
+  return `<div class="ring${g==null?'':' hasg'}" style="width:${size}px;height:${size}px"${g==null?'':` title="Gebets-Pünktlichkeit ${Math.round(g*100)} %"`}><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7CF0C8"/><stop offset="1" stop-color="#2FB98C"/></linearGradient></defs><circle cx="${m}" cy="${m}" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6"/><circle cx="${m}" cy="${m}" r="${r}" fill="none" stroke="url(#rg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-p)}" transform="rotate(-90 ${m} ${m})"/>${gold}</svg><b>${Math.round(p*100)}</b></div>`}
 function swipeRow(front,actions){return `<div class="swipe" data-swipe><div class="swipe-actions">${actions}</div><div class="swipe-front">${front}</div></div>`}
 const sa=(cls,a,attrs,icon,label)=>`<button type="button" class="sa ${cls}" data-a="${a}" ${attrs}><i>${icon}</i>${label}</button>`;
 function dayTitle(d){const t=today();return d===t?'Heute':d===addDays(t,1)?'Morgen':d===addDays(t,-1)?'Gestern':fmtShort(d)}
@@ -674,7 +702,7 @@ function vHeute(){
   const t=today(),sel=curSel(),fut=sel>t,ws=weekStart(sel),e=dayGet(sel)||{},sd=pdate(sel);
   let days='';
   for(let i=0;i<7;i++){const d=addDays(ws,i),f=d>t;days+=`<button type="button" class="day${d===t?' today':''}${d===sel?' sel':''}${f?' fut':''}" data-a="sel" data-d="${d}" aria-label="${fmtLong(d)}"><span class="dn">${DN[i]}</span><span class="dd">${pdate(d).getDate()}</span><span class="db"><i style="width:${f?0:Math.round(dayScore(d)*100)}%"></i></span></button>`}
-  let h=`<header class="weekbar glass" data-wswipe><div class="wb-in"><div class="mon"><b>${MS[sd.getMonth()].toUpperCase()}</b><span>${sd.getFullYear()}</span></div><div class="days">${days}</div>${ring(fut?0:dayScore(sel))}</div></header>`;
+  let h=`<header class="weekbar glass" data-wswipe><div class="wb-in"><div class="mon"><b>${MS[sd.getMonth()].toUpperCase()}</b><span>${sd.getFullYear()}</span></div><div class="days">${days}</div>${ring(fut?0:dayScore(sel),56,fut?null:(prayerDay(sel)?.avg??null))}</div></header>`;
   // kleine Kopfzeile (Name, Tag, Datum), die Pfeile wechseln den Tag
   const un=S.settings.userName,hr=new Date().getHours(),gr=hr>=5&&hr<11?'Guten Morgen':hr>=17&&hr<23?'Guten Abend':'Hallo';
   h+=`<div class="titlebar"><div class="tb-l">${sel===t&&un?`<div class="eyebrow">${gr}, ${esc(un)}</div>`:''}<div class="tb-row"><h1>${dayTitle(sel)}</h1><span class="sub">${fmtMid(sel)}</span></div></div><div class="wknav"><button type="button" class="rbtn" data-a="dstep" data-dir="-1" aria-label="Vorheriger Tag">‹</button><button type="button" class="rbtn" data-a="dstep" data-dir="1" aria-label="Nächster Tag">›</button></div></div>`;
@@ -749,10 +777,19 @@ function habitRow(x,d,locked){
   const bits=[];if(x.time)bits.push(x.time);
   if(x.freq==='weekly')bits.push(`${weekCount(x,weekStart(d),d)}/${x.target} diese Woche`);else if(T>1&&!locked)bits.push(`${v}/${T}`);
   if(locked)bits.push('geplant');
+  const pd=isPrayerH(x)?prayerDay(d):null;
+  if(pd&&pd.avg!=null)bits.push(`Pünktlich ${Math.round(pd.avg*100)} %`);
   const sub=bits.join(' · ');
   let ctrl='',below='';
   if(x.freq==='daily'&&x.labels?.length){const on=Array.isArray(raw)?raw:[];
-    below=`<div class="chips">${x.labels.map((l,i)=>`<button type="button" class="chip${on.includes(i)?' on':''}" data-a="lab" data-h="${x.id}" data-d="${d}" data-i="${i}" aria-pressed="${on.includes(i)}" ${dis}>${esc(l)}</button>`).join('')}</div>`;
+    below=`<div class="chips">${x.labels.map((l,i)=>{const it=pd&&pd.items[i],wait=it&&it.st==='wait'&&!on.includes(i);
+      const cls=(on.includes(i)?' on':'')+(wait?' plock':'')+(it&&it.st==='miss'?' pmiss':'');
+      const extra=it?` data-p="1"${wait?` data-from="${it.s}"`:''} aria-label="${esc(l)}${it.sc!=null&&it.tk?', '+it.sc+' %':''}${wait?', ab '+hm(it.s):''}"`:'';
+      return `<button type="button" class="chip${cls}" data-a="lab" data-h="${x.id}" data-d="${d}" data-i="${i}" aria-pressed="${on.includes(i)}"${extra} ${dis||(wait?'disabled':'')}>${esc(l)}${it&&it.tk?`<span class="pb" style="width:${it.sc}%"></span>${it.ed?'<i class="pe">✎</i>':''}`:''}</button>`}).join('')}</div>`;
+    if(pd&&d===today()){const st=prayerStatus(d),py=prayerDay(addDays(d,-1));
+      if(st)below+=`<div class="pstat" data-pd="${d}">${esc(st)}</div>`;
+      if(py&&py.items[4].st==='now')below+=`<button type="button" class="link pyest" data-a="lab" data-h="${x.id}" data-d="${addDays(d,-1)}" data-i="4">${esc(pLabel(4))} von gestern abhaken</button>`}
+    if(isPrayerH(x)&&!PS().city)below+=`<button type="button" class="link pyest" data-a="pcity" data-m="home">Stadt für Gebetszeiten wählen ›</button>`;
     ctrl=`<span class="circle${dn?' on':''}" aria-hidden="true">${dn?CHECK:`<span class="num" style="font-size:15px;font-weight:600">${v}</span>`}</span>`}
   else if(x.freq==='daily'&&T>1){
     ctrl=`<div class="counter"><button type="button" class="cbtn" data-a="dec" data-h="${x.id}" data-d="${d}" aria-label="Weniger" ${dis}>−</button><button type="button" class="cbtn plus" data-a="inc" data-h="${x.id}" data-d="${d}" aria-label="Mehr" ${dis}>+</button></div>`;
@@ -885,6 +922,7 @@ function vStats(){const t=today(),hs=S.habits.filter(x=>!x.archived);
     ${dayCal(M)}
     <div class="legend"><span><i style="background:var(--accent)"></i>alles erledigt</span><span><i style="background:conic-gradient(var(--accent) 50%,rgba(255,255,255,.15) 0)"></i>teilweise</span><span>Tippen öffnet den Tag</span></div></div>`;
   // per habit
+  h+=vPStats();
   if(hs.length)h+=`<section class="sec"><div class="sec-h"><h2>Habits im ${MN[mm-1]}</h2></div>${hs.map(x=>{const r=monthRate(x,M);return `<button type="button" class="hstat glass press" data-a="hopen" data-h="${x.id}"><span class="emo">${esc(x.emoji)}</span><span class="hs-main"><b>${esc(x.name)}</b><span class="bar"><i style="width:${r}%"></i></span></span><span class="hs-num">${r}%<small>🔥 ${streak(x)}</small></span></button>`}).join('')}</section>`;
   return h}
 
@@ -904,7 +942,7 @@ function vMehr(){
   h+=`<section class="sec"><h2>Persönlich</h2><div class="card glass stack" style="gap:12px">
     <div class="fgroup"><label class="label" for="s-name">Dein Name</label><input class="tinput" id="s-name" data-set="userName" value="${esc(S.settings.userName)}" placeholder="Dein Vorname" maxlength="30" autocomplete="off" enterkeyhint="done"></div>
     <span class="saved" data-saved="set"></span><span class="hint">Erscheint als Begrüßung oben auf der Heute-Seite.</span></div></section>`;
-  h+=vQuotes()+vSit();
+  h+=vGebet()+vQuotes()+vSit();
   const pd=S.plan.days||{},n=Object.values(pd).reduce((a,b)=>a+b.length,0);
   h+=`<section class="sec"><div class="sec-h"><h2>Wochenplan</h2>${n?`<span class="pill num">${n} Einträge</span>`:''}</div><div class="card glass stack" style="gap:12px">
     <span class="hint">Füge deinen Plan ein. Pro Tag eine Überschrift, darunter die Punkte. Uhrzeiten am Anfang werden erkannt. Die Einträge erscheinen jede Woche im Tagesablauf des jeweiligen Tages.</span>
@@ -924,7 +962,8 @@ function vMehr(){
 
 function vQuotes(){const Q=S.quotes,isV=UI.qType==='vers',dr=UI.qDraft;
   const sugs=QSUG.filter(x=>!Q.some(q=>q.t===x));
-  return `<section class="sec"><div class="sec-h"><h2>Sätze &amp; Verse</h2>${Q.length?`<span class="pill num" style="font-size:14px">${Q.length}</span>`:''}</div><div class="card glass stack" style="gap:12px">
+  const open=!!FOLD.q;
+  return `<section class="sec"><div class="sec-h">${foldBtn('q','Sätze &amp; Verse',Q.length?`<span class="pill num" style="font-size:14px">${Q.length}</span>`:'')}</div>${open?`<div class="card glass stack" style="gap:12px">
     <span class="hint">Jeden Tag erscheint einer davon oben auf der Heute-Seite. Antippen zeigt den nächsten. Ohne Einträge bleibt dort alles frei.</span>
     ${Q.length?`<ul class="qlist">${Q.map(q=>`<li><span class="qtag${q.type==='vers'?' v':''}">${q.type==='vers'?'Vers':'Satz'}</span><span class="qbody">${esc(q.t)}${q.src?`<small>${esc(q.src)}</small>`:''}</span><button type="button" class="nx" data-a="qdel" data-id="${esc(q.id)}" aria-label="Löschen">✕</button></li>`).join('')}</ul>`:''}
     <div class="seg"><button type="button" class="${isV?'':'on'}" data-a="qtype" data-v="satz">Satz</button><button type="button" class="${isV?'on':''}" data-a="qtype" data-v="vers">Vers</button></div>
@@ -932,14 +971,15 @@ function vQuotes(){const Q=S.quotes,isV=UI.qType==='vers',dr=UI.qDraft;
     ${isV?`<input class="tinput" id="q-src" data-qd="src" value="${esc(dr.src)}" placeholder="Quelle, z. B. Sure 94:5–6 (optional)" maxlength="60" autocomplete="off" enterkeyhint="done">`:''}
     <button type="button" class="btn pri" data-a="qadd">${isV?'Vers hinzufügen':'Satz hinzufügen'}</button>
     ${sugs.length?`<div class="stack" style="gap:8px"><span class="label">Vorschläge · antippen zum Übernehmen</span><div class="sugs">${sugs.map(x=>`<button type="button" class="sug" data-a="qsug" data-i="${QSUG.indexOf(x)}"><span>${esc(x)}</span><b>+</b></button>`).join('')}</div></div>`:''}
-  </div></section>`}
+  </div>`:''}</section>`}
 function vSit(){const on=S.settings.sit.on;
-  return `<section class="sec"><div class="sec-h"><h2>Situations-Sätze</h2><button type="button" class="switch${on?' on':''}" data-a="sitoggle" role="switch" aria-checked="${on}" aria-label="Situations-Sätze anzeigen"></button></div><div class="card glass stack" style="gap:12px">
+  const open=!!FOLD.s;
+  return `<section class="sec"><div class="sec-h">${foldBtn('s','Situations-Sätze')}<button type="button" class="switch${on?' on':''}" data-a="sitoggle" role="switch" aria-checked="${on}" aria-label="Situations-Sätze anzeigen"></button></div>${open?`<div class="card glass stack" style="gap:12px">
     <span class="hint">Erscheinen oben auf der Heute-Seite, wenn die Situation eintritt. Immer nur einer. Leeres Feld = Standardsatz.${on?'':' Ausgeschaltet: Nur der Hinweis bei ausgelassenen Habits bleibt, ohne Satz.'}</span>
     <div class="sitgrid${on?'':' off'}">${Object.entries(SIT_DEF).map(([k,v])=>`<div class="fgroup" style="gap:5px"><label class="label" for="sit-${k}">${v.label}</label><span class="hint" style="font-style:italic">Standard: ${esc(v.def)}</span><input class="tinput" id="sit-${k}" data-sit="${k}" value="${esc(S.settings.sit.txt[k]||'')}" placeholder="Eigener Satz (optional)" maxlength="200" autocomplete="off" enterkeyhint="done"></div>`).join('')}</div>
     <span class="saved" data-saved="sit"></span>
-  </div></section>`}
-const PAGES={habit:pHabit,hform:pHForm,tform:pTForm};
+  </div>`:''}</section>`}
+const PAGES={habit:pHabit,hform:pHForm,tform:pTForm,ptime:pPTime,pcity:pCity};
 
 /* ---------- navigation ---------- */
 function go(page){if(UI.page)UI.stack.push(UI.page);UI.page=page;render('push');window.scrollTo(0,0)}
@@ -949,10 +989,84 @@ function openDay(d){UI.tab='heute';UI.page=null;UI.stack=[];UI.sel=d===today()?n
 
 /* ---------- actions ---------- */
 function lockedMsg(d){if(d>today()){toast('Abhaken geht erst an diesem Tag.');return true}return false}
-function setH(x,d,val){if(!x||lockedMsg(d))return;const e=dayEnsure(d);if(!e.h||typeof e.h!=='object')e.h={};
+function setH(x,d,val){if(!x||lockedMsg(d))return;
+  const pb=isPrayerH(x)?labelsOf(hraw(x,d)).slice():null;
+  if(pb){const lk=labelsOf(val).filter(i=>!pb.includes(i)).map(i=>prayerLock(d,i)).find(Boolean);if(lk){toast(lk);return}}
+  const e=dayEnsure(d);if(!e.h||typeof e.h!=='object')e.h={};
   if(!val||(Array.isArray(val)&&!val.length))delete e.h[x.id];else e.h[x.id]=val;
+  if(pb)prayerSync(d,pb,labelsOf(val));
   if(val&&d<x.created){x.created=d;touch('state')}touch(mkey(d));render()}
 const H=id=>S.habits.find(x=>x.id===id);
+/* ---------- Gebet: Zeiten (Diyanet), Wertung nach Uhrzeit, goldener Ring ---------- */
+const PN=['Fajr','Dhuhr','Asr','Maghrib','Isha'],GOLD='#E3BE76';
+const PDEF={on:false,habit:'',city:null,travel:null,buf:30,notify:true,since:''};
+function PS(){const p=S.settings.prayer;if(!p||typeof p!=='object'){S.settings.prayer={...PDEF};return S.settings.prayer}
+  for(const k of Object.keys(PDEF))if(!(k in p))p[k]=PDEF[k];return p}
+const labelsOf=v=>Array.isArray(v)?v:[];
+// Gebets-Habit: eingestellt oder automatisch ein Habit mit 5 Teilen namens Beten/Gebet/Namaz/Salah
+function prayerHabit(){const P=PS(),L=S.habits.filter(x=>!x.archived&&x.freq==='daily'&&x.labels&&x.labels.length===5);
+  return L.find(x=>x.id===P.habit)||(!P.habit?L.find(x=>/bet|gebet|namaz|salah|salat/i.test(x.name)):null)||null}
+const isPrayerH=x=>!!x&&PS().on&&prayerHabit()===x;
+const pLabel=i=>{const x=prayerHabit();return (x&&x.labels[i])||PN[i]};
+const hm=m=>{m=((Math.round(m)%1440)+1440)%1440;return pad(Math.floor(m/60))+':'+pad(m%60)};
+const dur=m=>{m=Math.max(0,Math.round(m));return m<60?m+' Min.':Math.floor(m/60)+':'+pad(m%60)+' h'};
+const nowMin=d=>Math.floor((NOW()-pdate(d).getTime())/60000);
+// Zeiten pro Stadt (Ortszeit), aus gebetszeiten/z/<id>.json, offline aus dem Speicher
+const PT={},PTL={};
+function loadCity(id){if(!id)return;id=+id;
+  if(!PT[id]){try{const c=JSON.parse(localStorage.getItem('sabrly-pt:'+id)||'null');if(c&&c.days)PT[id]=c}catch(e){}}
+  if(PTL[id])return;PTL[id]=1;
+  fetch('gebetszeiten/z/'+id+'.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(j=>{
+    if(!j||!j.days)return;const same=PT[id]&&JSON.stringify(PT[id].days)===JSON.stringify(j.days);PT[id]=j;
+    try{localStorage.setItem('sabrly-pt:'+id,JSON.stringify(j))}catch(e){}
+    if(!same)renderIdle()}).catch(()=>{}).finally(()=>{setTimeout(()=>{PTL[id]=0},3600e3)})}
+function loadPrayerCities(){const P=PS();if(!P.on)return;if(P.city)loadCity(P.city.id);if(P.travel)loadCity(P.travel.id)}
+function cityFor(d){const P=PS(),t=P.travel;return t&&t.from<=d&&d<=t.until?t:P.city}
+function timesFor(d){const c=cityFor(d);if(!c)return null;const z=PT[c.id];if(!z)return null;const a=z.days[d];if(!a)return null;
+  const b=z.days[addDays(d,1)]||a;return {s:a+'|'+b.slice(0,4),c:c.id}}
+function pzParse(s){if(!s||!/^\d{24}\|\d{4}$/.test(s))return null;const m=i=>+s.slice(i*4,i*4+2)*60+ +s.slice(i*4+2,i*4+4);
+  return {F:m(0),S:m(1),D:m(2),A:m(3),M:m(4),I:m(5),F2:1440+ +s.slice(25,27)*60+ +s.slice(27,29)}}
+function pzFor(d){const e=dayGet(d);if(e&&e.pz)return pzParse(e.pz);const t=timesFor(d);return t?pzParse(t.s):null}
+// Zeitfenster: [Beginn, Ende]. Asr endet für die Wertung „buf“ Minuten vor Maghrib, Isha bei Fajr
+function pWin(z,i,buf){return [[z.F,z.S],[z.D,z.A],[z.A,z.M-buf],[z.M,z.I],[z.I,z.F2]][i]}
+const lin=(x,x0,x1,y0,y1)=>x1<=x0?y1:y0+(y1-y0)*Math.min(1,Math.max(0,(x-x0)/(x1-x0)));
+// Wertung 0–100 für ein Gebet zur Minute m (ab Mitternacht des Tages); null = noch nicht begonnen
+function pScore(z,i,m,buf){
+  if(i===0){if(m<z.F)return null;if(m>=z.S)return 10;const B1=z.S-40,B2=z.S-10;
+    if(m<B1)return Math.round(lin(m,z.F,B1,50,100));if(m<B2)return 100;return Math.round(lin(m,B2,z.S,100,20))}
+  if(i===4){if(m<z.I)return null;const N=z.M+(z.F2-z.M)/2,L=z.M+2*(z.F2-z.M)/3;
+    if(m<N)return Math.round(lin(m,z.I,N,100,20));if(m<L)return 20;return 10}
+  const [s,e]=pWin(z,i,buf);if(m<s)return null;if(m>=e)return 10;return Math.round(lin(m,s,e,100,20))}
+function prayerDay(d){const P=PS();if(!P.on||!P.since||d<P.since)return null;const x=prayerHabit();if(!x||x.created>d||!scheduled(x,d))return null;
+  const z=pzFor(d);if(!z)return null;const e=dayGet(d)||{},on=labelsOf(hraw(x,d)),pt=e.pt||{},pe=e.pe||{},nm=nowMin(d);
+  const items=[0,1,2,3,4].map(i=>{const [s,end]=pWin(z,i,P.buf),tk=on.includes(i);let sc=null,st;
+    if(tk){const m=pt[i];sc=m==null?10:(pScore(z,i,m,P.buf)??10);st='done'}else if(nm<s)st='wait';else if(nm<end)st='now';else{sc=0;st='miss'}
+    return {i,s,end,sc,st,tk,m:pt[i],ed:!!pe[i]}});
+  const sc=items.filter(it=>it.sc!=null);return {x,z,items,avg:sc.length?sc.reduce((a,b)=>a+b.sc,0)/sc.length/100:null}}
+function prayerStatus(d){const pd=prayerDay(d);if(!pd)return '';const nm=nowMin(d),z=pd.z,cur=pd.items.find(it=>it.st==='now');
+  if(cur){const i=cur.i,L=pLabel(i);
+    if(i===0){const B1=z.S-40,B2=z.S-10;if(nm<B1)return `${L} · beste Zeit ab ${hm(B1)}`;if(nm<B2)return `${L} · beste Zeit, noch ${dur(B2-nm)}`;return `${L} · noch ${dur(z.S-nm)}`}
+    if(i===4){const N=z.M+(z.F2-z.M)/2,T=z.M+2*(z.F2-z.M)/3;if(nm<N)return `${L} · bis Mitternacht ${hm(N)}`;if(nm<T)return `${L} · noch bis ${hm(T)}`;return `${L} · letztes Drittel der Nacht`}
+    return `${L} · noch ${dur(cur.end-nm)}`}
+  const nx=pd.items.find(it=>it.st==='wait');if(nx)return `${pLabel(nx.i)} ab ${hm(nx.s)}`;
+  return pd.items.every(it=>it.tk)?'Alle Gebete verrichtet':''}
+// beim Abhaken: Uhrzeit merken (Minuten ab Mitternacht des Tages, nach Mitternacht > 1440) und Zeiten des Tages festhalten
+function prayerSync(d,before,after){const e=dayEnsure(d);e.pt=e.pt&&typeof e.pt==='object'?e.pt:{};const nm=nowMin(d);
+  for(const i of after)if(!before.includes(i)){e.pt[i]=nm;if(e.pe)delete e.pe[i]}
+  for(const i of before)if(!after.includes(i)){delete e.pt[i];if(e.pe)delete e.pe[i]}
+  if(!Object.keys(e.pt).length)delete e.pt;if(e.pe&&!Object.keys(e.pe).length)delete e.pe;
+  if(!e.pz){const t=timesFor(d);if(t){e.pz=t.s;e.pc=t.c}}}
+// vor Beginn gesperrt (gilt für jeden Tag: Minuten seit Mitternacht des Tages)
+function prayerLock(d,i){const P=PS();if(!P.on||!P.since||d<P.since)return '';const z=pzFor(d);if(!z)return '';const s=pWin(z,i,P.buf)[0];
+  return nowMin(d)<s?`${pLabel(i)} beginnt um ${hm(s)}.`:''}
+// Liste aller Orte (gebetszeiten/orte.json)
+let ORTE=null,ORTEP=null;
+function loadOrte(){if(ORTE)return Promise.resolve(ORTE);if(ORTEP)return ORTEP;
+  ORTEP=fetch('gebetszeiten/orte.json',{cache:'no-cache'}).then(r=>r.json()).then(j=>{const L=[];
+    for(const c of j.countries)for(const s of c.states)for(const x of s.cities)L.push({id:x[0],name:x[1],state:s.name,country:c.name,lat:x[2],lon:x[3],n:pnorm(x[1])});
+    ORTE=L;return L}).catch(e=>{ORTEP=null;throw e});return ORTEP}
+const pnorm=s=>String(s||'').toLowerCase().replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ß/g,'ss').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+function km(a,b,c,d){const r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 12742*Math.asin(Math.sqrt(x))}
 const fullVal=x=>x.freq==='daily'&&x.labels?.length?x.labels.map((_,i)=>i):tgt(x);
 function stepVal(x,d){
   if(x.freq==='daily'&&x.labels?.length){const r=hraw(x,d),a=Array.isArray(r)?[...r]:[];const nx=x.labels.findIndex((_,i)=>!a.includes(i));return nx<0?[]:[...a,nx].sort((p,q)=>p-q)}
@@ -966,6 +1080,28 @@ const ACT={
   tab:el=>{const changed=UI.tab!==el.dataset.t||!!UI.page;UI.page=null;UI.stack=[];UI.tab=el.dataset.t;if(UI.tab!=='heute')UI.sel=null;render(changed?'enter':null);window.scrollTo(0,0)},
   sel:el=>{const from=curSel(),to=el.dataset.d;UI.sel=to===today()?null:to;render();if(to!==from)slideIn(to>from?1:-1,false)},
   wk:el=>weekSlide(+el.dataset.dir,null),
+  fold:el=>{const k=el.dataset.k;FOLD[k]=!FOLD[k];try{localStorage.setItem('sabrly-fold',JSON.stringify(FOLD))}catch(e){}render()},
+  pon:()=>{const P=PS();P.on=!P.on;if(P.on&&!P.since)P.since=today();touch('state');loadPrayerCities();if(P.on&&!P.city)go({t:'pcity',mode:'home',q:''});else render()},
+  pcity:el=>go({t:'pcity',mode:el.dataset.m||'home',q:'',until:addDays(today(),3)}),
+  pcset:el=>{const o=ORTE&&ORTE.find(c=>c.id===+el.dataset.id);setCity(o)},
+  ploc:()=>{if(!navigator.geolocation){toast('Standort ist hier nicht verfügbar. Such die Stadt einfach.');return}
+    toast('Suche deinen Standort …');
+    navigator.geolocation.getCurrentPosition(pos=>{loadOrte().then(L=>{const {latitude:a,longitude:b}=pos.coords;let best=null,bd=1e9;
+      for(const o of L)if(o.lat!=null){const k=km(a,b,o.lat,o.lon);if(k<bd){bd=k;best=o}}
+      if(!best||bd>150){toast('Keine Stadt in deiner Nähe gefunden. Such sie bitte.');return}setCity(best)}).catch(()=>toast('Die Liste konnte nicht geladen werden.'))},
+      ()=>toast('Standort nicht freigegeben. Such die Stadt einfach.'),{timeout:12000,maximumAge:600000})},
+  ptend:()=>{PS().travel=null;touch('state');render();toast('Wieder zu Hause')},
+  pbuf:el=>{const P=PS();P.buf=Math.max(10,Math.min(60,P.buf+ +el.dataset.dir));touch('state');render()},
+  pnotify:()=>{const P=PS();P.notify=!P.notify;touch('state');render()},
+  ptsave:()=>{const f=UI.page,d=f.d,i=f.i,x=prayerHabit(),pd=prayerDay(d),m=ptMin();if(!x||!pd||lockedMsg(d))return;
+    if(m==null){toast('Bitte eine Uhrzeit eingeben.');return}
+    if(pScore(pd.z,i,m,PS().buf)==null){toast(`${pLabel(i)} beginnt erst um ${hm(pWin(pd.z,i,PS().buf)[0])}.`);return}
+    if(m>nowMin(d)){toast('Diese Uhrzeit liegt in der Zukunft.');return}
+    const e=dayEnsure(d);if(!e.h||typeof e.h!=='object')e.h={};const on=labelsOf(e.h[x.id]).slice();if(!on.includes(i))on.push(i);e.h[x.id]=on.sort((p,q)=>p-q);
+    e.pt=e.pt&&typeof e.pt==='object'?e.pt:{};e.pt[i]=m;e.pe=e.pe&&typeof e.pe==='object'?e.pe:{};e.pe[i]=true;
+    if(!e.pz){const tz=timesFor(d);if(tz){e.pz=tz.s;e.pc=tz.c}}
+    if(d<x.created){x.created=d;touch('state')}touch(mkey(d));back();toast(`${pLabel(i)} um ${hm(m)} eingetragen`)},
+  ptdel:()=>{const f=UI.page,x=prayerHabit();if(!x)return;const on=labelsOf(hraw(x,f.d)).filter(q=>q!==f.i);setH(x,f.d,on);back()},
   dstep:el=>{const dir=+el.dataset.dir,n=addDays(curSel(),dir);UI.sel=n===today()?null:n;render();slideIn(dir,false)},
   openday:el=>openDay(el.dataset.d),
   qnext:el=>{const d=el.dataset.d;UI.qOff[d]=(UI.qOff[d]||0)+1;const q=pickQuote(d),b=document.querySelector('.quote');if(q&&b)b.outerHTML=quoteHTML(q,d)},
@@ -1066,6 +1202,92 @@ function readAuth(){if(!UI.auth)UI.auth={mode:'login',email:'',pw:'',err:'',info
 function hasGuestData(){return (MODE==='guest'||UI.fromGuest)&&(S.todos.length>0||Object.keys(LOGS).length>0||S.quotes.length>0||!!S.plan.text||S.habits.some(h=>!['h-beten','h-lesen'].includes(h.id)))}
 const shiftMonth=(M,dir)=>{const[y,m]=M.split('-').map(Number),d=new Date(y,m-1+dir,1);return d.getFullYear()+'-'+pad(d.getMonth()+1)};
 
+/* --- Gebet: Seiten (Uhrzeit ändern, Stadt wählen) --- */
+function openPTime(d,i){const pd=prayerDay(d);if(!pd){toast('Für diesen Tag gibt es keine Gebetszeiten.');return}
+  const it=pd.items[i],v=it.m!=null?hm(it.m):hm(Math.min(nowMin(d),it.end-1));go({t:'ptime',d,i,v})}
+function ptMin(){const f=UI.page,pd=f&&prayerDay(f.d),v=String(f&&f.v||'');if(!pd||!/^\d\d:\d\d$/.test(v))return null;
+  let m=+v.slice(0,2)*60+ +v.slice(3,5);if(f.i===4&&m<pd.z.I-120)m+=1440;return m}
+function ptPreview(){const f=UI.page,pd=prayerDay(f.d),m=ptMin();if(m==null||!pd)return '–';const s=pScore(pd.z,f.i,m,PS().buf);return s==null?'vor Beginn':s+' %'}
+function pPTime(){const f=UI.page,d=f.d,i=f.i,pd=prayerDay(d),L=pLabel(i);
+  const top=`<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Abbrechen</button><h2>${esc(L)}</h2><button type="button" class="r txtbtn pri" data-a="ptsave"${pd?'':' disabled'}>Sichern</button></div>`;
+  if(!pd)return top+`<span class="hint">Für diesen Tag gibt es keine Gebetszeiten.</span>`;
+  const z=pd.z,P=PS(),it=pd.items[i],[s,e]=pWin(z,i,P.buf);
+  const win=i===0?`${hm(z.F)} – ${hm(z.S)}, am besten ${hm(z.S-40)} – ${hm(z.S-10)}`:i===4?`${hm(z.I)} – ${hm(z.F2)}, bis Mitternacht (${hm(z.M+(z.F2-z.M)/2)}) am besten`:i===2?`${hm(s)} – ${hm(e)}, danach bis Maghrib nur noch 10 %`:`${hm(s)} – ${hm(e)}`;
+  return top+`<div class="card glass stack" style="gap:12px">
+    <span class="label">${esc(dayTitle(d))} · ${fmtMid(d)}</span>
+    <span class="hint">Zeitfenster: ${win}</span>
+    <div class="fgroup"><label class="label" for="pt-time">Wann hast du gebetet?</label><input class="tinput" type="time" id="pt-time" data-pt="1" value="${esc(f.v)}"></div>
+    <div class="pprev">Wertung <b id="pt-prev">${ptPreview()}</b></div>
+    <span class="hint">Nur ändern, wenn du wirklich zu einer anderen Uhrzeit gebetet hast. Geänderte Zeiten bekommen ein ✎.</span>
+    ${it.tk?`<button type="button" class="btn danger" data-a="ptdel">Abhaken entfernen</button>`:''}</div>`}
+function pCity(){const f=UI.page,tr=f.mode==='travel';
+  return `<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Zurück</button><h2>${tr?'Unterwegs':'Stadt'}</h2><span></span></div>
+  <div class="card glass stack" style="gap:12px">
+    ${tr?`<div class="fgroup"><label class="label" for="pc-until">Bis einschließlich</label><input class="tinput" type="date" id="pc-until" data-pcu="1" value="${esc(f.until)}" min="${today()}"></div>`:''}
+    <button type="button" class="btn" data-a="ploc">📍 Standort verwenden</button>
+    <input class="tinput" id="pc-q" data-pq="1" value="${esc(f.q||'')}" placeholder="Stadt suchen, z. B. Köln" autocomplete="off" enterkeyhint="search">
+    <div id="pc-list" class="plist">${cityListHTML()}</div>
+    <span class="hint">Offizielle Diyanet-Zeiten. Ganz Deutschland, im Ausland bisher Ankara, Istanbul, Izmir, Mekka, Medina und Tokio.</span>
+  </div>`}
+function cityListHTML(){
+  if(!ORTE){loadOrte().then(()=>{const l=$('#pc-list');if(l)l.innerHTML=cityListHTML()}).catch(()=>{const l=$('#pc-list');if(l)l.innerHTML='<span class="hint">Die Liste konnte nicht geladen werden. Bist du online?</span>'});return '<span class="hint">Lädt …</span>'}
+  const q=pnorm(UI.page&&UI.page.q||'');let L;
+  if(q.length<2){const P=PS(),fav=[P.city&&ORTE.find(o=>o.id===P.city.id),ORTE.find(o=>o.id===10977)].filter(Boolean);L=[...new Set(fav.concat(ORTE.filter(o=>o.country!=='Deutschland')))]}
+  else L=ORTE.filter(o=>o.n.includes(q)).sort((a,b)=>(b.n.startsWith(q)-a.n.startsWith(q))||a.name.localeCompare(b.name,'de')).slice(0,40);
+  if(!L.length)return '<span class="hint">Keine Stadt gefunden.</span>';
+  return L.map(o=>`<button type="button" class="pcity" data-a="pcset" data-id="${o.id}"><b>${esc(o.name)}</b><span>${esc(o.state)}${o.country!=='Deutschland'?' · '+esc(o.country):''}</span></button>`).join('')}
+function setCity(o){const P=PS(),f=UI.page,t=today();if(!o)return;
+  if(f&&f.mode==='travel'){const u=f.until&&f.until>=t?f.until:addDays(t,3);P.travel={id:o.id,name:o.name,from:t,until:u};toast(`Unterwegs in ${o.name} bis ${fmtShort(u)}`)}
+  else{P.city={id:o.id,name:o.name};toast(`Gebetszeiten für ${o.name}`)}
+  touch('state');loadCity(o.id);back()}
+
+/* --- Gebet: Einstellungen (Mehr) --- */
+function vGebet(){const P=PS(),x=prayerHabit(),t=today(),L=S.habits.filter(h=>!h.archived&&h.freq==='daily'&&h.labels&&h.labels.length===5);
+  const tr=P.travel&&P.travel.until>=t?P.travel:null,tz=P.on?timesFor(t):null,z=tz&&pzParse(tz.s);
+  return `<section class="sec"><div class="sec-h"><h2>Gebet</h2><button type="button" class="switch${P.on?' on':''}" data-a="pon" role="switch" aria-checked="${P.on}" aria-label="Gebetszeiten nutzen"></button></div><div class="card glass stack" style="gap:14px">
+    <span class="hint">Je früher im Zeitfenster du abhakst, desto mehr Prozent. Bei Fajr zählen die letzten 40 Minuten vor Sonnenaufgang am meisten. Die Pünktlichkeit siehst du als goldenen Ring. Offizielle Diyanet-Zeiten.</span>
+    ${P.on?`
+    ${!x?`<span class="hint" style="color:var(--crit)">Lege einen täglichen Habit mit 5 Teilen an, z. B. Beten: Fajr, Dhuhr, Asr, Maghrib, Isha.</span>`:''}
+    ${L.length>1?`<div class="fgroup"><label class="label" for="p-hab">Gebets-Habit</label><select class="tinput" id="p-hab" data-pset="habit">${L.map(h=>`<option value="${h.id}"${x===h?' selected':''}>${esc(h.emoji||'')} ${esc(h.name)}</option>`).join('')}</select></div>`:''}
+    <div class="row between"><div style="min-width:0"><span class="label">Stadt</span><div class="pval">${P.city?esc(P.city.name):'Noch keine'}</div></div><button type="button" class="btn" data-a="pcity" data-m="home">${P.city?'Ändern':'Wählen'}</button></div>
+    <div class="row between"><div style="min-width:0"><span class="label">Unterwegs</span><div class="pval">${tr?`${esc(tr.name)} bis ${fmtShort(tr.until)}`:'Nein'}</div></div>${tr?`<button type="button" class="btn" data-a="ptend">Beenden</button>`:`<button type="button" class="btn" data-a="pcity" data-m="travel">Unterwegs …</button>`}</div>
+    ${z?`<div class="ptimes">${[['Fajr',z.F],['Sonne',z.S],['Dhuhr',z.D],['Asr',z.A],['Maghrib',z.M],['Isha',z.I]].map(([n,m])=>`<span><small>${n}</small><b class="num">${hm(m)}</b></span>`).join('')}</div>`:P.city?'<span class="hint">Zeiten werden geladen …</span>':''}
+    <div class="row between"><span>Asr endet vor Maghrib</span><div class="stepper"><button type="button" class="cbtn" data-a="pbuf" data-dir="-5" aria-label="Weniger">−</button><b style="font-size:16px;white-space:nowrap;min-width:64px;text-align:center">${P.buf} Min.</b><button type="button" class="cbtn" data-a="pbuf" data-dir="5" aria-label="Mehr">+</button></div></div>
+    <div class="row between"><div style="min-width:0"><span>Adhan-Mitteilungen</span><div class="hint">Kommen über Scriptable, sobald das Sabrly-Widget eingerichtet ist.</div></div><button type="button" class="switch${P.notify?' on':''}" data-a="pnotify" role="switch" aria-checked="${P.notify}" aria-label="Adhan-Mitteilungen"></button></div>`:''}
+  </div></section>`}
+
+/* --- Gebet: Statistik --- */
+function vPStats(){const P=PS(),t=today();if(!P.on||!prayerHabit())return '';
+  const days=[];for(let k=0;k<30;k++){const d=addDays(t,-k),pd=prayerDay(d);if(pd&&pd.avg!=null)days.push({d,pd})}
+  if(!days.length)return '';
+  const avg=L=>L.length?Math.round(L.reduce((a,b)=>a+b,0)/L.length):null;
+  const a7=avg(days.filter(x=>x.d>addDays(t,-7)).map(x=>x.pd.avg*100)),a30=avg(days.map(x=>x.pd.avg*100));
+  const per=[0,1,2,3,4].map(i=>avg(days.map(x=>x.pd.items[i].sc).filter(v=>v!=null)));
+  const ed=days.reduce((n,x)=>n+x.pd.items.filter(it=>it.ed).length,0);
+  let bars='';for(let k=6;k>=0;k--){const d=addDays(t,-k),pd=prayerDay(d),v=pd&&pd.avg!=null?Math.round(pd.avg*100):null;
+    bars+=`<div class="pbcol"><div class="pbt"><i style="height:${v??0}%"></i></div><small>${DN[wd(d)]}</small></div>`}
+  return `<section class="sec"><div class="sec-h"><h2>Gebet</h2><span class="pill num" style="color:${GOLD}">Ø ${a7??'–'} %</span></div><div class="card glass stack" style="gap:14px">
+    <div class="pbars">${bars}</div>
+    <div class="ptimes">${per.map((v,i)=>`<span><small>${esc(pLabel(i))}</small><b class="num">${v??'–'}${v==null?'':' %'}</b></span>`).join('')}</div>
+    <span class="hint">Pünktlichkeit: 7 Tage Ø ${a7??'–'} % · 30 Tage Ø ${a30??'–'} %${ed?` · ${ed}× Uhrzeit geändert ✎`:''}</span></div></section>`}
+
+/* --- Einklappen (Sätze & Verse, Situations-Sätze) --- */
+const FOLD=(()=>{try{return JSON.parse(localStorage.getItem('sabrly-fold')||'{}')}catch(e){return {}}})();
+const foldBtn=(k,title,extra)=>`<button type="button" class="fold" data-a="fold" data-k="${k}" aria-expanded="${!!FOLD[k]}"><h2>${title}</h2>${extra||''}<i class="chev" aria-hidden="true"></i></button>`;
+
+/* --- lange drücken auf ein Gebet: Uhrzeit ändern --- */
+let lp=null,lpFired=false;
+document.addEventListener('pointerdown',e=>{const c=e.target.closest&&e.target.closest('.chip[data-p]');if(!c||c.disabled)return;
+  lp={x:e.clientX,y:e.clientY,t:setTimeout(()=>{lp=null;lpFired=true;swallowUntil=Date.now()+400;haptic();openPTime(c.dataset.d,+c.dataset.i)},550)}},{passive:true});
+document.addEventListener('pointermove',e=>{if(lp&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>8){clearTimeout(lp.t);lp=null}},{passive:true});
+// nach dem langen Druck den Klick beim Loslassen schlucken
+['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>{if(lp){clearTimeout(lp.t);lp=null}if(lpFired){lpFired=false;swallowUntil=Date.now()+350}},{passive:true}));
+document.addEventListener('contextmenu',e=>{if(e.target.closest&&e.target.closest('.chip[data-p]'))e.preventDefault()});
+// Restzeit live, und gesperrte Gebete freigeben, sobald ihre Zeit beginnt
+setInterval(()=>{if(UI.page||UI.tab!=='heute'||document.hidden)return;
+  document.querySelectorAll('.pstat[data-pd]').forEach(el=>{el.textContent=prayerStatus(el.dataset.pd)});
+  const lk=[...document.querySelectorAll('.chip.plock[data-from]')].some(c=>nowMin(c.dataset.d)>=+c.dataset.from);if(lk)renderIdle()},20000);
+
 /* ---------- Wochenleiste: sauberes Wechseln von Woche und Tag ---------- */
 const EASE='cubic-bezier(.2,.8,.2,1)';
 // neue Ansicht weich hereinschieben: die Tagesleiste (Woche) bzw. nur den Inhalt darunter (Tag)
@@ -1141,6 +1363,9 @@ document.addEventListener('input',e=>{const el=e.target;
   if(el.dataset.emo&&UI.page){const g=lastGrapheme(el.value);if(g){el.value=g;UI.page.emoji=g;const pv=$('#emo-prev');if(pv)pv.textContent=g;document.querySelectorAll('.emojis button').forEach(b=>b.classList.toggle('on',b.dataset.e===g))}return}
   if(el.dataset.set){S.settings[el.dataset.set]=el.value.slice(0,30);touch('state',900);return}
   if(el.dataset.qd){UI.qDraft[el.dataset.qd]=el.value;return}
+  if(el.dataset.pt&&UI.page&&UI.page.t==='ptime'){UI.page.v=el.value;const b=$('#pt-prev');if(b)b.textContent=ptPreview();return}
+  if(el.dataset.pq&&UI.page&&UI.page.t==='pcity'){UI.page.q=el.value;const l=$('#pc-list');if(l)l.innerHTML=cityListHTML();return}
+  if(el.dataset.pcu&&UI.page){UI.page.until=el.value;return}
   if(el.dataset.sit&&el.matches('input')){const k=el.dataset.sit,v=el.value.slice(0,200);if(v.trim())S.settings.sit.txt[k]=v;else delete S.settings.sit.txt[k];touch('state',900);return}
   if(el.dataset.ff&&UI.page){UI.page[el.dataset.ff]=el.value;
     if(el.dataset.ff==='labels'){const box=$('#tgtbox');if(box)box.hidden=labelList(el.value).length>0}return}
@@ -1148,6 +1373,9 @@ document.addEventListener('input',e=>{const el=e.target;
 document.addEventListener('change',e=>{const el=e.target;
   if(el.dataset.set){S.settings[el.dataset.set]=el.value.slice(0,30).trim();touch('state',150);flashSaved('set');return}
   if(el.dataset.qd)return;
+  if(el.dataset.pset){PS()[el.dataset.pset]=el.value;touch('state',150);render();return}
+  if(el.dataset.pt&&UI.page&&UI.page.t==='ptime'){UI.page.v=el.value;const b=$('#pt-prev');if(b)b.textContent=ptPreview();return}
+  if(el.dataset.pcu&&UI.page){UI.page.until=el.value;return}
   if(el.dataset.sit&&el.matches('input')){const k=el.dataset.sit,v=el.value.trim().slice(0,200);if(v)S.settings.sit.txt[k]=v;else delete S.settings.sit.txt[k];touch('state',150);flashSaved('sit');return}if(el.dataset.ff&&UI.page){UI.page[el.dataset.ff]=el.value;return}
   if(!el.dataset.f)return;const k=commitField(el);if(k){touch(k,100);flashSaved(el.dataset.f)}});
 

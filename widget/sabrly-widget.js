@@ -1,4 +1,4 @@
-// SABRLY_WIDGET v6
+// SABRLY_WIDGET v7
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
 // Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
@@ -84,7 +84,8 @@ function normalizeState(s) {
   const todos = (Array.isArray(s.todos) ? s.todos : []).map(x => ({ id: String(x.id || ''), title: String(x.title || ''), prio: ['h', 'n', 'l'].includes(x.prio) ? x.prio : 'n', due: x.due || null, time: x.time || '', done: !!x.done }));
   return {
     habits, todos, quotes: Array.isArray(s.quotes) ? s.quotes : [],
-    settings: { dayStart: Math.max(0, Math.min(6, +((s.settings || {}).dayStart) || 0)), userName: String((s.settings || {}).userName || '') }
+    settings: { dayStart: Math.max(0, Math.min(6, +((s.settings || {}).dayStart) || 0)), userName: String((s.settings || {}).userName || ''),
+      prayer: (s.settings && s.settings.prayer && typeof s.settings.prayer === 'object') ? s.settings.prayer : null }
   };
 }
 
@@ -251,6 +252,17 @@ async function patchField(id, segs, val, pre) {
   if (j.error) throw fsError(j.error);
   return j;
 }
+// mehrere Felder in einem Schritt (z. B. Gebet + Uhrzeit)
+function mergeF(a, b) { for (const [k, v] of Object.entries(b)) { if (a[k] && a[k].mapValue && v.mapValue) a[k] = { mapValue: { fields: mergeF(Object.assign({}, a[k].mapValue.fields || {}), v.mapValue.fields || {}) } }; else a[k] = v; } return a; }
+async function patchFields(id, ops, pre) {
+  let url = docUrl(id) + '?' + ops.map(([segs]) => 'updateMask.fieldPaths=' + encodeURIComponent(fpath(segs))).join('&');
+  if (pre) url += '&currentDocument.updateTime=' + encodeURIComponent(pre);
+  else if (pre === null) url += '&currentDocument.exists=false';
+  const fields = ops.reduce((acc, [segs, val]) => mergeF(acc, nest(segs, val)), {});
+  const j = await fsCall('PATCH', url, { fields });
+  if (j.error) throw fsError(j.error);
+  return j;
+}
 async function retry(fn) { for (let i = 0; ; i++) { try { return await fn(); } catch (e) { if (e.message !== 'CONFLICT' || i >= 3) throw e; } } }
 const asObj = doc => fv({ mapValue: { fields: (doc && doc.fields) || {} } });
 async function readState() { const sd = await getDoc('state'); if (!sd) throw new Error('NODATA'); S = normalizeState(asObj(sd)); return sd; }
@@ -263,6 +275,7 @@ async function actTick(hid) {
   await stateFor(hid);
   const h = S.habits.find(x => x.id === hid && !x.archived);
   if (!h) return { title: 'Nicht gefunden', msg: 'Diesen Habit gibt es nicht mehr.' };
+  if (prayerHabit() === h && PS().on) { const r = await actPrayer(h); if (r) return r; }
   const t = today();
   if (!scheduled(h, t) || h.created > t) return { title: q(h.name), msg: 'Ist heute nicht geplant.' };
   return retry(async () => {
@@ -307,7 +320,150 @@ async function actTodo(tid) {
     return { ok: true, title: q(title) + ' erledigt ✓', msg: left ? 'Noch ' + left + ' offen.' : 'Keine offenen Aufgaben mehr.', undo: { doc: 'state', segs: ['todos'], val: before, pre: res.updateTime } };
   });
 }
-async function undo(u) { await patchField(u.doc, u.segs, u.val, u.pre); }
+async function undo(u) { if (u.ops) await patchFields(u.doc, u.ops, u.pre); else await patchField(u.doc, u.segs, u.val, u.pre); }
+/* ---------- Gebet: Zeiten, Wertung, Abhaken mit Uhrzeit, Adhan-Mitteilungen ---------- */
+const PDEF = { on: false, habit: '', city: null, travel: null, buf: 30, notify: true, since: '' };
+const PS = () => Object.assign({}, PDEF, (S.settings && S.settings.prayer) || {});
+const PN = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+const labelsOf = v => Array.isArray(v) ? v : [];
+function prayerHabit() {
+  const P = PS(), L = S.habits.filter(x => !x.archived && x.freq === 'daily' && x.labels.length === 5);
+  return L.find(x => x.id === P.habit) || (!P.habit ? L.find(x => /bet|gebet|namaz|salah|salat/i.test(x.name)) : null) || null;
+}
+const pLabel = i => { const x = prayerHabit(); return (x && x.labels[i]) || PN[i]; };
+const hmM = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + ':' + pad(m % 60); };
+const durM = m => { m = Math.max(0, Math.round(m)); return m < 60 ? m + ' Min.' : Math.floor(m / 60) + ':' + pad(m % 60) + ' h'; };
+const nowMin = d => Math.floor((Date.now() - pdate(d).getTime()) / 60000);
+const TIMES = {};
+async function loadCityTimes(id) {
+  id = +id; if (!id || TIMES[id]) return;
+  const fm = FileManager.local(), p = fm.joinPath(fm.documentsDirectory(), 'sabrly-pt-' + id + '.json');
+  let c = null; try { if (fm.fileExists(p)) c = JSON.parse(fm.readString(p)); } catch (e) {}
+  if (!c || !c.days || !c.days[addDays(today(), 2)] || Date.now() - (c.at || 0) > 12 * 3600e3) {
+    try {
+      const r = new Request(CFG.appUrl + 'gebetszeiten/z/' + id + '.json'); r.timeoutInterval = 10;
+      const j = await r.loadJSON(); if (j && j.days) { c = { at: Date.now(), days: j.days }; fm.writeString(p, JSON.stringify(c)); }
+    } catch (e) {}
+  }
+  if (c && c.days) TIMES[id] = c.days;
+}
+async function ensureTimes() { const P = PS(); if (!P.on) return; if (P.city) await loadCityTimes(P.city.id); if (P.travel) await loadCityTimes(P.travel.id); }
+function cityFor(d) { const P = PS(), t = P.travel; return t && t.from <= d && d <= t.until ? t : P.city; }
+function timesFor(d) { const c = cityFor(d); if (!c) return null; const z = TIMES[+c.id]; if (!z || !z[d]) return null; const b = z[addDays(d, 1)] || z[d]; return { s: z[d] + '|' + b.slice(0, 4), c: +c.id }; }
+function pzParse(s) {
+  if (!s || !/^\d{24}\|\d{4}$/.test(s)) return null; const m = i => +s.slice(i * 4, i * 4 + 2) * 60 + +s.slice(i * 4 + 2, i * 4 + 4);
+  return { F: m(0), S: m(1), D: m(2), A: m(3), M: m(4), I: m(5), F2: 1440 + +s.slice(25, 27) * 60 + +s.slice(27, 29) };
+}
+function pzFor(d) { const e = dayGet(d); if (e && e.pz) return pzParse(e.pz); const t = timesFor(d); return t ? pzParse(t.s) : null; }
+const pWin = (z, i, buf) => [[z.F, z.S], [z.D, z.A], [z.A, z.M - buf], [z.M, z.I], [z.I, z.F2]][i];
+const lin = (x, x0, x1, y0, y1) => x1 <= x0 ? y1 : y0 + (y1 - y0) * Math.min(1, Math.max(0, (x - x0) / (x1 - x0)));
+// gleiche Wertung wie in der App: Fajr steigt zum besten Fenster, sonst 100 → 20, nachgeholt 10
+function pScore(z, i, m, buf) {
+  if (i === 0) { if (m < z.F) return null; if (m >= z.S) return 10; const B1 = z.S - 40, B2 = z.S - 10;
+    if (m < B1) return Math.round(lin(m, z.F, B1, 50, 100)); if (m < B2) return 100; return Math.round(lin(m, B2, z.S, 100, 20)); }
+  if (i === 4) { if (m < z.I) return null; const N = z.M + (z.F2 - z.M) / 2, L = z.M + 2 * (z.F2 - z.M) / 3;
+    if (m < N) return Math.round(lin(m, z.I, N, 100, 20)); if (m < L) return 20; return 10; }
+  const [s, e] = pWin(z, i, buf); if (m < s) return null; if (m >= e) return 10; return Math.round(lin(m, s, e, 100, 20));
+}
+function prayerDay(d) {
+  const P = PS(); if (!P.on || !P.since || d < P.since) return null; const x = prayerHabit(); if (!x || x.created > d || !scheduled(x, d)) return null;
+  const z = pzFor(d); if (!z) return null; const e = dayGet(d) || {}, on = labelsOf(hraw(x, d)), pt = e.pt || {}, nm = nowMin(d);
+  const items = [0, 1, 2, 3, 4].map(i => {
+    const [s, end] = pWin(z, i, P.buf), tk = on.includes(i); let sc = null, st;
+    if (tk) { const m = pt[i]; sc = m == null ? 10 : (pScore(z, i, m, P.buf) ?? 10); st = 'done'; } else if (nm < s) st = 'wait'; else if (nm < end) st = 'now'; else { sc = 0; st = 'miss'; }
+    return { i, s, end, sc, st, tk };
+  });
+  const sc = items.filter(it => it.sc != null); return { x, z, items, avg: sc.length ? sc.reduce((a, b) => a + b.sc, 0) / sc.length / 100 : null };
+}
+// welches Gebet ein Tipp abhakt: Isha von gestern nach Mitternacht, sonst das laufende, sonst das älteste verpasste
+function prayerTarget() {
+  const t = today(), y = addDays(t, -1), py = prayerDay(y), pt = prayerDay(t);
+  if (py && py.items[4].st === 'now') return { d: y, i: 4, yest: true };
+  if (!pt) return null;
+  const cur = pt.items.find(x => x.st === 'now') || pt.items.find(x => x.st === 'miss');
+  if (cur) return { d: t, i: cur.i };
+  const w = pt.items.find(x => x.st === 'wait'); if (w) return { lock: true, i: w.i, s: w.s };
+  return { done: true };
+}
+function prayerStatus(d) {
+  const pd = prayerDay(d); if (!pd) return ''; const nm = nowMin(d), z = pd.z, cur = pd.items.find(it => it.st === 'now');
+  if (cur) { const i = cur.i, L = pLabel(i);
+    if (i === 0) { const B1 = z.S - 40, B2 = z.S - 10; if (nm < B1) return L + ' · beste Zeit ab ' + hmM(B1); if (nm < B2) return L + ' · beste Zeit, noch ' + durM(B2 - nm); return L + ' · noch ' + durM(z.S - nm); }
+    if (i === 4) { const N = z.M + (z.F2 - z.M) / 2, T = z.M + 2 * (z.F2 - z.M) / 3; if (nm < N) return L + ' · bis Mitternacht ' + hmM(N); if (nm < T) return L + ' · noch bis ' + hmM(T); return L + ' · letztes Drittel der Nacht'; }
+    return L + ' · noch ' + durM(cur.end - nm); }
+  const nx = pd.items.find(it => it.st === 'wait'); if (nx) return pLabel(nx.i) + ' ab ' + hmM(nx.s);
+  return pd.items.every(it => it.tk) ? 'Alle Gebete verrichtet' : '';
+}
+// abhaken mit Uhrzeit (explicit = { d, i } aus einer Mitteilung); null = Gebetszeiten nicht nutzbar
+async function actPrayer(h, explicit) {
+  await ensureTimes();
+  return retry(async () => {
+    const t = today(), y = addDays(t, -1), docs = {};
+    LOGS = {};
+    for (const k of [...new Set([mkey(y), mkey(t)].concat(explicit ? [mkey(explicit.d)] : []))]) { docs[k] = await getDoc(k); if (docs[k]) LOGS[k] = asObj(docs[k]); }
+    let d, i;
+    if (explicit) { d = explicit.d; i = explicit.i; }
+    else {
+      const tg = prayerTarget(); if (!tg) return null;
+      if (tg.lock) return { title: q(h.name), msg: pLabel(tg.i) + ' beginnt um ' + hmM(tg.s) + '.' };
+      if (tg.done) return { title: q(h.name) + ' ✓', msg: 'Alle Gebete für heute verrichtet.' };
+      d = tg.d; i = tg.i;
+    }
+    const pd = prayerDay(d); if (!pd || !(i >= 0 && i <= 4)) return null;
+    const it = pd.items[i];
+    if (it.tk) return { title: pLabel(i) + ' ✓', msg: 'Ist schon abgehakt.' };
+    if (it.st === 'wait') return { title: q(h.name), msg: pLabel(i) + ' beginnt um ' + hmM(it.s) + '.' };
+    const mk = mkey(d), md = docs[mk] || null, m = nowMin(d);
+    const hs = ['days', d, 'h', h.id], ps = ['days', d, 'pt', String(i)];
+    const nv = labelsOf(hraw(h, d)).concat([i]).sort((a, b) => a - b);
+    const ops = [[hs, tval(nv)], [ps, tval(m)]];
+    const e = dayGet(d) || {}; if (!e.pz) { const tz = timesFor(d); if (tz) ops.push([['days', d, 'pz'], tval(tz.s)], [['days', d, 'pc'], tval(tz.c)]); }
+    const res = await patchFields(mk, ops, md ? md.updateTime : null);
+    const sc = pScore(pd.z, i, m, PS().buf) ?? 10;
+    return { ok: true, title: q(h.name) + ': ' + pLabel(i) + (d !== t ? ' (gestern)' : '') + ' ✓', msg: 'Wertung ' + sc + ' %',
+      undo: { doc: mk, ops: [[hs, md ? rawAt(md.fields, hs) : undefined], [ps, md ? rawAt(md.fields, ps) : undefined]], pre: res.updateTime } };
+  });
+}
+function notifBody(z, i, buf) {
+  if (i === 0) return 'Am besten ' + hmM(z.S - 40) + '–' + hmM(z.S - 10) + ' · Sonnenaufgang ' + hmM(z.S);
+  if (i === 4) return 'Am besten bis Mitternacht (' + hmM(z.M + (z.F2 - z.M) / 2) + ')';
+  return 'Zeit bis ' + hmM(pWin(z, i, buf)[1]);
+}
+// Adhan-Mitteilungen für die nächsten 36 Stunden planen (nur Änderungen, gleiche Kennung ersetzt die alte)
+async function syncPrayerNotifs() {
+  try {
+    const P = PS(), want = [];
+    if (P.on && P.notify && prayerHabit()) {
+      await ensureTimes();
+      const t = today();
+      for (const d of [t, addDays(t, 1)]) {
+        const pd = prayerDay(d); if (!pd) continue;
+        for (const it of pd.items) {
+          if (it.tk) continue;
+          const at = pdate(d).getTime() + it.s * 60000;
+          if (at <= Date.now() + 30000 || at > Date.now() + 36 * 3600e3) continue;
+          want.push({ id: 'sabrly-p-' + d + '-' + it.i, at, d, i: it.i, title: '🕌 ' + pLabel(it.i) + ' · ' + hmM(it.s), body: notifBody(pd.z, it.i, P.buf) });
+        }
+      }
+    }
+    const fm = FileManager.local(), p = fm.joinPath(fm.documentsDirectory(), 'sabrly-notif.json');
+    let prev = []; try { if (fm.fileExists(p)) prev = JSON.parse(fm.readString(p)) || []; } catch (e) {}
+    const sig = o => o.id + '|' + o.at + '|' + o.title + '|' + o.body, had = new Set(prev.map(sig));
+    const stale = prev.filter(o => !want.some(w => w.id === o.id)).map(o => o.id);
+    if (stale.length) Notification.removePending(stale);
+    for (const o of want) {
+      if (had.has(sig(o))) continue;
+      const n = new Notification(); n.identifier = o.id; n.title = o.title; n.body = o.body; n.threadIdentifier = 'sabrly-gebet';
+      n.sound = 'default'; n.userInfo = { sabrly: 'p', d: o.d, i: o.i };
+      n.setTriggerDate(new Date(o.at)); n.addAction('Gebetet ✓', run({ a: 'ptick', d: o.d, i: o.i }));
+      await n.schedule();
+    }
+    fm.writeString(p, JSON.stringify(want));
+  } catch (e) {}
+}
+// nächste Gebetszeit heute (damit das Widget pünktlich aktualisiert)
+function nextPrayerAt() { const t = today(), pd = prayerDay(t); if (!pd) return null; const w = pd.items.find(x => x.st === 'wait'); return w ? pdate(t).getTime() + w.s * 60000 : null; }
+
 
 /* ---------- Zeichnen ---------- */
 const hhmm = ms => { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
@@ -631,6 +787,13 @@ function habitWidget(fam, data, stale, q) {
   const state = done ? 'done' : 'open', label = !planned ? '–' : T > 1 ? v + '/' + T : '';
   centered(w, bigCircle(state, planned && T > 1 ? v / T : 0, done ? '' : label), fam === 'small' ? 62 : 76);
   w.addSpacer(10);
+  const tg = prayerHabit() === h ? prayerTarget() : null;
+  if (tg) {
+    if (tg.lock || tg.done) w.url = run({ a: 'heute' });
+    pill(centerStack(w), tg.done ? 'Alle verrichtet ✓' : tg.lock ? pLabel(tg.i) + ' ab ' + hmM(tg.s) : pLabel(tg.i) + (tg.yest ? ' (gestern)' : '') + ' abhaken');
+    const stx = prayerStatus(t); if (stx && !tg.lock) { w.addSpacer(5); const r = centerStack(w); txt(r, stx.replace(/^[^·]+· /, ''), Font.semiboldSystemFont(10), new Color('#E3BE76')); }
+    return w;
+  }
   const nl = nextLabel(h, t);
   pill(centerStack(w), !planned ? 'Heute frei' : done ? 'Erledigt ✓' : nl ? nl + ' abhaken' : 'Abhaken');
   return w;
@@ -757,6 +920,8 @@ async function getWidget(fam, param) {
     data = readCache(); stale = true;
     if (!data) return messageWidget(fam, 'Keine Verbindung', 'Das Widget lädt deine Daten, sobald du online bist.');
   }
+  S = normalizeState(data.state); LOGS = data.logs || {};
+  await ensureTimes(); if (!stale) await syncPrayerNotifs();
   return build(fam, data, stale, param);
 }
 /* ---------- Aktionen in der Scriptable-App (nach einem Tipp aufs Widget) ---------- */
@@ -786,9 +951,10 @@ async function showResult(r) {
     catch (e) { await info('Rückgängig ging nicht', String(e.message) === 'CONFLICT' ? 'In der Zwischenzeit wurde in Sabrly etwas geändert. Mach es bitte dort.' : errText(e)); }
   }
 }
-async function loadAll() { const d = await loadRemote(); if (!d.state) throw new Error('NODATA'); saveCache(d); S = normalizeState(d.state); LOGS = d.logs || {}; return d; }
+async function loadAll() { const d = await loadRemote(); if (!d.state) throw new Error('NODATA'); saveCache(d); S = normalizeState(d.state); LOGS = d.logs || {}; await ensureTimes(); await syncPrayerNotifs(); return d; }
 const openToday = t => active(t).filter(h => !isDone(h, t) && !(h.freq === 'weekly' && weekCount(h, weekStart(t), t) >= h.target));
 function habitLabel(h, t) {
+  if (prayerHabit() === h) { const tg = prayerTarget(); if (tg && !tg.done) return h.emoji + '  ' + h.name + ' · ' + pLabel(tg.i) + (tg.lock ? ' ab ' + hmM(tg.s) : tg.yest ? ' (gestern)' : '') + '  (' + hv(h, t) + '/5)'; }
   const nl = nextLabel(h, t), T = tgt(h);
   return h.emoji + '  ' + h.name + (nl ? ' · ' + nl : '') + (h.freq === 'weekly' ? '  (' + weekCount(h, weekStart(t), t) + '/' + h.target + ' diese Woche)' : T > 1 ? '  (' + hv(h, t) + '/' + T + ')' : '');
 }
@@ -869,7 +1035,15 @@ async function shortcutRun(text) {
 }
 
 // Tipp aufs Widget: eintragen, kurze Bestätigung mit „Rückgängig“
+async function prayerFromNotif(d, i) {
+  return showResult(await act(async () => {
+    await stateFor(null); const h = prayerHabit();
+    if (!h) return { title: 'Gebet', msg: 'In Sabrly ist kein Gebets-Habit eingerichtet.' };
+    return (await actPrayer(h, { d, i })) || { title: 'Gebet', msg: 'Für diesen Tag gibt es keine Gebetszeiten.' };
+  }));
+}
 async function handleLink(P) {
+  if (P.a === 'ptick' && P.d && P.i != null) return prayerFromNotif(String(P.d), +P.i);
   if (P.a === 'tick' && P.h) return showResult(await act(() => actTick(P.h)));
   if (P.a === 'todo' && P.t) return showResult(await act(() => actTodo(P.t)));
   if (P.a === 'mood' && P.v) return showResult(await act(() => actMood(P.v)));
@@ -882,7 +1056,8 @@ async function main() {
   if (inWidget) {
     const fam = config.widgetFamily || 'medium';
     const w = await getWidget(fam, args.widgetParameter);
-    w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+    const np = nextPrayerAt();
+    w.refreshAfterDate = new Date(Math.min(Date.now() + 15 * 60 * 1000, np ? np + 60 * 1000 : Infinity));
     Script.setWidget(w);
     return;
   }
@@ -890,6 +1065,14 @@ async function main() {
   if (st) { await shortcutRun(st); return; }
   // in der Scriptable-App: anmelden, Aktion vom Widget ausführen oder Vorschau zeigen
   if (!kget(K.refresh)) { if (!(await login())) return; }
+  // Tipp auf eine Adhan-Mitteilung: kurz nachfragen
+  const N = args.notification, ui = N && N.userInfo;
+  if (ui && ui.sabrly === 'p') {
+    const a = new Alert(); a.title = '🕌 ' + String(N.title || 'Gebet').replace(/^🕌\s*/, ''); a.message = 'Hast du gebetet?';
+    a.addAction('Gebetet ✓'); a.addCancelAction('Später');
+    if (await a.presentAlert() === 0) return prayerFromNotif(String(ui.d), +ui.i);
+    return;
+  }
   const P = (args && args.queryParameters) || {};
   if (P.a) return handleLink(P);
   const a = new Alert();
