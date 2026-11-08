@@ -1075,6 +1075,8 @@ async function main() {
   }
   const P = (args && args.queryParameters) || {};
   if (P.a) return handleLink(P);
+  // Daten laden und Adhan-Mitteilungen planen (beim ersten Mal fragt iOS nach der Erlaubnis)
+  try { await loadAll(); } catch (e) {}
   const a = new Alert();
   a.title = 'Sabrly-Widget';
   a.message = 'Angemeldet als ' + (kget(K.email) || '…') + '.\nWähle eine Vorschau oder füge das Widget auf dem Home-Bildschirm hinzu.';
