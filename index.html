@@ -944,13 +944,13 @@ function vMehr(){
     <span class="saved" data-saved="set"></span><span class="hint">Erscheint als Begrüßung oben auf der Heute-Seite.</span></div></section>`;
   h+=vGebet()+vQuotes()+vSit();
   const pd=S.plan.days||{},n=Object.values(pd).reduce((a,b)=>a+b.length,0);
-  h+=`<section class="sec"><div class="sec-h"><h2>Wochenplan</h2>${n?`<span class="pill num">${n} Einträge</span>`:''}</div><div class="card glass stack" style="gap:12px">
+  h+=`<section class="sec"><div class="sec-h">${foldBtn('w','Wochenplan',n?`<span class="pill num">${n} Einträge</span>`:'')}</div>${FOLD.w?`<div class="card glass stack" style="gap:12px">
     <span class="hint">Füge deinen Plan ein. Pro Tag eine Überschrift, darunter die Punkte. Uhrzeiten am Anfang werden erkannt. Die Einträge erscheinen jede Woche im Tagesablauf des jeweiligen Tages.</span>
     <span class="hint"><code>Mo: 18:00 Push-Training; 21:00 Lesen</code><br><code>Dienstag</code><br><code>- 16:30 Unterricht</code></span>
     <textarea class="area" id="f-plan" placeholder="Mo: …">${esc(S.plan.text||'')}</textarea>
     <div class="btns"><button type="button" class="btn pri" data-a="planapply">Plan übernehmen</button>${n?'<button type="button" class="btn danger" data-a="planclear">Plan leeren</button>':''}</div>
     ${n?`<div>${[0,1,2,3,4,5,6].map(i=>`<div class="pday"><b>${DN[i]}</b><ul>${(pd[i]||[]).map(it=>`<li>${it.t?`<span class="num">${esc(it.t)}</span>`:''}${esc(it.x)}</li>`).join('')||'<li class="muted">–</li>'}</ul></div>`).join('')}</div>`:''}
-  </div></section>`;
+  </div>`:''}</section>`;
   h+=`<section class="sec"><h2>Tageswechsel</h2><div class="card glass stack"><div class="row between"><span>Neuer Tag beginnt um</span><div class="stepper"><button type="button" class="cbtn" data-a="ds" data-dir="-1" aria-label="Früher">−</button><b>${pad(S.settings.dayStart)}:00</b><button type="button" class="cbtn" data-a="ds" data-dir="1" aria-label="Später">+</button></div></div><span class="hint">Standard ist 00:00. Stellst du z. B. 03:00 ein, zählt alles bis 03:00 noch zum Vortag.</span></div></section>`;
   h+=`<section class="sec"><h2>Konto</h2><div class="card glass stack" style="gap:12px">${USER?`<div class="row between"><div style="min-width:0"><span class="label">Angemeldet als</span><div style="overflow-wrap:anywhere;font-size:15px;margin-top:2px">${esc(USER.email||'…')}</div></div><button type="button" class="btn danger" data-a="alogout" style="flex:none">Abmelden</button></div>`
       :auth?`<span class="hint" style="font-size:14px">Du nutzt Sabrly ohne Konto. Mit Konto sind deine Daten gesichert und auf all deinen Geräten gleich. Deine bisherigen Einträge nimmst du mit.</span><button type="button" class="btn pri" data-a="alogin">Konto erstellen oder anmelden</button>`
@@ -1081,7 +1081,7 @@ const ACT={
   sel:el=>{const from=curSel(),to=el.dataset.d;UI.sel=to===today()?null:to;render();if(to!==from)slideIn(to>from?1:-1,false)},
   wk:el=>weekSlide(+el.dataset.dir,null),
   fold:el=>{const k=el.dataset.k;FOLD[k]=!FOLD[k];try{localStorage.setItem('sabrly-fold',JSON.stringify(FOLD))}catch(e){}render()},
-  pon:()=>{const P=PS();P.on=!P.on;if(P.on&&!P.since)P.since=today();touch('state');loadPrayerCities();if(P.on&&!P.city)go({t:'pcity',mode:'home',q:''});else render()},
+  pon:()=>{const P=PS();P.on=!P.on;if(P.on&&!P.since)P.since=today();if(P.on&&!FOLD.g){FOLD.g=true;try{localStorage.setItem('sabrly-fold',JSON.stringify(FOLD))}catch(e){}}touch('state');loadPrayerCities();if(P.on&&!P.city)go({t:'pcity',mode:'home',q:''});else render()},
   pcity:el=>go({t:'pcity',mode:el.dataset.m||'home',q:'',until:addDays(today(),3)}),
   pcset:el=>{const o=ORTE&&ORTE.find(c=>c.id===+el.dataset.id);setCity(o)},
   ploc:()=>{if(!navigator.geolocation){toast('Standort ist hier nicht verfügbar. Such die Stadt einfach.');return}
@@ -1244,7 +1244,8 @@ function setCity(o){const P=PS(),f=UI.page,t=today();if(!o)return;
 /* --- Gebet: Einstellungen (Mehr) --- */
 function vGebet(){const P=PS(),x=prayerHabit(),t=today(),L=S.habits.filter(h=>!h.archived&&h.freq==='daily'&&h.labels&&h.labels.length===5);
   const tr=P.travel&&P.travel.until>=t?P.travel:null,tz=P.on?timesFor(t):null,z=tz&&pzParse(tz.s);
-  return `<section class="sec"><div class="sec-h"><h2>Gebet</h2><button type="button" class="switch${P.on?' on':''}" data-a="pon" role="switch" aria-checked="${P.on}" aria-label="Gebetszeiten nutzen"></button></div><div class="card glass stack" style="gap:14px">
+  const open=!!FOLD.g;
+  return `<section class="sec"><div class="sec-h">${foldBtn('g','Gebet')}<button type="button" class="switch${P.on?' on':''}" data-a="pon" role="switch" aria-checked="${P.on}" aria-label="Gebetszeiten nutzen"></button></div>${open?`<div class="card glass stack" style="gap:14px">
     <span class="hint">Je früher im Zeitfenster du abhakst, desto mehr Prozent. Bei Fajr zählen die letzten 40 Minuten vor Sonnenaufgang am meisten. Die Pünktlichkeit siehst du als goldenen Ring. Offizielle Diyanet-Zeiten.</span>
     ${P.on?`
     ${!x?`<span class="hint" style="color:var(--crit)">Lege einen täglichen Habit mit 5 Teilen an, z. B. Beten: Fajr, Dhuhr, Asr, Maghrib, Isha.</span>`:''}
@@ -1254,7 +1255,7 @@ function vGebet(){const P=PS(),x=prayerHabit(),t=today(),L=S.habits.filter(h=>!h
     ${z?`<div class="ptimes">${[['Fajr',z.F],['Sonne',z.S],['Dhuhr',z.D],['Asr',z.A],['Maghrib',z.M],['Isha',z.I]].map(([n,m])=>`<span><small>${n}</small><b class="num">${hm(m)}</b></span>`).join('')}</div>`:P.city?'<span class="hint">Zeiten werden geladen …</span>':''}
     <div class="row between"><span>Asr endet vor Maghrib</span><div class="stepper"><button type="button" class="cbtn" data-a="pbuf" data-dir="-5" aria-label="Weniger">−</button><b style="font-size:16px;white-space:nowrap;min-width:64px;text-align:center">${P.buf} Min.</b><button type="button" class="cbtn" data-a="pbuf" data-dir="5" aria-label="Mehr">+</button></div></div>
     <div class="row between"><div style="min-width:0"><span>Adhan-Mitteilungen</span><div class="hint">Kommen über Scriptable, sobald das Sabrly-Widget eingerichtet ist.</div></div><button type="button" class="switch${P.notify?' on':''}" data-a="pnotify" role="switch" aria-checked="${P.notify}" aria-label="Adhan-Mitteilungen"></button></div>`:''}
-  </div></section>`}
+  </div>`:''}</section>`}
 
 /* --- Gebet: Statistik --- */
 function vPStats(){const P=PS(),t=today();if(!P.on||!prayerHabit())return '';
