@@ -1,7 +1,7 @@
-// SABRLY_WIDGET v2
+// SABRLY_WIDGET v3
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
-// Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
+// Ein Tipp auf einen Habit trägt ein und öffnet danach Sabrly (Scriptable blitzt dabei kurz auf).
 // Welches Widget erscheint, steuerst du über das Feld „Parameter“ in den Widget-Einstellungen:
 //   (leer)        Übersicht: Tagesring, Habits, Woche
 //   woche         Wochenraster: jeder Habit mit Häkchen pro Tag
@@ -12,7 +12,8 @@
 const CFG = {
   apiKey: 'AIzaSyDigyr-IMs9guXwfa-o-fs5CLmZ9INUGdc',
   projectId: 'sabrly-b38ee',
-  appUrl: 'https://zetzet38.github.io/Sabrly/'
+  appUrl: 'https://zetzet38.github.io/Sabrly/',
+  webApp: 'webapp://zetzet38.github.io/Sabrly/' // öffnet die Sabrly-App vom Home-Bildschirm statt Safari
 };
 const K = { refresh: 'sabrly.refresh', id: 'sabrly.idtoken', exp: 'sabrly.exp', uid: 'sabrly.uid', email: 'sabrly.email' };
 const COL = {
@@ -251,10 +252,12 @@ async function retry(fn) { for (let i = 0; ; i++) { try { return await fn(); } c
 const asObj = doc => fv({ mapValue: { fields: (doc && doc.fields) || {} } });
 async function readState() { const sd = await getDoc('state'); if (!sd) throw new Error('NODATA'); S = normalizeState(asObj(sd)); return sd; }
 const q = s => '„' + s + '“';
+// Habit-Definitionen und Tageswechsel aus dem Widget-Zwischenspeicher (spart eine Anfrage), sonst frisch laden
+async function stateFor(hid) { const c = readCache(); if (c && c.state) { S = normalizeState(c.state); if (!hid || S.habits.some(x => x.id === hid)) return; } await readState(); }
 
 // einen Habit für heute abhaken (bei mehreren Schritten: der nächste Schritt)
 async function actTick(hid) {
-  await readState();
+  await stateFor(hid);
   const h = S.habits.find(x => x.id === hid && !x.archived);
   if (!h) return { title: 'Nicht gefunden', msg: 'Diesen Habit gibt es nicht mehr.' };
   const t = today();
@@ -277,7 +280,7 @@ function openLine(t) { const n = openToday(t).length; return n ? 'Heute noch ' +
 // Stimmung für heute speichern
 async function actMood(v) {
   v = Math.round(+v); if (!(v >= 1 && v <= 5)) return { title: 'Stimmung', msg: 'Ungültiger Wert.' };
-  await readState();
+  await stateFor(null);
   const t = today(), mk = mkey(t), segs = ['days', t, 'mood'];
   return retry(async () => {
     const md = await getDoc(mk), before = md ? rawAt(md.fields, segs) : undefined;
@@ -305,8 +308,7 @@ async function undo(u) { await patchField(u.doc, u.segs, u.val, u.pre); }
 
 /* ---------- Zeichnen ---------- */
 const hhmm = ms => { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
-const link = s => CFG.appUrl + '#' + s;
-// Tipp → Scriptable führt dieses Skript mit Parametern aus und trägt direkt ein
+// Tipp auf eine Zeile → Scriptable führt dieses Skript mit Parametern aus, trägt ein und öffnet danach Sabrly
 const SCRIPT_NAME = (() => { try { return Script.name() || 'Sabrly'; } catch (e) { return 'Sabrly'; } })();
 const run = p => 'scriptable:///run/' + encodeURIComponent(SCRIPT_NAME) + (p ? '?' + Object.keys(p).map(k => k + '=' + encodeURIComponent(p[k])).join('&') : '');
 function mix(a, b, t) { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const A = p(a), B = p(b); return new Color('#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join('')); }
@@ -367,7 +369,7 @@ function glowBackground(fam, hex) {
   if (hex) for (let i = 0; i < 40; i++) { const k = 1 - i / 40, rw = W * 1.0 * k, rh = H * 0.8 * k; ctx.setFillColor(new Color(hex, 0.032)); ctx.fillEllipse(new Rect(W / 2 - rw / 2, H - rh * 0.42, rw, rh)); }
   return ctx.getImage();
 }
-function base(w, fam, glow) { w.backgroundImage = glowBackground(fam, glow); w.url = run({ a: 'heute' }); }
+function base(w, fam, glow) { w.backgroundImage = glowBackground(fam, glow); w.url = CFG.webApp; }
 function txt(stack, s, font, color, lines) { const t = stack.addText(s); t.font = font; t.textColor = color || COL.fg; t.lineLimit = lines || 1; t.minimumScaleFactor = 0.75; return t; }
 function centered(stack, img, size) { const row = stack.addStack(); row.layoutHorizontally(); row.addSpacer(); const i = row.addImage(img); i.imageSize = new Size(size, size); row.addSpacer(); return row; }
 function centerStack(stack) { const row = stack.addStack(); row.layoutHorizontally(); row.addSpacer(); const inner = row.addStack(); row.addSpacer(); return inner; }
@@ -504,7 +506,7 @@ function habitWidget(fam, data, stale, q) {
   const h = pickHabit(q), w = new ListWidget(); base(w, fam, '#3B6DFF'); w.setPadding(14, 14, 14, 14);
   if (!h) { txt(w, 'Kein Habit gefunden', Font.boldSystemFont(14), COL.fg, 2); txt(w, 'Lege in Sabrly einen Habit an.', Font.mediumSystemFont(11), COL.muted, 3); return w; }
   const t = today(), planned = scheduled(h, t) && h.created <= t, done = planned && isDone(h, t), T = tgt(h), v = hv(h, t);
-  w.url = planned && !done ? run({ a: 'tick', h: h.id }) : run({ a: 'heute' });
+  w.url = planned && !done ? run({ a: 'tick', h: h.id }) : CFG.webApp;
   const head = w.addStack(); head.layoutHorizontally(); head.centerAlignContent();
   txt(head, h.emoji, Font.systemFont(20), COL.fg); head.addSpacer(8);
   txt(head, h.name, Font.boldSystemFont(17), COL.fg); head.addSpacer();
@@ -521,7 +523,7 @@ function habitWidget(fam, data, stale, q) {
 /* ---------- Stimmung ---------- */
 function moodWidget(fam, data, stale) {
   const t = today(), e = dayGet(t) || {}, cur = +e.mood || 0, wide = fam !== 'small';
-  const w = new ListWidget(); base(w, fam, '#F2A93B'); w.setPadding(14, 12, 14, 12); w.url = run({ a: 'mood' });
+  const w = new ListWidget(); base(w, fam, '#F2A93B'); w.setPadding(14, 12, 14, 12);
   const head = w.addStack(); head.layoutHorizontally(); head.centerAlignContent(); if (!wide) head.addSpacer(2);
   txt(head, '🎭', Font.systemFont(19), COL.fg); head.addSpacer(8); txt(head, 'Stimmung', Font.boldSystemFont(17), COL.fg);
   w.addSpacer();
@@ -543,7 +545,7 @@ function moodWidget(fam, data, stale) {
 /* ---------- Aufgaben ---------- */
 function todoWidget(fam, data, stale) {
   const L = todoList(), big = fam === 'large' || fam === 'extraLarge', sm = fam === 'small';
-  const w = new ListWidget(); base(w, fam); w.setPadding(14, 16, 12, 16); w.url = run({ a: 'aufgaben' });
+  const w = new ListWidget(); base(w, fam); w.setPadding(14, 16, 12, 16);
   const head = w.addStack(); head.layoutHorizontally(); head.centerAlignContent();
   txt(head, 'Aufgaben', Font.boldSystemFont(sm ? 15 : 17), COL.fg); head.addSpacer();
   pill(head, L.now.length + ' offen', Font.semiboldSystemFont(11));
@@ -569,15 +571,15 @@ function todoWidget(fam, data, stale) {
 }
 
 /* ---------- Sperrbildschirm ---------- */
-function accCircular(m) { const w = new ListWidget(); w.addAccessoryWidgetBackground = true; w.url = run({ a: 'heute' }); centered(w, ringImage(m.score, 120, 12, 26), 58); return w; }
+function accCircular(m) { const w = new ListWidget(); w.addAccessoryWidgetBackground = true; w.url = CFG.webApp; centered(w, ringImage(m.score, 120, 12, 26), 58); return w; }
 function accRect(m) {
-  const w = new ListWidget(); w.url = run({ a: 'heute' });
+  const w = new ListWidget(); w.url = CFG.webApp;
   txt(w, 'Sabrly · ' + Math.round(m.score * 100) + '%', Font.boldSystemFont(14), Color.white());
   txt(w, m.total ? m.done + ' von ' + m.total + ' Habits erledigt' : 'Heute keine Habits', Font.mediumSystemFont(12), Color.white());
   if (m.best > 0) txt(w, '🔥 ' + m.best + ' Tage Serie', Font.mediumSystemFont(12), Color.white());
   return w;
 }
-function accInline(m) { const w = new ListWidget(); w.url = run({ a: 'heute' }); txt(w, 'Sabrly ' + Math.round(m.score * 100) + '% · ' + (m.total - m.done) + ' offen', Font.mediumSystemFont(12), Color.white()); return w; }
+function accInline(m) { const w = new ListWidget(); w.url = CFG.webApp; txt(w, 'Sabrly ' + Math.round(m.score * 100) + '% · ' + (m.total - m.done) + ' offen', Font.mediumSystemFont(12), Color.white()); return w; }
 function messageWidget(fam, title, msg) {
   const w = new ListWidget(); if (!String(fam).startsWith('accessory')) { base(w, fam); w.setPadding(14, 14, 14, 14); }
   w.url = run();
@@ -681,7 +683,7 @@ async function pickToday() {
   const k = i - open.length;
   if (k === 0) return pickMood();
   if (k === 1) return pickTodo();
-  Safari.open(CFG.appUrl);
+  Safari.open(CFG.webApp);
 }
 async function pickMood() {
   if (!(await act(loadAll))) return;
@@ -703,12 +705,15 @@ async function pickTodo() {
   const i = await a.presentAlert();
   if (i < 0) return;
   if (i < list.length) return showResult(await act(() => actTodo(list[i].id)));
-  Safari.open(link('aufgaben'));
+  Safari.open(CFG.webApp);
 }
+// Tipp aufs Widget: eintragen und direkt Sabrly öffnen (bei einem Fehler bleibt Scriptable mit einer Meldung offen)
+async function quick(fn) { const r = await act(fn); if (r) Safari.open(CFG.webApp); }
 async function handleLink(P) {
-  if (P.a === 'tick' && P.h) return showResult(await act(() => actTick(P.h)));
-  if (P.a === 'todo' && P.t) return showResult(await act(() => actTodo(P.t)));
-  if (P.a === 'mood' && P.v) return showResult(await act(() => actMood(P.v)));
+  if (P.a === 'tick' && P.h) return quick(() => actTick(P.h));
+  if (P.a === 'todo' && P.t) return quick(() => actTodo(P.t));
+  if (P.a === 'mood' && P.v) return quick(() => actMood(P.v));
+  if (P.a === 'open') { Safari.open(CFG.webApp); return; }
   if (P.a === 'mood') return pickMood();
   if (P.a === 'aufgaben') return pickTodo();
   return pickToday();

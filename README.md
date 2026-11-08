@@ -20,4 +20,4 @@ Im Widget unter „Parameter“ eintragen:
 | `stimmung` | Stimmung des Tages |
 | `aufgaben` | offene Aufgaben |
 
-Ein Tipp öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
+Ein Tipp auf einen Habit, eine Aufgabe oder eine Stimmung trägt ein und öffnet danach die Sabrly-App vom Home-Bildschirm (`webapp://`). Scriptable blitzt dabei kurz auf. Ein Tipp auf eine freie Stelle öffnet nur Sabrly.
