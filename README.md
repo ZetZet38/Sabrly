@@ -21,3 +21,7 @@ Im Widget unter „Parameter“ eintragen:
 | `aufgaben` | offene Aufgaben |
 
 Ein Tipp auf einen Habit, eine Aufgabe oder eine Stimmung öffnet kurz Scriptable und trägt direkt ein (Bestätigung mit „Rückgängig“). Ein Tipp auf eine freie Stelle zeigt die Liste „Heute abhaken“. Die Sabrly-App selbst lässt sich aus Scriptable nicht öffnen (`webapp://` funktioniert nur aus Notizen).
+
+### Abhaken ohne dass sich etwas öffnet (Kurzbefehle)
+
+Kurzbefehl mit der Aktion „Run Script“ (Scriptable): Script `Sabrly`, Parameter = Habit-Name (z. B. `Beten`) oder `stimmung: 4`, „Run In App“ aus. Die Kurzbefehle in einen Ordner legen und das Kurzbefehle-Widget mit diesem Ordner auf den Home-Bildschirm setzen.

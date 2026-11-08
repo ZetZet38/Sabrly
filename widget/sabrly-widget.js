@@ -1,4 +1,4 @@
-// SABRLY_WIDGET v4
+// SABRLY_WIDGET v5
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
 // Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
@@ -704,6 +704,46 @@ async function pickTodo() {
   if (i < 0) return;
   if (i < list.length) return showResult(await act(() => actTodo(list[i].id)));
 }
+/* ---------- Kurzbefehle: abhaken im Hintergrund, ohne dass sich etwas öffnet ----------
+   Kurzbefehl mit der Aktion „Run Script“ (Scriptable): Script = Sabrly, Parameter = Habit-Name
+   (oder „stimmung: 4“), „Run In App“ aus. Erfolg → Häkchen im Kurzbefehle-Widget, Fehler → Meldung. */
+function findHabit(q) {
+  const l = String(q || '').trim().toLowerCase(); if (!l) return null;
+  const all = S.habits.filter(h => !h.archived);
+  return all.find(h => h.name.toLowerCase() === l) || all.find(h => h.name.toLowerCase().startsWith(l)) || all.find(h => h.name.toLowerCase().includes(l)) || null;
+}
+function shortcutText() {
+  const sp = args.shortcutParameter;
+  if (typeof sp === 'string' && sp.trim()) return sp.trim();
+  if (typeof sp === 'number') return String(sp);
+  if (sp && typeof sp === 'object') { const v = sp.habit || sp.text || sp.name; if (v) return String(v).trim(); }
+  const pt = args.plainTexts; if (Array.isArray(pt) && pt.length && String(pt[0]).trim()) return String(pt[0]).trim();
+  return '';
+}
+async function shortcutRun(text) {
+  if (!kget(K.refresh)) throw new Error('Nicht angemeldet. Öffne Scriptable und tippe einmal auf das Sabrly-Skript.');
+  let r;
+  try {
+    const m = text.match(/^(stimmung|mood)\s*:?\s*([1-5])$/i);
+    if (m) r = await actMood(+m[2]);
+    else {
+      const q = text.replace(/^(habit|gewohnheit)\s*:?\s*/i, '');
+      await stateFor(null); let h = findHabit(q);
+      if (!h) { await readState(); h = findHabit(q); }
+      if (!h) throw new Error('NOTFOUND');
+      r = await actTick(h.id);
+    }
+  } catch (e) {
+    const m = String(e.message);
+    if (m === 'NOTFOUND') throw new Error('Habit „' + text + '“ gibt es in Sabrly nicht. Prüfe den Parameter im Kurzbefehl.');
+    if (m === 'LOGIN') throw new Error('Anmeldung abgelaufen. Öffne Scriptable und tippe einmal auf das Sabrly-Skript.');
+    throw new Error(errText(e));
+  }
+  const out = r.title + (r.msg ? ' – ' + r.msg : '');
+  Script.setShortcutOutput(out);
+  return out;
+}
+
 // Tipp aufs Widget: eintragen, kurze Bestätigung mit „Rückgängig“
 async function handleLink(P) {
   if (P.a === 'tick' && P.h) return showResult(await act(() => actTick(P.h)));
@@ -722,6 +762,8 @@ async function main() {
     Script.setWidget(w);
     return;
   }
+  const st = shortcutText();
+  if (st) { await shortcutRun(st); return; }
   // in der Scriptable-App: anmelden, Aktion vom Widget ausführen oder Vorschau zeigen
   if (!kget(K.refresh)) { if (!(await login())) return; }
   const P = (args && args.queryParameters) || {};
