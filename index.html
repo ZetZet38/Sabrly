@@ -207,6 +207,14 @@ h2{font-size:23px;font-weight:700;letter-spacing:-.015em;margin:0;text-wrap:bala
 .hname small{display:block;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:1px}
 .hrow.done .hname{color:var(--muted)}
 .hrow.locked{opacity:.62}
+/* Heute: Namen von Habits und Aufgaben deutlicher */
+.hl .hname{font-size:17px;font-weight:700;letter-spacing:-.01em;color:#F4F7F6}
+.hl .hname small{font-size:12px;font-weight:500;letter-spacing:0;margin-top:2px}
+.hl .emo{font-size:20px;width:28px}
+.hl .hrow.done .hname{color:var(--muted)}
+.hl .todo .tt b{font-size:16.5px;font-weight:700;letter-spacing:-.01em;color:#F4F7F6}
+.hl .todo .tt span{font-size:12px}
+.hl .todo.done .tt b{color:var(--muted)}
 .circle{width:34px;height:34px;border-radius:50%;border:2px solid #5D6563;display:grid;place-items:center;flex:none;transition:background .2s,border-color .2s,transform .2s var(--spring)}
 .circle.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);animation:pop2 .32s var(--spring)}
 .circle:disabled,.chip:disabled,.cbtn:disabled,.check:disabled{opacity:.45}
@@ -681,12 +689,12 @@ function vHeute(){
       <div class="mood${e.mood?' set':''}">${MOODS.map((m,i)=>`<button type="button" class="${e.mood===i+1?'on':''}" data-a="mood" data-d="${sel}" data-v="${i+1}" aria-label="Stimmung ${i+1} von 5" aria-pressed="${e.mood===i+1}">${m}</button>`).join('')}</div></div>`;
   // habits
   const hs=active(sel),open=hs.filter(x=>!isDone(x,sel)).length;
-  h+=`<section class="sec"><div class="sec-h"><div class="row"><h2>Habits</h2><span class="pill num" style="font-size:14px">${fut?hs.length+' geplant':open+' offen'}</span></div><div class="right">${hs.length?`<button type="button" class="mini" data-a="hnew" aria-label="Habit erstellen">+</button>`:''}<button type="button" class="link" data-a="tab" data-t="habits">Alle ›</button></div></div>`;
+  h+=`<section class="sec hl"><div class="sec-h"><div class="row"><h2>Habits</h2><span class="pill num" style="font-size:14px">${fut?hs.length+' geplant':open+' offen'}</span></div><div class="right">${hs.length?`<button type="button" class="mini" data-a="hnew" aria-label="Habit erstellen">+</button>`:''}<button type="button" class="link" data-a="tab" data-t="habits">Alle ›</button></div></div>`;
   h+=hs.length?hs.map(x=>habitRow(x,sel,fut)).join(''):`<button type="button" class="addrow glass press" data-a="hnew"><span class="emo">✨</span>${S.habits.some(x=>!x.archived)?'Keine Habits an diesem Tag · Habit erstellen':'Ersten Habit erstellen'}<span class="plusic">+</span></button>`;
   h+=`</section>`;
   // todos
   const td=dayTodos(sel),openTd=td.filter(x=>!x.done).length;
-  h+=`<section class="sec"><div class="sec-h"><div class="row"><h2>Aufgaben</h2><span class="pill num" style="font-size:14px">${openTd} offen</span></div><div class="right">${td.length?`<button type="button" class="mini" data-a="tnew" data-d="${sel===t?'':sel}" aria-label="Aufgabe hinzufügen">+</button>`:''}<button type="button" class="link" data-a="tab" data-t="aufgaben">Alle ›</button></div></div>${td.length?td.map(x=>todoRow(x,fut)).join(''):`<button type="button" class="addrow glass press" data-a="tnew" data-d="${sel===t?'':sel}"><span class="emo">📝</span>${sel===t?'Aufgabe hinzufügen':'Aufgabe für '+esc(dayTitle(sel))}<span class="plusic">+</span></button>`}</section>`;
+  h+=`<section class="sec hl"><div class="sec-h"><div class="row"><h2>Aufgaben</h2><span class="pill num" style="font-size:14px">${openTd} offen</span></div><div class="right">${td.length?`<button type="button" class="mini" data-a="tnew" data-d="${sel===t?'':sel}" aria-label="Aufgabe hinzufügen">+</button>`:''}<button type="button" class="link" data-a="tab" data-t="aufgaben">Alle ›</button></div></div>${td.length?td.map(x=>todoRow(x,fut)).join(''):`<button type="button" class="addrow glass press" data-a="tnew" data-d="${sel===t?'':sel}"><span class="emo">📝</span>${sel===t?'Aufgabe hinzufügen':'Aufgabe für '+esc(dayTitle(sel))}<span class="plusic">+</span></button>`}</section>`;
   // Rückblick
   if(!fut)h+=`<section class="sec"><h2>Rückblick</h2><div class="card glass stack" style="gap:6px"><span class="label">Was war ${sel===t?'heute':'an dem Tag'} okay?</span><input class="field" id="f-okay" data-f="okay" data-d="${sel}" value="${esc(e.okay||'')}" placeholder="Ein Satz reicht" autocomplete="off" enterkeyhint="done"><span class="saved" data-saved="okay"></span></div></section>`;
   // Notizen
