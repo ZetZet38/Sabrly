@@ -152,12 +152,19 @@ h2{font-size:23px;font-weight:700;letter-spacing:-.015em;margin:0;text-wrap:bala
 .banner.good{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 11%,var(--glass))}
 .banner.good b{color:var(--accent)}
 /* Tagesspruch */
-.quote{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;margin-top:-10px;padding:2px 0}
-.quote .qm{font-family:Georgia,"Times New Roman",serif;font-size:34px;line-height:.9;color:var(--accent);flex:none;margin-top:2px}
-.quote .qb{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-.quote .qt{font-size:15.5px;line-height:1.45;color:#D3DAD8;font-style:italic;overflow-wrap:anywhere;text-wrap:pretty}
-.quote.vers .qt{font-style:normal}
-.quote .qs{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.02em}
+.quote{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:10px;text-align:left;width:100%;overflow:hidden;border-radius:var(--r-lg);padding:18px 20px 19px;--qc:var(--accent);
+  background:radial-gradient(130% 120% at 0% 0%,color-mix(in srgb,var(--qc) 17%,transparent),transparent 62%),linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));
+  border:1px solid color-mix(in srgb,var(--qc) 30%,var(--line));box-shadow:inset 0 1px 0 var(--glass-hi),0 14px 34px rgba(0,0,0,.4);animation:enter .25s var(--spring);transition:transform .15s}
+.quote:active{transform:scale(.985)}
+.quote.vers{--qc:#E3BE76}
+.qh-top{position:relative;display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px}
+.qh-lab{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--qc)}
+.qh-more{font-size:16px;color:var(--muted);line-height:1}
+.quote .qt{position:relative;font-family:ui-serif,"New York",Georgia,"Times New Roman",serif;font-size:24px;line-height:1.36;color:#F4F7F6;font-weight:500;overflow-wrap:anywhere;text-wrap:pretty}
+.quote .qt.m{font-size:20px}
+.quote .qt.l{font-size:17.5px;line-height:1.45}
+.quote .qs{position:relative;font-size:14px;font-weight:600;color:var(--qc)}
+.qh-mark{position:absolute;right:14px;bottom:-84px;font-family:Georgia,"Times New Roman",serif;font-size:150px;line-height:1;color:var(--qc);opacity:.1;pointer-events:none}
 /* Sätze & Verse list */
 .qlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .qlist li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
@@ -650,13 +657,12 @@ function vHeute(){
   let days='';
   for(let i=0;i<7;i++){const d=addDays(ws,i),f=d>t;days+=`<button type="button" class="day${d===t?' today':''}${d===sel?' sel':''}${f?' fut':''}" data-a="sel" data-d="${d}" aria-label="${fmtLong(d)}"><span class="dn">${DN[i]}</span><span class="dd">${pdate(d).getDate()}</span><span class="db"><i style="width:${f?0:Math.round(dayScore(d)*100)}%"></i></span></button>`}
   let h=`<header class="weekbar glass" data-wswipe><div class="wb-in"><div class="mon"><b>${MS[sd.getMonth()].toUpperCase()}</b><span>${sd.getFullYear()}</span></div><div class="days">${days}</div>${ring(fut?0:dayScore(sel))}</div></header>`;
+  // Vers/Satz des Tages ganz oben, als Erstes im Blick (nur wenn es welche gibt)
+  const qq=pickQuote(sel);if(qq)h+=quoteHTML(qq,sel);
   const un=S.settings.userName,hr=new Date().getHours(),gr=hr>=5&&hr<11?'Guten Morgen':hr>=17&&hr<23?'Guten Abend':'Hallo';
   h+=`<div class="titlebar"><div style="min-width:0">${sel===t&&un?`<div class="eyebrow">${gr}, ${esc(un)}</div>`:''}<h1>${dayTitle(sel)}</h1><div class="sub">${fmtLong(sel)}</div></div><div class="wknav"><button type="button" class="rbtn" data-a="wk" data-dir="-1" aria-label="Vorherige Woche">‹</button><button type="button" class="rbtn" data-a="wk" data-dir="1" aria-label="Nächste Woche">›</button></div></div>`;
   if(sel!==t)h+=`<button type="button" class="link" data-a="sel" data-d="${t}" style="align-self:flex-start;margin-top:-12px">Zurück zu heute ›</button>`;
   if(fut)h+=`<div class="futnote">Hier planst du voraus. Abhaken geht ab ${sel===addDays(t,1)?'morgen':'diesem Tag'}.</div>`;
-  // Tagesspruch (only when you have at least one)
-  const qq=pickQuote(sel);
-  if(qq)h+=`<button type="button" class="quote${qq.type==='vers'?' vers':''}" data-a="qnext" data-d="${sel}" aria-label="Nächster Spruch"><span class="qm">“</span><span class="qb"><span class="qt">${esc(qq.t)}</span>${qq.src?`<span class="qs">${esc(qq.src)}</span>`:''}</span></button>`;
   // one situation box at most
   if(sel===t)h+=situationBox(t);
   // mood
@@ -686,6 +692,8 @@ const noteLi=(n,d)=>`<li data-nid="${esc(n.id)}"><span class="nb">•</span><spa
 function addNote(d,input){const v=(input.value||'').trim();if(!v)return;const e=dayEnsure(d);if(!Array.isArray(e.n))e.n=[];const n={id:'n-'+newId(),t:v.slice(0,300)};e.n.push(n);touch(mkey(d),300);
   input.value='';const ul=$('#nlist');if(ul)ul.insertAdjacentHTML('beforeend',noteLi(n,d));}
 function dayHash(d){let h=0;for(const c of d)h=(h*31+c.charCodeAt(0))>>>0;return h}
+function quoteHTML(q,d){const v=q.type==='vers',L=q.t.length;
+  return `<button type="button" class="quote${v?' vers':''}" data-a="qnext" data-d="${d}" aria-label="Nächster Spruch"><span class="qh-mark" aria-hidden="true">”</span><span class="qh-top"><span class="qh-lab">${v?'Vers':'Satz'} des Tages</span>${S.quotes.length>1?'<span class="qh-more" aria-hidden="true">↻</span>':''}</span><span class="qt${L>170?' l':L>85?' m':''}">${esc(q.t)}</span>${q.src?`<span class="qs">— ${esc(q.src)}</span>`:''}</button>`}
 function pickQuote(d){const n=S.quotes.length;if(!n)return null;return S.quotes[(dayHash(d)+(UI.qOff[d]||0))%n]}
 function situationBox(t){const on=S.settings.sit.on,sent=k=>on?`<span class="bs">${esc(sitText(k))}</span>`:'';
   const y=addDays(t,-1);
@@ -939,8 +947,7 @@ const ACT={
   sel:el=>{UI.sel=el.dataset.d===today()?null:el.dataset.d;render()},
   wk:el=>{const n=addDays(curSel(),7*+el.dataset.dir);UI.sel=n===today()?null:n;render('enter')},
   openday:el=>openDay(el.dataset.d),
-  qnext:el=>{const d=el.dataset.d;UI.qOff[d]=(UI.qOff[d]||0)+1;const q=pickQuote(d),b=document.querySelector('.quote');
-    if(q&&b){b.classList.toggle('vers',q.type==='vers');b.querySelector('.qb').innerHTML=`<span class="qt">${esc(q.t)}</span>${q.src?`<span class="qs">${esc(q.src)}</span>`:''}`}},
+  qnext:el=>{const d=el.dataset.d;UI.qOff[d]=(UI.qOff[d]||0)+1;const q=pickQuote(d),b=document.querySelector('.quote');if(q&&b)b.outerHTML=quoteHTML(q,d)},
   qtype:el=>{UI.qType=el.dataset.v;render()},
   qadd:()=>{const t=(UI.qDraft.t||'').trim();if(!t){toast(UI.qType==='vers'?'Gib zuerst den Vers ein.':'Gib zuerst einen Satz ein.');$('#q-text')?.focus();return}
     S.quotes.push({id:'q-'+newId(),type:UI.qType,t:t.slice(0,400),src:UI.qType==='vers'?(UI.qDraft.src||'').trim().slice(0,60):''});UI.qDraft={t:'',src:''};touch('state',200);render();toast(UI.qType==='vers'?'Vers hinzugefügt':'Satz hinzugefügt')},

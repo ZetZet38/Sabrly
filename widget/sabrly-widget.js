@@ -1,13 +1,17 @@
-// SABRLY_WIDGET v5
+// SABRLY_WIDGET v6
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
 // Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
 // Welches Widget erscheint, steuerst du über das Feld „Parameter“ in den Widget-Einstellungen:
-//   (leer)        Übersicht: Tagesring, Habits, Woche
+//   (leer)        klein: Tagesring · mittel/groß: alle Habits von heute
+//   heute         alle Habits von heute als Liste
 //   woche         Wochenraster: jeder Habit mit Häkchen pro Tag
 //   habit: Lesen  ein einzelner Habit zum Abhaken (Name aus Sabrly)
-//   stimmung      Stimmung des Tages
 //   aufgaben      offene Aufgaben
+//   vers          Vers bzw. Satz des Tages
+//   monat         Monatskalender mit Erfüllung pro Tag
+//   serie         längste Serie (serie: Lesen für einen bestimmten Habit)
+//   stimmung      Stimmung des Tages
 
 const CFG = {
   apiKey: 'AIzaSyDigyr-IMs9guXwfa-o-fs5CLmZ9INUGdc',
@@ -375,40 +379,10 @@ function centered(stack, img, size) { const row = stack.addStack(); row.layoutHo
 function centerStack(stack) { const row = stack.addStack(); row.layoutHorizontally(); row.addSpacer(); const inner = row.addStack(); row.addSpacer(); return inner; }
 function pill(stack, label, font) { const p = stack.addStack(); p.setPadding(5, 13, 5, 13); p.cornerRadius = 14; p.backgroundColor = new Color('#FFFFFF', 0.08); p.borderWidth = 1; p.borderColor = new Color('#FFFFFF', 0.16); txt(p, label, font || Font.mediumSystemFont(12), COL.fg); return p; }
 function footer(stack, data, stale) { txt(stack, (stale ? 'Offline · ' : '') + 'Stand ' + hhmm(data.at), Font.mediumSystemFont(10), COL.faint); }
-function statusText(i) { return i.done ? '✓' : (i.T > 1 ? i.v + '/' + i.T : ''); }
-function greeting(name) { const h = new Date().getHours(); const g = h >= 5 && h < 11 ? 'Guten Morgen' : h >= 17 && h < 23 ? 'Guten Abend' : 'Hallo'; return name ? g + ', ' + name : g; }
 function dateLine(t) { const d = pdate(t); return DL[wd(t)] + ', ' + d.getDate() + '. ' + MN[d.getMonth()]; }
 function weekTitle(ws, we) { const a = pdate(ws), b = pdate(we); return a.getMonth() === b.getMonth() ? MS[a.getMonth()] + ' ' + a.getDate() + '–' + b.getDate() : MS[a.getMonth()] + ' ' + a.getDate() + ' – ' + MS[b.getMonth()] + ' ' + b.getDate(); }
 
-/* ---------- Übersicht (Standard) ---------- */
-function habitRows(stack, m, max, fs) {
-  const list = m.items.slice(0, max);
-  list.forEach((i, idx) => {
-    if (idx) stack.addSpacer(fs > 13 ? 6 : 4);
-    const row = stack.addStack(); row.layoutHorizontally(); row.centerAlignContent();
-    if (!i.done && !i.td) row.url = run({ a: 'tick', h: i.id });
-    txt(row, i.emoji, Font.systemFont(fs), COL.fg); row.addSpacer(6);
-    txt(row, i.name, Font.semiboldSystemFont(fs), i.done ? COL.muted : COL.fg); row.addSpacer(6);
-    const st = statusText(i);
-    if (st) txt(row, st, i.done ? Font.boldSystemFont(fs) : Font.mediumRoundedSystemFont(fs - 1), i.done ? COL.accent : COL.muted);
-  });
-  if (m.items.length > max) { stack.addSpacer(4); txt(stack, '+' + (m.items.length - max) + ' weitere', Font.mediumSystemFont(fs - 2), COL.muted); }
-  if (!m.items.length) txt(stack, 'Heute keine Habits geplant', Font.mediumSystemFont(fs), COL.muted, 2);
-}
-function weekBars(stack, m, h) {
-  const row = stack.addStack(); row.layoutHorizontally(); row.bottomAlignContent();
-  m.week.forEach((d, idx) => {
-    if (idx) row.addSpacer();
-    const col = row.addStack(); col.layoutVertically(); col.centerAlignContent();
-    const track = col.addStack(); track.size = new Size(18, h); track.cornerRadius = 6; track.layoutVertically();
-    track.backgroundColor = d.fut ? COL.chip : COL.track;
-    const bh = Math.round(h * d.p);
-    if (bh > 0) { track.addSpacer(); const bar = track.addStack(); bar.size = new Size(18, Math.max(6, bh)); bar.cornerRadius = 6; bar.backgroundColor = COL.accent; }
-    else track.addSpacer();
-    col.addSpacer(4);
-    txt(col, d.label, d.today ? Font.boldSystemFont(10) : Font.mediumSystemFont(10), d.today ? COL.fg : COL.muted);
-  });
-}
+/* ---------- Übersicht klein (Ring) ---------- */
 function small(m, data, stale) {
   const w = new ListWidget(); base(w, 'small'); w.setPadding(14, 14, 12, 14);
   const top = w.addStack(); top.layoutHorizontally(); top.centerAlignContent();
@@ -421,46 +395,188 @@ function small(m, data, stale) {
   footer(w, data, stale);
   return w;
 }
-function medium(m, data, stale) {
-  const w = new ListWidget(); base(w, 'medium'); w.setPadding(14, 16, 12, 16);
-  const row = w.addStack(); row.layoutHorizontally();
-  const left = row.addStack(); left.layoutVertically(); left.size = new Size(104, 0);
-  txt(left, 'SABRLY', Font.heavySystemFont(10), COL.accent); left.addSpacer(6);
-  const ri = left.addImage(ringImage(m.score, 200, 18, 38)); ri.imageSize = new Size(92, 92);
-  left.addSpacer(6);
-  txt(left, m.best > 0 ? '🔥 ' + m.best + ' Tage' : m.done + '/' + m.total + ' erledigt', Font.semiboldSystemFont(12), COL.fg);
-  row.addSpacer(14);
-  const right = row.addStack(); right.layoutVertically();
-  txt(right, 'Heute', Font.boldSystemFont(17), COL.fg);
-  txt(right, dateLine(m.t), Font.mediumSystemFont(11), COL.muted);
-  right.addSpacer(8);
-  habitRows(right, m, 4, 13);
-  right.addSpacer();
-  footer(right, data, stale);
+// nur anzeigen, wenn die Daten nicht frisch sind
+function staleNote(stack, data, stale) { if (stale) { stack.addSpacer(4); txt(stack, 'Offline · Stand ' + hhmm(data.at), Font.mediumSystemFont(10), COL.faint); } }
+const isBig = fam => fam === 'large' || fam === 'extraLarge';
+const serif = s => { try { return new Font('Georgia', s); } catch (e) { return Font.italicSystemFont(s); } };
+
+/* ---------- Heute: alle Habits auf einen Blick ---------- */
+function todayRows() {
+  const t = today();
+  return S.habits.filter(h => !h.archived && h.created <= t && scheduled(h, t)).map(h => {
+    const wk = h.freq === 'weekly', td = isDone(h, t), T = wk ? h.target : tgt(h), v = wk ? weekCount(h, weekStart(t), t) : hv(h, t);
+    return { h, td, T, v, done: td || (wk && v >= T), p: wk ? (td ? 1 : 0) : frac(h, t) };
+  });
+}
+function listRow(stack, r, fs, ds, counts) {
+  const row = stack.addStack(); row.layoutHorizontally(); row.centerAlignContent();
+  if (!r.done) row.url = run({ a: 'tick', h: r.h.id });
+  txt(row, r.h.emoji, Font.systemFont(fs), COL.fg); row.addSpacer(fs > 13 ? 9 : 6);
+  txt(row, r.h.name, Font.semiboldSystemFont(fs), r.done ? COL.muted : COL.fg);
+  row.addSpacer();
+  if (counts && r.T > 1 && !r.done) { txt(row, r.v + '/' + r.T, Font.mediumRoundedSystemFont(fs - 2), COL.muted); row.addSpacer(7); }
+  const im = row.addImage(dotImage(r.done ? 'done' : r.p > 0 ? 'part' : 'today', r.done ? 0 : r.p)); im.imageSize = new Size(ds, ds);
+  return row;
+}
+function listWidget(fam, data, stale) {
+  const rows = todayRows(), n = rows.filter(r => r.done).length, big = isBig(fam), sm = fam === 'small';
+  const w = new ListWidget(); base(w, fam);
+  if (big) w.setPadding(18, 18, 16, 18); else if (sm) w.setPadding(14, 13, 12, 13); else w.setPadding(14, 16, 12, 16);
+  const head = w.addStack(); head.layoutHorizontally(); head.centerAlignContent();
+  txt(head, 'Heute', Font.boldSystemFont(big ? 22 : sm ? 15 : 17), COL.fg); head.addSpacer();
+  if (rows.length) txt(head, n + '/' + rows.length, Font.semiboldRoundedSystemFont(big ? 16 : 13), n === rows.length ? COL.accent : COL.muted);
+  w.addSpacer(big ? 14 : sm ? 8 : 10);
+  if (!rows.length) { txt(w, 'Heute keine Habits geplant', Font.mediumSystemFont(13), COL.muted, 2); w.addSpacer(); staleNote(w, data, stale); return w; }
+  if (fam === 'medium') {
+    const max = 6, list = rows.length > max ? rows.slice(0, max - 1) : rows;
+    const cols = w.addStack(); cols.layoutHorizontally(); cols.topAlignContent();
+    [list.slice(0, 3), list.slice(3, 6)].forEach((part, ci) => {
+      if (ci) cols.addSpacer(16);
+      const col = cols.addStack(); col.layoutVertically(); col.size = new Size(137, 0);
+      part.forEach((r, i) => { if (i) col.addSpacer(8); listRow(col, r, 13, 18, false); });
+      if (ci === 1 && rows.length > max) { if (part.length) col.addSpacer(8); txt(col, '+' + (rows.length - list.length) + ' weitere', Font.mediumSystemFont(12), COL.muted); }
+    });
+  } else {
+    const max = big ? 9 : 4, list = rows.length > max ? rows.slice(0, max - 1) : rows;
+    // groß: bei wenigen Habits mehr Luft zwischen den Zeilen
+    const gap = big ? Math.round(Math.min(20, Math.max(9, (250 - list.length * 22) / Math.max(1, list.length - 1)))) : 6;
+    list.forEach((r, i) => { if (i) w.addSpacer(gap); listRow(w, r, big ? 15 : 12, big ? 22 : 15, big); });
+    if (rows.length > max) { w.addSpacer(big ? 9 : 6); txt(w, '+' + (rows.length - list.length) + ' weitere', Font.mediumSystemFont(big ? 13 : 11), COL.muted); }
+  }
+  w.addSpacer();
+  staleNote(w, data, stale);
   return w;
 }
-function large(m, data, stale) {
-  const w = new ListWidget(); base(w, 'large'); w.setPadding(16, 18, 14, 18);
-  const head = w.addStack(); head.layoutHorizontally(); head.centerAlignContent();
-  const hl = head.addStack(); hl.layoutVertically();
-  txt(hl, 'SABRLY', Font.heavySystemFont(10), COL.accent);
-  txt(hl, greeting(m.name), Font.boldSystemFont(19), COL.fg);
-  txt(hl, dateLine(m.t), Font.mediumSystemFont(12), COL.muted);
-  head.addSpacer();
-  const ri = head.addImage(ringImage(m.score, 160, 14, 30)); ri.imageSize = new Size(66, 66);
-  w.addSpacer(12);
-  const hab = w.addStack(); hab.layoutVertically();
-  habitRows(hab, m, 6, 14);
+
+/* ---------- Vers / Satz des Tages ---------- */
+function quoteWidget(fam, data, stale) {
+  const t = today(), qq = pickQuote(t), big = isBig(fam), sm = fam === 'small';
+  const vers = !!qq && qq.type === 'vers', tint = new Color(vers ? '#E3BE76' : '#46E0AE');
+  const w = new ListWidget(); base(w, fam, qq ? (vers ? '#A87C2E' : '#1C8F69') : null);
+  w.setPadding(big ? 22 : 15, big ? 22 : sm ? 14 : 18, big ? 20 : 14, big ? 22 : sm ? 14 : 18);
+  txt(w, vers ? 'VERS DES TAGES' : 'SATZ DES TAGES', Font.heavySystemFont(sm ? 9 : 10), tint);
   w.addSpacer();
-  const wk = w.addStack(); wk.layoutVertically();
-  const wh = wk.addStack(); wh.layoutHorizontally();
-  txt(wh, 'Diese Woche', Font.boldSystemFont(12), COL.fg); wh.addSpacer();
-  if (m.best > 0) txt(wh, '🔥 ' + m.best + ' Tage Serie', Font.semiboldSystemFont(11), COL.muted);
-  wk.addSpacer(6);
-  weekBars(wk, m, 44);
-  if (m.quote) { w.addSpacer(10); const q = txt(w, '„' + m.quote.t + '“' + (m.quote.src ? ' · ' + m.quote.src : ''), Font.italicSystemFont(12), COL.muted, 2); q.minimumScaleFactor = 0.85; }
-  w.addSpacer(6);
-  footer(w, data, stale);
+  if (!qq) {
+    txt(w, 'Noch keine Sätze', Font.boldSystemFont(14), COL.fg); w.addSpacer(4);
+    txt(w, 'Füge in Sabrly unter Mehr → Sätze & Verse welche hinzu.', Font.mediumSystemFont(11), COL.muted, 4);
+    w.addSpacer(); return w;
+  }
+  const L = qq.t.length;
+  const fs = big ? (L < 90 ? 27 : L < 170 ? 22 : L < 260 ? 18 : 15) : sm ? (L < 50 ? 16 : L < 90 ? 14 : 12) : (L < 70 ? 20 : L < 130 ? 16 : L < 200 ? 14 : 12);
+  const tx = txt(w, qq.t, serif(fs), COL.fg, big ? 14 : sm ? 8 : 6); tx.minimumScaleFactor = 0.6;
+  if (qq.src) { w.addSpacer(big ? 12 : 7); txt(w, '— ' + qq.src, Font.semiboldSystemFont(big ? 14 : sm ? 11 : 12), tint); }
+  w.addSpacer();
+  staleNote(w, data, stale);
+  return w;
+}
+
+/* ---------- Monat ---------- */
+function monthStats() {
+  const t = today(), first = t.slice(0, 8) + '01', dim = new Date(+t.slice(0, 4), +t.slice(5, 7), 0).getDate();
+  let sum = 0, cnt = 0, perfect = 0;
+  for (let i = 0; i < dim; i++) { const d = addDays(first, i); if (d > t || !active(d).length) continue; const p = dayScore(d); sum += p; cnt++; if (p >= 0.999) perfect++; }
+  return { t, first, dim, off: wd(first), avg: cnt ? sum / cnt : 0, perfect, month: MN[pdate(t).getMonth()] };
+}
+function monthImage(ms, cell, gap, labels, numbers) {
+  const rows = Math.ceil((ms.off + ms.dim) / 7), lab = labels ? 18 : 0;
+  const W = 7 * cell + 6 * gap, H = lab + rows * cell + (rows - 1) * gap, ctx = canvas(W, H), rad = Math.max(3, Math.round(cell * 0.3));
+  if (labels) { ctx.setFont(Font.semiboldSystemFont(10)); ctx.setTextAlignedCenter(); ctx.setTextColor(COL.muted); ['M', 'D', 'M', 'D', 'F', 'S', 'S'].forEach((l, i) => ctx.drawTextInRect(l, new Rect(i * (cell + gap), 0, cell, 14))); }
+  const fsz = Math.round(cell * 0.36);
+  for (let i = 0; i < ms.dim; i++) {
+    const d = addDays(ms.first, i), k = ms.off + i, x = (k % 7) * (cell + gap), y = lab + Math.floor(k / 7) * (cell + gap);
+    const fut = d > ms.t, has = !fut && active(d).length > 0, p = has ? dayScore(d) : 0, full = p >= 0.999;
+    const box = () => { const pa = new Path(); pa.addRoundedRect(new Rect(x + 0.75, y + 0.75, cell - 1.5, cell - 1.5), rad, rad); ctx.addPath(pa); };
+    if (fut) { box(); ctx.setStrokeColor(new Color('#FFFFFF', 0.13)); ctx.setLineWidth(1); ctx.strokePath(); }
+    else {
+      box(); ctx.setFillColor(new Color('#FFFFFF', has ? 0.08 : 0.04)); ctx.fillPath();
+      if (p > 0) { box(); ctx.setFillColor(new Color('#46E0AE', full ? 1 : 0.2 + 0.55 * p)); ctx.fillPath(); }
+    }
+    if (d === ms.t) { box(); ctx.setStrokeColor(COL.fg); ctx.setLineWidth(1.5); ctx.strokePath(); }
+    if (numbers) {
+      ctx.setFont(Font.semiboldSystemFont(fsz)); ctx.setTextAlignedCenter();
+      ctx.setTextColor(full ? COL.ink : fut ? COL.faint : COL.fg);
+      ctx.drawTextInRect(String(i + 1), new Rect(x, y + (cell - fsz * 1.25) / 2, cell, fsz * 1.3));
+    }
+  }
+  return { img: ctx.getImage(), W, H };
+}
+function monthWidget(fam, data, stale) {
+  const ms = monthStats(), big = isBig(fam), sm = fam === 'small', m = model();
+  const w = new ListWidget(); base(w, fam);
+  const pct = Math.round(ms.avg * 100) + '%';
+  if (fam === 'medium') {
+    w.setPadding(14, 16, 14, 16);
+    const row = w.addStack(); row.layoutHorizontally();
+    const left = row.addStack(); left.layoutVertically();
+    txt(left, ms.month, Font.boldSystemFont(15), COL.fg); left.addSpacer(8);
+    const g = monthImage(ms, 13, 4, false, false), im = left.addImage(g.img); im.imageSize = new Size(g.W, g.H);
+    row.addSpacer();
+    const right = row.addStack(); right.layoutVertically();
+    txt(right, pct, Font.boldRoundedSystemFont(34), COL.fg);
+    txt(right, 'Ø diesen Monat', Font.mediumSystemFont(11), COL.muted);
+    right.addSpacer();
+    if (m.best > 0) txt(right, '🔥 ' + m.best + ' Tage Serie', Font.semiboldSystemFont(12), COL.fg);
+    txt(right, ms.perfect + (ms.perfect === 1 ? ' perfekter Tag' : ' perfekte Tage'), Font.mediumSystemFont(12), COL.muted);
+    staleNote(right, data, stale);
+    return w;
+  }
+  w.setPadding(big ? 18 : 14, big ? 18 : 14, big ? 16 : 12, big ? 18 : 14);
+  const head = w.addStack(); head.layoutHorizontally(); head.centerAlignContent();
+  txt(head, ms.month, Font.boldSystemFont(big ? 22 : 14), COL.fg); head.addSpacer();
+  txt(head, 'Ø ' + pct, Font.semiboldRoundedSystemFont(big ? 16 : 12), COL.muted);
+  w.addSpacer(big ? 12 : 8);
+  const g = big ? monthImage(ms, 34, 6, true, true) : monthImage(ms, 14, 4, false, false);
+  { const r = w.addStack(); r.layoutHorizontally(); r.addSpacer(); const im = r.addImage(g.img); im.imageSize = new Size(g.W, g.H); r.addSpacer(); }
+  w.addSpacer();
+  if (big) { txt(w, (m.best > 0 ? '🔥 ' + m.best + ' Tage Serie · ' : '') + ms.perfect + (ms.perfect === 1 ? ' perfekter Tag' : ' perfekte Tage'), Font.mediumSystemFont(12), COL.muted); }
+  staleNote(w, data, stale);
+  return w;
+}
+
+/* ---------- Serie ---------- */
+function streakWidget(fam, data, stale, q) {
+  const all = S.habits.filter(h => !h.archived && h.created <= today()).map(h => ({ h, n: streak(h), unit: h.freq === 'weekly' ? 'Wochen' : 'Tage' }))
+    .sort((a, b) => b.n - a.n);
+  const pick = q ? (all.find(x => x.h === findHabit(q)) || null) : all[0] || null;
+  const w = new ListWidget(); base(w, fam, '#E8661C'); const big = isBig(fam);
+  if (!pick) { w.setPadding(14, 14, 14, 14); txt(w, 'Kein Habit gefunden', Font.boldSystemFont(14), COL.fg, 2); return w; }
+  if (fam === 'small') {
+    w.setPadding(14, 14, 14, 14);
+    const top = centerStack(w); txt(top, '🔥', Font.systemFont(22), COL.fg);
+    w.addSpacer(2);
+    const mid = centerStack(w); txt(mid, String(pick.n), Font.boldRoundedSystemFont(48), COL.fg);
+    const cap = centerStack(w); txt(cap, pick.n ? pick.unit + ' Serie' : 'Heute starten', Font.mediumSystemFont(12), COL.muted);
+    w.addSpacer();
+    const bot = centerStack(w); txt(bot, pick.h.emoji + ' ' + pick.h.name, Font.semiboldSystemFont(12), COL.fg);
+    return w;
+  }
+  w.setPadding(14, 16, 14, 16);
+  const head = w.addStack(); head.layoutHorizontally(); head.centerAlignContent();
+  txt(head, 'Serien', Font.boldSystemFont(big ? 22 : 17), COL.fg); head.addSpacer(); txt(head, '🔥', Font.systemFont(big ? 18 : 15), COL.fg);
+  w.addSpacer(big ? 14 : 10);
+  const list = q ? [pick].concat(all.filter(x => x !== pick)) : all;
+  if (!big) {
+    const row = w.addStack(); row.layoutHorizontally();
+    list.slice(0, 3).forEach((x, i) => {
+      if (i) row.addSpacer();
+      const col = row.addStack(); col.layoutVertically();
+      txt(col, String(x.n), Font.boldRoundedSystemFont(32), x.n ? COL.fg : COL.faint);
+      txt(col, x.unit, Font.mediumSystemFont(11), COL.muted); col.addSpacer(6);
+      txt(col, x.h.emoji + ' ' + x.h.name, Font.semiboldSystemFont(12), COL.fg);
+    });
+    if (list.length < 3) row.addSpacer();
+  } else {
+    list.slice(0, 9).forEach((x, i) => {
+      if (i) w.addSpacer(10);
+      const row = w.addStack(); row.layoutHorizontally(); row.centerAlignContent();
+      txt(row, x.h.emoji, Font.systemFont(15), COL.fg); row.addSpacer(9);
+      txt(row, x.h.name, Font.semiboldSystemFont(15), COL.fg); row.addSpacer();
+      txt(row, String(x.n), Font.boldRoundedSystemFont(17), x.n ? COL.fg : COL.faint); row.addSpacer(4);
+      txt(row, x.unit, Font.mediumSystemFont(12), COL.muted);
+    });
+  }
+  w.addSpacer();
+  staleNote(w, data, stale);
   return w;
 }
 
@@ -592,10 +708,15 @@ function messageWidget(fam, title, msg) {
 /* ---------- Auswahl ---------- */
 function variant(param) {
   const p = String(param || '').trim(), l = p.toLowerCase();
-  if (!l || ['übersicht', 'uebersicht', 'heute'].includes(l)) return { v: 'overview' };
+  if (!l || ['übersicht', 'uebersicht', 'ring'].includes(l)) return { v: 'overview' };
+  if (['heute', 'liste', 'habits', 'alle'].includes(l)) return { v: 'list' };
   if (['woche', 'week', 'wochenraster'].includes(l)) return { v: 'week' };
   if (['aufgaben', 'aufgabe', 'todos', 'todo'].includes(l)) return { v: 'todos' };
   if (['stimmung', 'mood'].includes(l)) return { v: 'mood' };
+  if (['vers', 'verse', 'satz', 'sätze', 'saetze', 'spruch', 'zitat'].includes(l)) return { v: 'quote' };
+  if (['monat', 'kalender', 'month'].includes(l)) return { v: 'month' };
+  const s = p.match(/^(serie|serien|streak)\s*:?\s*(.*)$/i);
+  if (s) return { v: 'streak', q: s[2].trim() };
   const m = p.match(/^(habit|gewohnheit)\s*:?\s*(.*)$/i);
   return { v: 'habit', q: m ? m[2].trim() : p };
 }
@@ -606,13 +727,16 @@ function build(fam, data, stale, param) {
   if (fam === 'accessoryRectangular') return accRect(m);
   if (fam === 'accessoryInline') return accInline(m);
   const V = variant(param);
+  if (V.v === 'list') return listWidget(fam, data, stale);
   if (V.v === 'week') return weekWidget(fam, data, stale);
   if (V.v === 'habit') return habitWidget(fam, data, stale, V.q);
   if (V.v === 'mood') return moodWidget(fam, data, stale);
   if (V.v === 'todos') return todoWidget(fam, data, stale);
-  if (fam === 'small') return small(m, data, stale);
-  if (fam === 'large' || fam === 'extraLarge') return large(m, data, stale);
-  return medium(m, data, stale);
+  if (V.v === 'quote') return quoteWidget(fam, data, stale);
+  if (V.v === 'month') return monthWidget(fam, data, stale);
+  if (V.v === 'streak') return streakWidget(fam, data, stale, V.q);
+  // Standard: klein = Ring, mittel/groß = schlichte Liste aller Habits von heute
+  return fam === 'small' ? small(m, data, stale) : listWidget(fam, data, stale);
 }
 async function present(w, fam) {
   if (fam === 'small') return w.presentSmall();
@@ -771,8 +895,9 @@ async function main() {
   const a = new Alert();
   a.title = 'Sabrly-Widget';
   a.message = 'Angemeldet als ' + (kget(K.email) || '…') + '.\nWähle eine Vorschau oder füge das Widget auf dem Home-Bildschirm hinzu.';
-  const opts = [['Übersicht (mittel)', 'medium', ''], ['Woche (mittel)', 'medium', 'woche'], ['Habit (klein)', 'small', 'habit'], ['Stimmung (klein)', 'small', 'stimmung'],
-    ['Aufgaben (mittel)', 'medium', 'aufgaben'], ['Übersicht (groß)', 'large', ''], ['Übersicht (klein)', 'small', ''], ['Sperrbildschirm', 'accessoryRectangular', '']];
+  const opts = [['Heute (groß)', 'large', 'heute'], ['Heute (mittel)', 'medium', 'heute'], ['Woche (mittel)', 'medium', 'woche'], ['Habit (klein)', 'small', 'habit'],
+    ['Übersicht (klein)', 'small', ''], ['Aufgaben (mittel)', 'medium', 'aufgaben'], ['Vers (mittel)', 'medium', 'vers'], ['Vers (groß)', 'large', 'vers'], ['Monat (mittel)', 'medium', 'monat'],
+    ['Monat (groß)', 'large', 'monat'], ['Serie (klein)', 'small', 'serie'], ['Stimmung (klein)', 'small', 'stimmung'], ['Sperrbildschirm', 'accessoryRectangular', '']];
   a.addAction('✓  Heute abhaken');
   for (const [l] of opts) a.addAction('Vorschau: ' + l);
   a.addDestructiveAction('Abmelden');
