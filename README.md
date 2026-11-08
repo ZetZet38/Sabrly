@@ -20,4 +20,4 @@ Im Widget unter „Parameter“ eintragen:
 | `stimmung` | Stimmung des Tages |
 | `aufgaben` | offene Aufgaben |
 
-Ein Tipp auf einen Habit, eine Aufgabe oder eine Stimmung trägt ein und öffnet danach die Sabrly-App vom Home-Bildschirm (`webapp://`). Scriptable blitzt dabei kurz auf. Ein Tipp auf eine freie Stelle öffnet nur Sabrly.
+Ein Tipp auf einen Habit, eine Aufgabe oder eine Stimmung öffnet kurz Scriptable und trägt direkt ein (Bestätigung mit „Rückgängig“). Ein Tipp auf eine freie Stelle zeigt die Liste „Heute abhaken“. Die Sabrly-App selbst lässt sich aus Scriptable nicht öffnen (`webapp://` funktioniert nur aus Notizen).
