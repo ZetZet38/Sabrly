@@ -1,0 +1,34 @@
+name: Gebetszeiten
+# Holt täglich die offiziellen Diyanet-Gebetszeiten (gebetszeiten/) für die App.
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: gebetszeiten
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: GeoNames (Koordinaten für „Standort verwenden“)
+        run: |
+          curl -sfL -o /tmp/DE.zip https://download.geonames.org/export/dump/DE.zip && unzip -o -q /tmp/DE.zip -d /tmp/geo || echo "GeoNames nicht verfügbar"
+      - name: Gebetszeiten laden
+        run: GEONAMES=/tmp/geo/DE.txt node scripts/gebetszeiten.mjs
+      - name: Speichern
+        run: |
+          git config user.name "sabrly-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gebetszeiten
+          if git diff --cached --quiet; then echo "Keine Änderungen"; exit 0; fi
+          git commit -m "Gebetszeiten aktualisiert"
+          for i in 1 2 3; do git pull --rebase -q && git push && exit 0; sleep 5; done
+          exit 1
