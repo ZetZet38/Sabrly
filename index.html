@@ -224,6 +224,8 @@ h2{font-size:23px;font-weight:700;letter-spacing:-.015em;margin:0;text-wrap:bala
 .chip{border-radius:11px;padding:8px 4px;font-size:12.5px;font-weight:600;text-align:center;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted);transition:background .2s,border-color .2s,transform .15s}
 .chip:not(:disabled):active{transform:scale(.94)}
 .chip.on{background:color-mix(in srgb,var(--accent) 20%,transparent);border-color:color-mix(in srgb,var(--accent) 70%,transparent);color:var(--fg)}
+.hsw-host{position:relative}
+.hsw{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;z-index:6;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .chip{position:relative;overflow:hidden;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .chip .pb{position:absolute;left:0;bottom:0;height:3px;background:#E3BE76;border-radius:0 3px 3px 0}
 .chip .pe{position:absolute;top:1px;right:4px;font-size:9px;font-style:normal;color:#E3BE76}
@@ -460,7 +462,6 @@ body.paged .toast{bottom:calc(24px + env(safe-area-inset-bottom,0px))}
   <button class="tab" data-a="tab" data-t="mehr" id="tab-mehr"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/></svg>Mehr</button>
 </nav>
 <div class="toast" id="toast" hidden></div>
-<label id="hap" aria-hidden="true" style="position:fixed;left:-200px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden"><input type="checkbox" switch tabindex="-1"></label>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -683,7 +684,7 @@ function render(anim){
   document.body.classList.toggle('authmode',MODE==='auth');
   if(MODE==='auth'){const view=$('#view');view.innerHTML=vAuth();if(anim){view.classList.remove('enter','push');void view.offsetWidth;view.classList.add('enter')}document.body.classList.remove('paged');return}
   const v=UI.page?PAGES[UI.page.t]:({heute:vHeute,habits:vHabits,aufgaben:vAufgaben,statistik:vStats,mehr:vMehr}[UI.tab]||vHeute);
-  const view=$('#view');view.innerHTML=v();
+  const view=$('#view');view.innerHTML=v();decorateHaptics(view);
   if(anim){view.classList.remove('enter','push');void view.offsetWidth;view.classList.add(anim==='push'?'push':'enter')}
   document.body.classList.toggle('paged',!!UI.page);
   document.querySelectorAll('.tab').forEach(t=>{t.classList.toggle('on',t.dataset.t===UI.tab);t.setAttribute('aria-current',t.dataset.t===UI.tab?'page':'false')});
@@ -1195,8 +1196,15 @@ const ACT={
   alogout:el=>{if(!el.classList.contains('arm')){el.classList.add('arm');el.textContent='Wirklich abmelden?';return}flush();auth.signOut().catch(e=>toast(authMsg(e)))},
   undo:()=>{const t=$('#toast');const fn=t._undo;t.hidden=true;t._undo=null;if(fn)fn()},
 };
-/* haptic tick: Android via vibrate, iPhone (iOS 18+) via the native switch control */
-function haptic(){try{if(navigator.vibrate&&navigator.vibrate(8))return;const l=document.getElementById('hap');if(!l)return;const a=document.activeElement;l.click();if(a&&a!==document.body&&document.activeElement!==a&&typeof a.focus==='function')a.focus({preventScroll:true})}catch(e){}}
+/* Haptik: Android über vibrate. iPhone: iOS spielt den Tick nur, wenn der Finger direkt einen nativen
+   Schalter (<input type=checkbox switch>) trifft – per Skript geht es seit iOS 26.5 nicht mehr. Darum liegt in
+   jedem Knopf mit Haptik ein unsichtbarer Schalter; der Tipp trifft ihn, der Klick läuft normal zum Knopf weiter. */
+function haptic(){try{if(navigator.vibrate)navigator.vibrate(8)}catch(e){}}
+const HAPTIC_SKIP=new Set(['asubmit']);
+function decorateHaptics(root){if(!/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)||!('ontouchend' in document))return;
+  (root||document).querySelectorAll('[data-a]').forEach(el=>{const a=el.dataset.a;if(!HAPTIC.has(a)||HAPTIC_SKIP.has(a)||el.disabled||el.querySelector(':scope > .hsw'))return;
+    if(getComputedStyle(el).position==='static')el.classList.add('hsw-host');
+    const i=document.createElement('input');i.type='checkbox';i.setAttribute('switch','');i.className='hsw';i.tabIndex=-1;i.setAttribute('aria-hidden','true');el.appendChild(i)})}
 const HAPTIC=new Set(['asubmit','qadd','qsug','qdel','sitoggle','mood','taskdone','ptick','tog','inc','dec','lab','hstep','quick','calday','hsave','tsave','tdone','nadd','ndel','hdelq','tdelq','harchq','undo','planapply','tpl','emo','hday','tprio','pfilter']);
 function readAuth(){if(!UI.auth)UI.auth={mode:'login',email:'',pw:'',err:'',info:'',busy:false};document.querySelectorAll('#view [data-af]').forEach(el=>{UI.auth[el.dataset.af]=el.value})}
 function hasGuestData(){return (MODE==='guest'||UI.fromGuest)&&(S.todos.length>0||Object.keys(LOGS).length>0||S.quotes.length>0||!!S.plan.text||S.habits.some(h=>!['h-beten','h-lesen'].includes(h.id)))}
@@ -1333,7 +1341,6 @@ document.addEventListener('pointercancel',e=>{if(sw&&sw.lock==='x')endSwipe(e);e
 
 /* ---------- events ---------- */
 document.addEventListener('click',e=>{
-  if(e.target.closest('#hap'))return;
   if(Date.now()<swallowUntil&&!e.target.closest('.swipe-actions')){e.preventDefault();e.stopPropagation();return}
   const el=e.target.closest('[data-a]');if(!el||el.disabled)return;
   const row=el.closest('[data-swipe]');
