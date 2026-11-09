@@ -37,3 +37,13 @@ In Sabrly unter Mehr → Gebet einschalten und die Stadt wählen. Je früher im 
 (Fajr: am besten in den letzten 40 Minuten vor Sonnenaufgang; Asr endet 30 Minuten vor Maghrib; Isha bis Mitternacht 100 → 20,
 dann 20, im letzten Drittel der Nacht 10; nachgeholt 10). Gesperrt vor Beginn, Uhrzeit ändern per langem Druck (✎).
 Adhan-Mitteilungen plant das Scriptable-Skript.
+
+## Training
+
+Eigener Tab in der Leiste (Statistik steckt dann oben in Habits; unter Mehr → Ansicht wieder als eigener Tab einstellbar).
+Beim ersten Öffnen eine Vorlage wählen (Push · Pull · Tag C, Push · Pull · Beine, Oberkörper · Unterkörper, Ganzkörper oder leer),
+danach ist alles änderbar: Trainingstage, Übungen aus der Bibliothek oder eigene, Sätze, Wiederholungsbereich, Pause (Zeitrad), EMOM-Blöcke.
+Die Woche wird pro Woche geplant (mit Schicht pro Tag). Im Training: Sätze abhaken, Pausen-Timer (±10 s), ⓘ für Ausführung und Video,
+⇄ für Alternativen. Vorschläge nach doppelter Progression, Plateau-Hinweis ab 5 Einheiten ohne Fortschritt.
+Läufe (locker/lang oder Intervalle nach Zeit oder Strecke) mit Auswertung „Pace bei Puls unter …“, Kilometer pro KW und Intervall-Verlauf.
+Nach dem Speichern wird der Habit „Training“ (bzw. „Laufen“) automatisch abgehakt.
