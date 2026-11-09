@@ -226,7 +226,7 @@ h2{font-size:23px;font-weight:700;letter-spacing:-.015em;margin:0;text-wrap:bala
 .chip:not(:disabled):active{transform:scale(.94)}
 .chip.on{background:color-mix(in srgb,var(--accent) 20%,transparent);border-color:color-mix(in srgb,var(--accent) 70%,transparent);color:var(--fg)}
 .hsw-host{position:relative}
-.hsw{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;z-index:6;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hsw{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;z-index:6;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:pan-y}
 .chip{position:relative;overflow:hidden;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .chip .pb{position:absolute;left:0;bottom:0;height:3px;background:#E3BE76;border-radius:0 3px 3px 0}
 .chip .pe{position:absolute;top:1px;right:4px;font-size:9px;font-style:normal;color:#E3BE76}
@@ -1396,9 +1396,10 @@ function haptic(){try{if(navigator.vibrate)navigator.vibrate(8)}catch(e){}}
 const HAPTIC_SKIP=new Set(['asubmit']);
 function decorateHaptics(root){if(!/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)||!('ontouchend' in document))return;
   (root||document).querySelectorAll('[data-a]').forEach(el=>{const a=el.dataset.a;if(!HAPTIC.has(a)||HAPTIC_SKIP.has(a)||el.disabled||el.querySelector(':scope > .hsw'))return;
+    const r=el.getBoundingClientRect();if(!r.width||r.width>120||r.height>64)return;
     if(getComputedStyle(el).position==='static')el.classList.add('hsw-host');
     const i=document.createElement('input');i.type='checkbox';i.setAttribute('switch','');i.className='hsw';i.tabIndex=-1;i.setAttribute('aria-hidden','true');el.appendChild(i)})}
-const HAPTIC=new Set(['asubmit','qadd','qsug','qdel','sitoggle','mood','taskdone','ptick','tog','inc','dec','lab','hstep','quick','calday','hsave','tsave','tdone','nadd','ndel','hdelq','tdelq','harchq','undo','planapply','tpl','emo','hday','tprio','pfilter']);
+const HAPTIC=new Set(['asubmit','qdel','sitoggle','mood','taskdone','ptick','tog','inc','dec','lab','hstep','quick','hsave','tsave','tdone','nadd','ndel','hdelq','tdelq','harchq','undo']);
 function readAuth(){if(!UI.auth)UI.auth={mode:'login',email:'',pw:'',err:'',info:'',busy:false};document.querySelectorAll('#view [data-af]').forEach(el=>{UI.auth[el.dataset.af]=el.value})}
 function hasGuestData(){return (MODE==='guest'||UI.fromGuest)&&(S.todos.length>0||Object.keys(LOGS).length>0||S.quotes.length>0||!!S.plan.text||S.habits.some(h=>!['h-beten','h-lesen'].includes(h.id))||!!S.training)}
 const shiftMonth=(M,dir)=>{const[y,m]=M.split('-').map(Number),d=new Date(y,m-1+dir,1);return d.getFullYear()+'-'+pad(d.getMonth()+1)};
@@ -2114,7 +2115,8 @@ Object.assign(ACT,{
   rundelq:el=>runDel(el.dataset.d,el.dataset.id),
   hseg:el=>{UI.hseg=el.dataset.v;render()},
   stattab:()=>{S.settings.statTab=!S.settings.statTab;if(!S.settings.statTab&&UI.tab==='statistik')UI.tab='habits';touch('state',200);render()}});
-['wset','wsave','wfinish','wemgo','wemdot','restp','restm','restskip','tsetup','paddk','pdel','pshift','swapto','pkset','cexsave','blksave','runsave','waddset','wfeel','daycol','cxm','thr','stattab','hseg'].forEach(a=>HAPTIC.add(a));
+// nur kleine Abhak-Elemente und Schalter – auf Zeilen/Karten würde der Schalter das Scrollen blockieren
+['wset','wsave','wfinish','wemdot','restp','restm','restskip','cexsave','blksave','runsave','thr','stattab'].forEach(a=>HAPTIC.add(a));
 
 /* ---------- Wochenleiste: sauberes Wechseln von Woche und Tag ---------- */
 const EASE='cubic-bezier(.2,.8,.2,1)';
