@@ -569,6 +569,34 @@ body.paged .proto{display:none}
 .nxt{display:flex;flex-direction:column;gap:8px}
 .nxt div{display:flex;justify-content:space-between;gap:10px;font-size:13.5px}
 .nxt div b{color:var(--accent);font-weight:650;text-align:right}
+.exf{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rctl{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted)}
+.rctl b{font-family:var(--num);font-size:16px;color:var(--fg);min-width:36px;text-align:center}
+.rctl button{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--line);font-size:17px;font-weight:700;color:var(--fg);display:grid;place-items:center}
+.ivp{display:flex;flex-wrap:wrap;gap:6px}
+.ivp button{padding:7px 11px;border-radius:10px;font-size:13px;font-weight:650;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
+.ivp button.on{background:rgba(242,169,59,.16);border-color:rgba(242,169,59,.4);color:var(--amber)}
+.ivrow{grid-template-columns:84px 1fr 1fr}
+.ivhd span{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.ivrow .lb{display:flex;flex-direction:column;gap:1px}.ivrow .lb b{font-size:13.5px;color:var(--fg);font-weight:650}.ivrow .lb small{font-size:11px;color:var(--muted)}
+.ivin{display:flex;align-items:baseline;gap:4px;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:var(--r-sm);padding:0 10px;min-height:42px;min-width:0}
+.ivin input{width:100%;min-width:0;background:transparent;border:0;outline:none;font-family:var(--num);font-size:19px;color:var(--fg);padding:8px 0}
+.ivin span{font-size:11px;color:var(--muted);white-space:nowrap}
+.ivcus{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
+.ivcus .seg{padding:2px}.ivcus .seg button{padding:8px 10px}
+.tday{display:flex;align-items:center;gap:12px;padding:11px 12px 11px 14px;border-radius:var(--r-md)}
+.tday .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;background:rgba(70,224,174,.14);color:var(--accent);font-size:18px}
+.tday .ic svg{width:22px;height:22px}
+.tday.run .ic{background:rgba(76,141,255,.16);color:#8DB4FF}
+.tday .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.tday .tx small{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.tday .tx b{font-size:16px}.tday .tx span{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tday .go{padding:8px 14px;border-radius:999px;font-size:13.5px;font-weight:700;background:var(--accent);color:var(--accent-ink);flex:none}
+.tday.run .go{background:#4C8DFF;color:#fff}
+.tday.ok .go{background:rgba(255,255,255,.08);color:var(--accent)}
+.phs{opacity:.5}.phs .sec-h h2{font-size:22px}
+.kmv{font-family:var(--num);font-size:11px;color:#C9D7F5}
+.kmw{gap:6px}.kmw .pbcol{min-width:0}.kmw .pbcol small{font-size:10px;white-space:nowrap}
 </style>
 <div class="bgfx" aria-hidden="true"></div>
 <div class="wrap" id="view"></div>
@@ -652,18 +680,25 @@ const W={
  push:{n:'Push',s:'Push',k:'k',ex:['dips','landmine','bpresse','swings','carry','katana'],min:65},
  pull:{n:'Pull',s:'Pull',k:'k',ex:['pullups','tbar','stepups','rotation','facepull','curls'],min:70},
  c:{n:'Tag C',s:'C',sub:'Oberkörper',k:'k',ex:['emom','bpresse95','kelso','kcurls','katana2','facepull3'],min:60},
- lauf:{n:'Lauf locker',s:'Lauf',k:'l',run:'easy',min:60,desc:'60 min · Puls unter 150 · Pace ca. 7:30–7:45'},
- qual:{n:'Qualitätslauf',s:'3×8',k:'q',run:'iv',min:45,desc:'3 × 8 min, dazwischen 2 min traben'},
+ lauf:{n:'Lauf locker',s:'Lauf',k:'l',run:'easy',min:60,desc:'60 min · Puls unter 150 · Pace ca. 7:30–7:45',d2:'60 min · Puls unter 150'},
+ qual:{n:'Qualitätslauf',s:'3×8',k:'q',run:'iv',min:45,desc:'3 × 8 min, dazwischen 2 min traben',d2:'3 × 8 min · 2 min traben'},
  rest:{n:'Ruhetag',k:'r'}};
 const DN=['Mo','Di','Mi','Do','Fr','Sa','So'];
+const IVP={'4x4':{n:4,len:4,u:'min',p:'3 min traben',v:[['5:10',168],['5:08',171],['5:06',173],['5:05',175]]},
+ '3x8':{n:3,len:8,u:'min',p:'2 min traben',v:[['5:36',167],['5:35',169],['5:34',171]]},
+ '6x400':{n:6,len:400,u:'m',p:'200 m traben',v:[['1:52',165],['1:51',168],['1:50',170],['1:50',171],['1:49',173],['1:48',174]]},
+ '8x200':{n:8,len:200,u:'m',p:'200 m gehen',v:[['0:53',158],['0:52',162],['0:52',164],['0:51',166],['0:51',167],['0:50',169],['0:50',170],['0:49',171]]}};
+const ivName=P=>`${P.n} × ${P.len} ${P.u}`;
+const toSec=t=>{const p=String(t).split(':').map(Number);return p.length===2?p[0]*60+p[1]:p.length===3?p[0]*3600+p[1]*60+p[2]:NaN};
+const kw=d=>{const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y)/864e5+1)/7)};
 /* ---------- Zustand ---------- */
 const now=new Date(),wd=(now.getDay()+6)%7,mon=new Date(now);mon.setDate(now.getDate()-wd);
 const dateOf=(i,w=0)=>{const d=new Date(mon);d.setDate(mon.getDate()+i+7*w);return d};
-const UI={tab:'training',page:null,bar:6,w:null,timer:null,rest:null,emom:null,sel:wd};
+const UI={tab:'training',page:null,stack:[],bar:5,w:null,timer:null,rest:null,emom:null,sel:wd};
 let WEEK=[['push'],['lauf'],['pull'],[],['qual'],['c'],['lauf']];   // diese Woche (Beispiel)
 const DONE=new Set();for(let i=0;i<wd;i++)DONE.add(i);              // vergangene Tage erledigt
 let NEXT={days:[[],[],[],[],[],[],[]],shift:['F','F','S','S','S','',''] };
-const RUNS=[{d:-2,t:'easy',km:8.0,dur:3690,hr:146,max:158},{d:-4,t:'iv',km:7.1,dur:2760,hr:158,max:176,iv:[['5:38',168],['5:36',170],['5:35',171]]},{d:-6,t:'easy',km:7.8,dur:3640,hr:147,max:157},{d:-9,t:'easy',km:7.6,dur:3620,hr:148,max:159}];
+const RUNS=[{d:-2,t:'easy',km:8.0,dur:3690,hr:146,max:158},{d:-4,t:'iv',n:'Intervalle 3 × 8 min',km:7.1,dur:2760,hr:158,max:176},{d:-6,t:'easy',km:7.8,dur:3640,hr:147,max:157},{d:-9,t:'easy',km:7.6,dur:3620,hr:148,max:159}];
 
 /* ---------- Rendering ---------- */
 function tabs(){const L=UI.bar===6?['heute','habits','aufgaben','training','statistik','mehr']:['heute','habits','training','aufgaben','mehr'];
@@ -673,8 +708,9 @@ function render(anim){const v=$('#view');
   v.innerHTML=UI.page?PAGES[UI.page.t]():({training:vTraining,heute:vHeute,habits:vHabits,statistik:vStat,aufgaben:vPh,mehr:vPh}[UI.tab])();
   if(anim){v.classList.remove('enter','push');void v.offsetWidth;v.classList.add(anim)}
   document.body.classList.toggle('paged',!!UI.page);tabs();restbar()}
-const go=p=>{UI.page=p;render('push');window.scrollTo(0,0)};
-const back=()=>{UI.page=null;render('enter');window.scrollTo(0,0)};
+const go=p=>{if(UI.page)UI.stack.push(UI.page);UI.page=p;render('push');window.scrollTo(0,0)};
+const back=()=>{UI.page=UI.stack.pop()||null;render('enter');window.scrollTo(0,0)};
+const home=()=>{UI.stack=[];back()};
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2200)}
 function sheet(h){$('#sheet').innerHTML=h?`<div class="ovl" data-a="close"><div class="sheet"><div class="grab"></div>${h}</div></div>`:''}
 
@@ -699,11 +735,16 @@ function vTraining(){const sd=UI.sel,today=WEEK[sd][0]||'rest',w=W[today],lbl=sd
     <button type="button" class="btn" data-a="run" data-k="easy">＋ Lauf eintragen<small>aus Garmin übernehmen</small></button><button type="button" class="btn" data-a="exlist">🏋️ Übungen<small>Verlauf & Bestwerte</small></button></div>`;
   return h}
 /* --- andere Tabs, nur angedeutet --- */
-function vHeute(){const k=WEEK[wd][0]||'rest',w=W[k];return `<div class="titlebar"><div class="tb-l"><div class="tb-row"><h1>Heute</h1></div></div></div>
-  <span class="hint">Im Prototyp nur angedeutet: Die Heute-Seite bleibt wie sie ist. Neu wäre nur diese Karte.</span>
-  ${w.ex?`<div class="hero"><span class="label" style="color:var(--accent)">Training heute</span><h3>${w.n}</h3><span class="meta">${w.ex.length} Übungen · ca. ${w.min} min</span><button type="button" class="btn pri" data-a="start" data-w="${k}">Starten</button></div>`
-   :w.run?`<div class="hero run"><span class="label" style="color:#8DB4FF">Training heute</span><h3>${w.n}</h3><span class="meta">${w.desc}</span></div>`:`<div class="hero"><h3>Ruhetag</h3></div>`}
-  <div class="card glass ph2">Vers des Tages · Situations-Satz · Habits · Aufgaben · Rückblick · Notizen …</div>`}
+function tday(){const k=WEEK[wd][0];if(!k)return '';const w=W[k],done=DONE.has(wd);
+  return `<div class="tday glass${w.run?' run':''}${done?' ok':''}"><span class="ic">${w.run?'🏃':ICON.training}</span><span class="tx"><small>Training heute</small><b>${w.n}${w.sub?' · '+w.sub:''}</b><span>${w.ex?w.ex.length+' Übungen · ca. '+w.min+' min':w.d2}</span></span>
+    ${done?'<span class="go">✓</span>':w.ex?`<button type="button" class="go" data-a="start" data-w="${k}">Starten</button>`:`<button type="button" class="go" data-a="run" data-k="${w.run}">Eintragen</button>`}</div>`}
+function vHeute(){const ph=(t,x)=>`<section class="sec phs"><div class="sec-h"><h2>${t}</h2></div><div class="card glass ph2">${x}</div></section>`;
+  return `<div class="titlebar"><div class="tb-l"><div class="tb-row"><h1>Heute</h1></div></div></div>
+  <div class="card glass ph2 phs">Vers des Tages · Situations-Satz</div>
+  ${ph('Habits','Deine Habits wie bisher')}${ph('Aufgaben','Deine Aufgaben wie bisher')}
+  ${tday()}
+  ${ph('Rückblick','Wie war dein Tag?')}${ph('Notizen','Notizen · Tagesablauf')}
+  <span class="hint">Im Prototyp angedeutet – neu ist nur die Trainingszeile zwischen Aufgaben und Rückblick. Am Ruhetag erscheint sie nicht.</span>`}
 function vHabits(){if(UI.bar===6)return vPh();UI.hseg=UI.hseg||'h';return `<div class="titlebar"><div class="tb-l"><div class="tb-row"><h1>Habits</h1></div></div></div>
   <div class="seg"><button class="${UI.hseg==='h'?'on':''}" data-a="hseg" data-v="h">Habits</button><button class="${UI.hseg==='s'?'on':''}" data-a="hseg" data-v="s">Statistik</button></div>
   <div class="card glass ph2">${UI.hseg==='h'?'Deine Habits wie bisher.':'Die Statistik wie bisher – nur eben hier oben umschaltbar statt als eigener Tab.'}</div>
@@ -712,7 +753,7 @@ function vStat(){return `<div class="titlebar"><div class="tb-l"><div class="tb-
 function vPh(){return `<div class="titlebar"><div class="tb-l"><div class="tb-row"><h1>${TABNAME[UI.tab]}</h1></div></div></div><div class="card glass ph2">Dieser Bereich bleibt wie in Sabrly – im Prototyp nur angedeutet. Probier den Tab <b>Training</b>.</div>`}
 
 /* --- Trainingsmodus --- */
-function startW(k){const w=W[k];UI.w={k,start:Date.now(),ex:w.ex.map(id=>({id,orig:id,name:EX[id].n,swapped:false,sets:EX[id].t==='emom'?[]:EX[id].sets.map(([a,b])=>({kg:a,r:b,done:false}))}))};go({t:'work'})}
+function startW(k){const w=W[k];UI.w={k,start:Date.now(),ex:w.ex.map(id=>({id,orig:id,name:EX[id].n,swapped:false,rest:EX[id].rest||60,sets:EX[id].t==='emom'?[]:EX[id].sets.map(([a,b])=>({kg:a,r:b,done:false}))}))};go({t:'work'})}
 function pWork(){const W0=UI.w,w=W[W0.k],el=Math.floor((Date.now()-W0.start)/1000);
   let h=`<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="wcancel">Abbrechen</button><h2>${w.n} · <span class="num wtime" id="wtime">${mmss(el)}</span></h2><button type="button" class="r txtbtn pri" data-a="wfinish">Fertig</button></div>`;
   const cur=W0.ex.findIndex(x=>x.sets.length?x.sets.some(s=>!s.done):!(UI.emom&&UI.emom.done));
@@ -725,7 +766,7 @@ function pWork(){const W0=UI.w,w=W[W0.k],el=Math.floor((Date.now()-W0.start)/100
         <label>${e.t==='bw'?'<span>+</span>':''}<input inputmode="decimal" value="${kg(s.kg)}" data-in="kg" data-x="${xi}" data-s="${si}"><span>kg${e.t==='side'&&x.id==='stepups'?' (2×)':''}</span></label>
         <label><input inputmode="numeric" value="${s.r}" data-in="r" data-x="${xi}" data-s="${si}"><span>${e.t==='time'?'s / Seite':e.t==='side'?'/ Seite':'Wdh.'}</span></label>
         <button type="button" class="ck" data-a="set" data-x="${xi}" data-s="${si}" aria-label="Satz erledigt">✓</button></div>`).join('')}</div>
-        <button type="button" class="addset" data-a="addset" data-x="${xi}">+ Satz</button>`}
+        <div class="exf"><button type="button" class="addset" data-a="addset" data-x="${xi}">+ Satz</button><span class="rctl">Pause<button type="button" data-a="rdec" data-x="${xi}" aria-label="10 Sekunden kürzer">−</button><b>${mmss(x.rest)}</b><button type="button" data-a="rinc" data-x="${xi}" aria-label="10 Sekunden länger">+</button></span></div>`}
     h+=`</div>`});
   h+=`<button type="button" class="btn pri" data-a="wfinish">Training beenden</button>`;return h}
 function emomCard(){const E=UI.emom||{r:0,left:60,run:false,done:false},e=EX.emom,ex=E.r%2===0?'Chin-ups':'Dips';
@@ -734,7 +775,7 @@ function emomCard(){const E=UI.emom||{r:0,left:60,run:false,done:false},e=EX.emo
     ${E.done?'':`<button type="button" class="btn${E.run?'':' pri'}" style="margin-top:6px;min-width:160px" data-a="emom">${E.run?'Pause':E.r?'Weiter':'EMOM starten'}</button>`}</div>`}
 function restbar(){const R=UI.rest,b=$('#restbar');if(!R||!UI.page||UI.page.t!=='work'){b.innerHTML='';return}
   const left=Math.max(0,Math.ceil((R.end-Date.now())/1000));
-  b.innerHTML=`<div class="rest"><span class="rt">${mmss(left)}</span><div class="rb"><i style="width:${left/R.total*100}%"></i></div><button type="button" data-a="rest15">+15 s</button><button type="button" data-a="restskip">Weiter</button></div>`;
+  b.innerHTML=`<div class="rest"><span class="rt">${mmss(left)}</span><div class="rb"><i style="width:${left/R.total*100}%"></i></div><button type="button" data-a="restm">−10 s</button><button type="button" data-a="restp">+10 s</button><button type="button" data-a="restskip">Weiter</button></div>`;
   if(left<=0){UI.rest=null;b.innerHTML='';toast('Pause vorbei – nächster Satz')}}
 setInterval(()=>{if(UI.page&&UI.page.t==='work'){const t=$('#wtime');if(t)t.textContent=mmss(Math.floor((Date.now()-UI.w.start)/1000));restbar();
   const E=UI.emom;if(E&&E.run){E.left--;if(E.left<=0){E.r++;E.left=60;if(E.r>=EX.emom.rounds){E.run=false;E.done=true}render()}else{const el=$('#emomt');if(el)el.textContent=mmss(E.left)}}}},1000);
@@ -773,34 +814,45 @@ function pPlan(){const harder=k=>['push','pull','c','qual'].includes(k);
       ${two?'<span class="warn">⚠︎ Zwei harte Einheiten an einem Tag</span>':''}${i>0&&L.includes('qual')&&NEXT.days[i-1].some(k=>['pull'].includes(k))?'<span class="warn">⚠︎ Qualitätslauf direkt nach Pull mit Step-ups – Beine evtl. noch müde</span>':''}</div>`}).join('')}
   <span class="hint">Schicht pro Tag antippen (frei → Früh → Spät → Nacht). Hilft beim Planen, z. B. Qualitätslauf an freien Tagen.</span>`}
 /* --- Laufen --- */
-function pRun(){const R=UI.page.r;const sec=(R.h*3600+R.m*60+R.s),pace=R.km>0?sec/R.km:0;
+function pRun(){const R=UI.page.r;const sec=(R.h*3600+R.m*60+R.s),pace=R.km>0?sec/R.km:0,iv=R.k==='iv';
   return `<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Abbrechen</button><h2>Lauf eintragen</h2><button type="button" class="r txtbtn pri" data-a="runsave">Sichern</button></div>
-  <div class="seg">${[['easy','Locker'],['iv','Intervalle'],['tempo','Tempo'],['long','Lang']].map(([k,t])=>`<button class="${R.k===k?'on':''}" data-a="rtype" data-v="${k}">${t}</button>`).join('')}</div>
+  <div class="seg">${[['easy','Locker / Lang'],['iv','Intervalle']].map(([k,t])=>`<button class="${R.k===k?'on':''}" data-a="rtype" data-v="${k}">${t}</button>`).join('')}</div>
   <div class="card glass stack" style="gap:12px"><div class="fgrid">
-    <div class="fgroup"><label class="label">Dauer (h:mm:ss)</label><input class="tinput" data-rf="dur" value="${R.h}:${pad(R.m)}:${pad(R.s)}" inputmode="numeric"></div>
-    <div class="fgroup"><label class="label">Distanz (km)</label><input class="tinput" data-rf="km" value="${kg(R.km)}" inputmode="decimal"></div>
+    <div class="fgroup"><label class="label">Dauer${iv?' gesamt':''}</label><input class="tinput" data-rf="dur" value="${R.h}:${pad(R.m)}:${pad(R.s)}" inputmode="numeric"></div>
+    <div class="fgroup"><label class="label">Distanz${iv?' gesamt':''} (km)</label><input class="tinput" data-rf="km" value="${kg(R.km)}" inputmode="decimal"></div>
     <div class="fgroup"><label class="label">Ø-Puls</label><input class="tinput" data-rf="hr" value="${R.hr}" inputmode="numeric"></div>
     <div class="fgroup"><label class="label">Max-Puls</label><input class="tinput" data-rf="max" value="${R.max}" inputmode="numeric"></div></div>
-    <div class="pace"><b id="pace">${pace?mmss(pace):'–'}</b><span class="hint">min/km</span><span style="flex:1"></span><span id="hrok" class="pill" style="color:${R.k==='easy'?(R.hr<150?'var(--accent)':'var(--amber)'):'var(--muted)'}">${R.k==='easy'?(R.hr<150?'Puls unter 150 ✓':'Puls über 150'):'Ø '+R.hr}</span></div></div>
-  ${R.k==='iv'?`<div class="card glass stack" style="gap:10px"><span class="label">Intervalle · 3 × 8 min, 2 min traben</span>${R.iv.map((v,i)=>`<div class="ivrow"><span>${i+1}. 8:00</span><input class="tinput" style="min-height:42px;padding:8px 12px" value="${v[0]}" placeholder="Pace"><input class="tinput" style="min-height:42px;padding:8px 12px" value="${v[1]}" placeholder="Ø-Puls"></div>`).join('')}
-    <button type="button" class="addset" data-a="noop">+ Intervall</button><span class="hint">Optional – pro Intervall Pace und Ø-Puls aus der Garmin-Runde.</span></div>`:''}
-  <span class="hint">Werte aus Garmin Connect bzw. der Trainings-App der Apple Watch übernehmen. Später möglich: automatisch über einen Kurzbefehl aus Apple Health.</span>`}
+    <div class="pace"><b id="pace">${pace?mmss(pace):'–'}</b><span class="hint">min/km${iv?' inkl. Ein-/Auslaufen':''}</span><span style="flex:1"></span>${iv?'':`<span id="hrok" class="pill" style="color:${R.hr<150?'var(--accent)':'var(--amber)'}">${R.hr<150?'Puls unter 150 ✓':'Puls über 150'}</span>`}</div></div>
+  ${iv?ivCard(R):''}
+  <span class="hint">${iv?'':'Lockere und lange Läufe landen zusammen in „Pace bei Puls unter 150“. '}Werte aus Garmin Connect bzw. der Trainings-App der Apple Watch übernehmen. Später möglich: automatisch über einen Kurzbefehl aus Apple Health.</span>`}
+function ivCard(R){const P=R.ivp==='own'?R.own:IVP[R.ivp],dist=P.u==='m';
+  return `<div class="card glass stack" style="gap:12px"><span class="label">Was bist du gelaufen?</span>
+  <div class="ivp">${Object.keys(IVP).map(k=>`<button class="${R.ivp===k?'on':''}" data-a="ivp" data-v="${k}">${ivName(IVP[k])}</button>`).join('')}<button class="${R.ivp==='own'?'on':''}" data-a="ivp" data-v="own">Eigene</button></div>
+  ${R.ivp==='own'?`<div class="ivcus"><label class="ivin"><input data-own="n" value="${P.n}" inputmode="numeric"><span>×</span></label><label class="ivin"><input data-own="len" value="${P.len}" inputmode="numeric"><span>${P.u}</span></label>
+    <div class="seg"><button class="${P.u==='min'?'on':''}" data-a="ownu" data-v="min">min</button><button class="${P.u==='m'?'on':''}" data-a="ownu" data-v="m">m</button></div></div>
+    <label class="ivin"><input data-own="p" value="${esc(P.p)}"><span>Pause dazwischen</span></label>`:`<span class="hint">Dazwischen: ${P.p}</span>`}
+  <div class="ivrow ivhd"><span>Intervall</span><span>${dist?'Zeit':'Pace'}</span><span>Ø-Puls</span></div>
+  ${R.iv.map((v,i)=>{const ps=dist&&v[0]?toSec(v[0])/(P.len/1000):0;
+    return `<div class="ivrow"><span class="lb"><b>${i+1}. · ${P.len} ${P.u}</b>${dist?`<small>${ps?'= '+mmss(ps)+' /km':''}</small>`:''}</span>
+    <label class="ivin"><input data-iv="${i}" data-f="0" value="${v[0]}" placeholder="${dist?'1:50':'5:30'}" inputmode="numeric"><span>${dist?'min':'/km'}</span></label>
+    <label class="ivin"><input data-iv="${i}" data-f="1" value="${v[1]}" placeholder="165" inputmode="numeric"><span>bpm</span></label></div>`}).join('')}
+  <span class="hint">Aus den Runden (Laps) deiner Uhr: bei Zeit-Intervallen die Pace, bei Strecken-Intervallen die Zeit – die Pace rechnet Sabrly dann aus. Ø-Puls = Durchschnittspuls in diesem Intervall. Ein Tempolauf ist einfach „Eigene“ mit 1 × 20 min.</span></div>`}
 function pRuns(){const P=[485,482,479,474,470,466,461,456],mx=490,mn=450,pts=P.map((v,i)=>[14+i*(292/7),12+(v-mn)/(mx-mn)*96]);
-  const KM=[18,22,16,24,21,25,23,27];
+  const cur=RUNS.filter(r=>r.d>=-wd).reduce((a,r)=>a+r.km,0),KM=[22,16,24,21,25,23,23,Math.round(cur*10)/10];
   return `<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Zurück</button><h2>Laufen</h2><button type="button" class="r txtbtn pri" data-a="run" data-k="easy">＋</button></div>
   <div class="card glass stack chart" style="gap:8px"><span class="label">Pace bei Puls unter 150 · 8 Wochen</span><span class="big1">7:36 <span class="hint" style="font-family:var(--ui)">min/km</span></span>
    <svg viewBox="0 0 320 120"><polyline fill="none" stroke="#8DB4FF" stroke-width="2.5" stroke-linejoin="round" points="${pts.map(p=>p.join(',')).join(' ')}"/>${pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#8DB4FF"/>`).join('')}</svg>
    <span class="hint" style="color:var(--accent)">Bei gleichem Puls 29 s/km schneller als vor 8 Wochen – deine Grundlagenausdauer wächst.</span></div>
-  <div class="card glass stack" style="gap:8px"><span class="label">Kilometer pro Woche</span><div class="pbars" style="height:70px">${KM.map((v,i)=>`<div class="pbcol"><div class="pbt" style="background:rgba(76,141,255,.12)"><i style="height:${v/30*100}%;background:#4C8DFF"></i></div><small>${v}</small></div>`).join('')}</div></div>
+  <div class="card glass stack" style="gap:8px"><span class="label">Kilometer pro Woche</span><div class="pbars kmw">${KM.map((v,i)=>{const d=dateOf(0,i-7);return `<div class="pbcol"><b class="kmv">${v?kg(v):'–'}</b><div class="pbt" style="background:rgba(76,141,255,.12)"><i style="height:${v/30*100}%;background:#4C8DFF${i===7?';opacity:.6':''}"></i></div><small>KW ${kw(d)}</small></div>`}).join('')}</div><span class="hint">Letzte Säule = diese Woche (läuft noch).</span></div>
   <div class="card glass stack" style="gap:6px"><span class="label">Intervalle 3 × 8 min</span><span>Ø-Puls im letzten Intervall bei ~5:35/km</span><span class="num" style="font-size:22px">176 → 171 <span class="hint" style="font-family:var(--ui)">in 4 Wochen</span></span></div>
   <section class="sec"><div class="sec-h"><h2 style="font-size:22px">Letzte Läufe</h2></div>${RUNS.map(r=>{const d=new Date(now);d.setDate(now.getDate()+r.d);
-    return `<div class="runl glass"><span class="ic" style="background:${r.t==='iv'?'rgba(242,169,59,.16)':'rgba(76,141,255,.16)'}">${r.t==='iv'?'⚡':'🏃'}</span><span class="tx"><b>${r.t==='iv'?'Qualitätslauf 3 × 8':'Lauf locker'}</b><small>${DN[(d.getDay()+6)%7]} ${d.getDate()}. · ${kg(r.km)} km · ${mmss(r.dur/r.km)} /km</small></span><span class="v">${r.hr}<small>Ø-Puls</small></span></div>`}).join('')}</section>`}
+    return `<div class="runl glass"><span class="ic" style="background:${r.t==='iv'?'rgba(242,169,59,.16)':'rgba(76,141,255,.16)'}">${r.t==='iv'?'⚡':'🏃'}</span><span class="tx"><b>${r.n||(r.t==='iv'?'Intervalle':'Lauf locker')}</b><small>${DN[(d.getDay()+6)%7]} ${d.getDate()}. · ${kg(r.km)} km · ${mmss(r.dur/r.km)} /km</small></span><span class="v">${r.hr}<small>Ø-Puls</small></span></div>`}).join('')}</section>`}
 const PAGES={work:pWork,done:pDone,ex:pEx,exlist:pExList,plan:pPlan,run:pRun,runs:pRuns};
 
 /* ---------- Aktionen ---------- */
 const ACT={
  day:el=>{UI.sel=+el.dataset.i;render()},
- tab:el=>{UI.tab=el.dataset.t;UI.sel=wd;UI.page=null;render('enter');window.scrollTo(0,0)},
+ tab:el=>{UI.tab=el.dataset.t;UI.sel=wd;UI.page=null;UI.stack=[];render('enter');window.scrollTo(0,0)},
  back:()=>back(),close:(el,e)=>{if(e.target===el)sheet('')},xclose:()=>sheet(''),noop:()=>toast('Im Prototyp nicht aktiv'),
  proto:()=>sheet(`<h3>Prototyp</h3><span class="hint">Klick-Prototyp mit deinem Split und Beispieldaten. Nichts wird gespeichert, deine echten Sabrly-Daten bleiben unberührt.</span>
    <span class="label">Leiste unten</span><div class="seg"><button class="${UI.bar===6?'on':''}" data-a="bar" data-v="6">6 Tabs</button><button class="${UI.bar===5?'on':''}" data-a="bar" data-v="5">5 Tabs (Statistik in Habits)</button></div>
@@ -810,9 +862,12 @@ const ACT={
  hseg:el=>{UI.hseg=el.dataset.v;render()},
  start:el=>{UI.emom=null;UI.feel=null;UI.wday=UI.sel;startW(el.dataset.w)},
  set:el=>{const x=UI.w.ex[+el.dataset.x],s=x.sets[+el.dataset.s];s.done=!s.done;
-   if(s.done){const r=EX[x.id].rest;UI.rest={end:Date.now()+r*1000,total:r}}render()},
+   if(s.done){const r=x.rest;if(r)UI.rest={end:Date.now()+r*1000,total:r}}render()},
  addset:el=>{const x=UI.w.ex[+el.dataset.x],l=x.sets[x.sets.length-1];x.sets.push({kg:l?l.kg:0,r:l?l.r:0,done:false});render()},
- rest15:()=>{if(UI.rest){UI.rest.end+=15000;UI.rest.total+=15}restbar()},
+ restp:()=>{if(UI.rest){UI.rest.end+=10000;UI.rest.total+=10}restbar()},
+ restm:()=>{if(UI.rest){UI.rest.end-=10000}restbar()},
+ rinc:el=>{const x=UI.w.ex[+el.dataset.x];x.rest=Math.min(600,x.rest+10);render()},
+ rdec:el=>{const x=UI.w.ex[+el.dataset.x];x.rest=Math.max(0,x.rest-10);render()},
  restskip:()=>{UI.rest=null;restbar()},
  emom:()=>{const E=UI.emom||(UI.emom={r:0,left:60,run:false,done:false});E.run=!E.run;render()},
  info:el=>infoSheet(UI.w.ex[+el.dataset.x].id,UI.w.ex[+el.dataset.x].name),
@@ -823,9 +878,9 @@ const ACT={
    ${x.swapped?`<button type="button" class="btn" data-a="swapback" data-x="${xi}">Zurück zu ${esc(e.n)}</button>`:''}`)},
  swapto:el=>{const x=UI.w.ex[+el.dataset.x],e=EX[x.orig];x.name=e.alt[+el.dataset.i][0];x.swapped=true;x.sets.forEach(s=>{s.done=false});sheet('');render();toast('Für heute getauscht')},
  swapback:el=>{const x=UI.w.ex[+el.dataset.x];x.name=EX[x.orig].n;x.swapped=false;sheet('');render()},
- wcancel:()=>{UI.w=null;UI.rest=null;UI.emom=null;back()},
+ wcancel:()=>{UI.w=null;UI.rest=null;UI.emom=null;home()},
  wfinish:()=>{UI.rest=null;UI.page={t:'done'};render('push');window.scrollTo(0,0)},
- wclose:()=>{DONE.add(UI.wday??wd);UI.w=null;UI.emom=null;back();toast('Training gespeichert ✓')},
+ wclose:()=>{DONE.add(UI.wday??wd);UI.w=null;UI.emom=null;home();toast('Training gespeichert ✓')},
  feel:el=>{UI.feel=+el.dataset.v;render()},
  exd:el=>go({t:'ex',x:el.dataset.x}),
  exlist:()=>go({t:'exlist'}),
@@ -837,21 +892,31 @@ const ACT={
  pdel:el=>{NEXT.days[+el.dataset.i].splice(+el.dataset.j,1);render()},
  padd:el=>{const i=+el.dataset.i;sheet(`<h3>${DN[i]} ${dateOf(i,1).getDate()}.</h3>${['push','pull','c','lauf','qual'].map(k=>`<button type="button" class="opt" data-a="paddk" data-i="${i}" data-k="${k}"><span class="tg ${W[k].k}" style="font-size:12px;padding:4px 8px">${W[k].n}</span><span style="flex:1"><small>${W[k].ex?W[k].ex.length+' Übungen · ca. '+W[k].min+' min':W[k].desc}</small></span></button>`).join('')}`)},
  paddk:el=>{NEXT.days[+el.dataset.i].push(el.dataset.k);sheet('');render()},
- run:el=>{const k=el.dataset.k||'easy';go({t:'run',r:{k,h:1,m:1,s:30,km:8.1,hr:146,max:158,iv:[['5:36',167],['5:35',169],['5:34',171]]}});if(k==='iv'){const R=UI.page.r;R.h=0;R.m=46;R.s=0;R.km=7.2;R.hr=158;R.max=175;render()}},
- rtype:el=>{const R=UI.page.r,k=el.dataset.v,S={easy:[1,1,30,8.1,146,158],iv:[0,46,0,7.2,158,175],tempo:[0,40,0,7.0,165,172],long:[1,35,0,12.4,144,152]}[k];R.k=k;if(S)[R.h,R.m,R.s,R.km,R.hr,R.max]=S;render()},
- runsave:()=>{const R=UI.page.r;RUNS.unshift({d:0,t:R.k==='iv'?'iv':'easy',km:R.km,dur:R.h*3600+R.m*60+R.s,hr:R.hr,max:R.max});UI.page={t:'runs'};render('push');toast('Lauf gespeichert ✓')},
+ run:el=>{const R={k:'easy',ivp:'3x8',iv:IVP['3x8'].v.map(a=>a.slice()),own:{n:5,len:1000,u:'m',p:'2 min traben'}};runVals(R,el.dataset.k==='iv'?'iv':'easy');go({t:'run',r:R})},
+ rtype:el=>{runVals(UI.page.r,el.dataset.v);render()},
+ ivp:el=>{const R=UI.page.r,k=el.dataset.v;R.ivp=k;R.iv=k==='own'?Array.from({length:R.own.n},()=>['','']):IVP[k].v.map(a=>a.slice());render()},
+ ownu:el=>{const R=UI.page.r;R.own.u=el.dataset.v;R.own.len=R.own.u==='m'?1000:5;R.iv=R.iv.map(()=>['','']);render()},
+ runsave:()=>{const R=UI.page.r,P=R.ivp==='own'?R.own:IVP[R.ivp];RUNS.unshift({d:0,t:R.k==='iv'?'iv':'easy',n:R.k==='iv'?'Intervalle '+ivName(P):'Lauf locker',km:R.km,dur:R.h*3600+R.m*60+R.s,hr:R.hr,max:R.max});
+   const top=UI.stack[UI.stack.length-1];if(top&&top.t==='runs')UI.page=UI.stack.pop();else UI.page={t:'runs'};render('push');window.scrollTo(0,0);toast('Lauf gespeichert ✓')},
  runs:()=>go({t:'runs'})};
+function runVals(R,k){R.k=k;[R.h,R.m,R.s,R.km,R.hr,R.max]=k==='iv'?[0,46,0,7.2,158,175]:[1,1,30,8.1,146,158]}
 function infoSheet(id,name){const e=EX[id];sheet(`<h3>${esc(name)}</h3><span class="label">So geht's</span><ul>${e.tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>
   <span class="label">Typischer Fehler</span><span style="font-size:14.5px">${esc(e.err)}</span>
   <a class="btn" style="text-decoration:none;color:var(--fg)" href="https://www.youtube.com/results?search_query=${encodeURIComponent(name+' Ausführung')}" target="_blank" rel="noopener">▶ Video ansehen</a>`)}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el||(el.dataset.a==='close'&&e.target!==el))return;const f=ACT[el.dataset.a];if(f){e.preventDefault();f(el,e)}});
 document.addEventListener('input',e=>{const el=e.target;
   if(el.dataset.in&&UI.w){const s=UI.w.ex[+el.dataset.x].sets[+el.dataset.s],v=parseFloat(String(el.value).replace(',','.'));if(!isNaN(v))s[el.dataset.in]=v;return}
+  if(el.dataset.iv&&UI.page&&UI.page.t==='run'){const R=UI.page.r;R.iv[+el.dataset.iv][+el.dataset.f]=el.value;
+    const P=R.ivp==='own'?R.own:IVP[R.ivp],sm=el.closest('.ivrow').querySelector('.lb small');if(sm&&el.dataset.f==='0'){const t=toSec(el.value);sm.textContent=t>0?'= '+mmss(t/(P.len/1000))+' /km':''}return}
+  if(el.dataset.own&&UI.page&&UI.page.t==='run'){const O=UI.page.r.own;O[el.dataset.own]=el.dataset.own==='p'?el.value:(parseInt(el.value)||0);return}
   if(el.dataset.rf&&UI.page&&UI.page.t==='run'){const R=UI.page.r,v=el.value;
     if(el.dataset.rf==='dur'){const p=v.split(':').map(Number);if(p.length===3){R.h=p[0]||0;R.m=p[1]||0;R.s=p[2]||0}else if(p.length===2){R.h=0;R.m=p[0]||0;R.s=p[1]||0}}
     else R[el.dataset.rf]=parseFloat(String(v).replace(',','.'))||0;
     const sec=R.h*3600+R.m*60+R.s;$('#pace').textContent=R.km>0&&sec?mmss(sec/R.km):'–';
     const ok=$('#hrok');if(ok&&R.k==='easy'){ok.textContent=R.hr<150?'Puls unter 150 ✓':'Puls über 150';ok.style.color=R.hr<150?'var(--accent)':'var(--amber)'}}});
+document.addEventListener('change',e=>{const el=e.target;if(!UI.page||UI.page.t!=='run')return;const R=UI.page.r;
+  if(el.dataset.own==='n'){const n=Math.max(1,Math.min(20,R.own.n||1));R.own.n=n;R.iv=Array.from({length:n},(_,i)=>R.iv[i]||['',''])}
+  if(el.dataset.own)render()});
 render();
 setTimeout(()=>{try{if(!sessionStorage.getItem('proto-seen')){ACT.proto();sessionStorage.setItem('proto-seen','1')}}catch(e){ACT.proto()}},400);
 </script>
