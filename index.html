@@ -1883,6 +1883,7 @@ function pDayEd(){const D=TDAY(UI.page.id);if(!D){UI.page=null;UI.stack=[];retur
   <button type="button" class="btn danger" data-a="daydel">Tag löschen</button>`}
 // Baustein bearbeiten (Kopie in UI.page.b, gesichert mit „Sichern“)
 function pBlk(){const f=UI.page,b=f.b,em=b.k==='emom',X=em?null:EXD(b.e),tm=X&&X.t==='time';
+  if(!em&&f.per==null)f.per=!b.p.every(x=>x.k===b.p[0].k&&x.r===b.p[0].r);const per=!em&&f.per;
   let h=`<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Abbrechen</button><h2>${em?'EMOM':esc(X.n)}</h2><button type="button" class="r txtbtn pri" data-a="blksave">Sichern</button></div>`;
   if(em){h+=`<div class="card glass stack" style="gap:14px">
     <div class="row between"><span>Takt (eine Runde)</span>${twheel(b.v,'data-tw="bv"','big')}</div>
@@ -1897,9 +1898,11 @@ function pBlk(){const f=UI.page,b=f.b,em=b.k==='emom',X=em?null:EXD(b.e),tm=X&&X
     <div class="row between"><div style="min-width:0"><span class="label">Übung</span><div style="font-weight:650;margin-top:2px">${esc(X.n)}</div></div><button type="button" class="btn" data-a="tpick" data-m="blkex">Ändern</button></div>
     <div class="row between"><span>Sätze</span><div class="stepper"><button type="button" class="cbtn" data-a="bksets" data-dir="-1" aria-label="Weniger">−</button><b>${b.p.length}</b><button type="button" class="cbtn" data-a="bksets" data-dir="1" aria-label="Mehr">+</button></div></div>
     <div class="row between"><span>${tm?'Sekunden':'Wiederholungen'} von – bis</span><span class="row" style="gap:6px"><label class="tmini"><input inputmode="numeric" value="${b.lo}" data-bk="lo" aria-label="von"></label>–<label class="tmini"><input inputmode="numeric" value="${b.hi}" data-bk="hi" aria-label="bis"></label></span></div>
-    <div class="row between"><span>Startgewicht</span><label class="tmini"><input inputmode="decimal" value="${fk(b.p[0]&&b.p[0].k)}" placeholder="–" data-bk="k" aria-label="Startgewicht"><span>kg</span></label></div>
+    ${per?`<div class="stack" style="gap:8px"><div class="row between"><span>Start pro Satz</span><button type="button" class="link" data-a="bkper" data-v="0">Alle gleich</button></div>
+      ${b.p.map((x,j)=>`<div class="row between"><span class="muted">Satz ${j+1}</span><span class="row" style="gap:6px"><label class="tmini"><input inputmode="decimal" value="${fk(x.k)}" placeholder="–" data-bp="k" data-j="${j}" aria-label="Gewicht Satz ${j+1}"><span>kg</span></label><label class="tmini"><input inputmode="numeric" value="${x.r??''}" placeholder="–" data-bp="r" data-j="${j}" aria-label="${tm?'Sekunden':'Wiederholungen'} Satz ${j+1}"><span>${tm?'s':'Wdh.'}</span></label></span></div>`).join('')}</div>`
+    :`<div class="row between"><div style="min-width:0"><span>Startgewicht</span><div><button type="button" class="link" data-a="bkper" data-v="1" style="font-size:13px;opacity:.75">Pro Satz einzeln ›</button></div></div><label class="tmini"><input inputmode="decimal" value="${fk(b.p[0]&&b.p[0].k)}" placeholder="–" data-bk="k" aria-label="Startgewicht"><span>kg</span></label></div>`}
     <div class="row between"><span>Pause nach jedem Satz</span>${twheel(b.rest,'data-tw="brest"','big')}</div>
-    <span class="hint">Sabrly schlägt vor: erst Wiederholungen bis zum oberen Wert, dann mehr Gewicht. Das Startgewicht gilt nur, solange es noch keine Einheit gibt.</span></div>`;
+    <span class="hint">Sabrly schlägt vor: erst Wiederholungen bis zum oberen Wert, dann mehr Gewicht. Die Startwerte gelten nur, solange es noch keine Einheit gibt – danach übernimmt jedes Training die Werte vom letzten Mal, und im Training kannst du jeden Satz einzeln ändern.</span></div>`;
   h+=`<div class="fgroup"><label class="label" for="bk-note">Notiz (optional)</label><input class="tinput" id="bk-note" data-bk="note" value="${esc(b.note)}" placeholder="z. B. Satz 1 Stopp bei 8" maxlength="140" autocomplete="off" enterkeyhint="done"></div>
   <button type="button" class="btn pri" data-a="blksave">Sichern</button>${f.i!=null?`<button type="button" class="btn danger" data-a="blkdel">Aus dem Tag entfernen</button>`:''}`;
   return h}
@@ -2098,6 +2101,7 @@ Object.assign(ACT,{
   blkmv:el=>{const D=TDAY(UI.page.id),i=+el.dataset.i,j=i+ +el.dataset.dir;if(!D||j<0||j>=D.blocks.length)return;[D.blocks[i],D.blocks[j]]=[D.blocks[j],D.blocks[i]];touch('state');render()},
   bksets:el=>{const b=UI.page.b,n=Math.max(1,Math.min(12,b.p.length+ +el.dataset.dir));while(b.p.length<n)b.p.push({...b.p[b.p.length-1]});b.p.length=n;render()},
   bidel:el=>{UI.page.b.it.splice(+el.dataset.i,1);render()},
+  bkper:el=>{const f=UI.page;f.per=el.dataset.v==='1';if(!f.per){const k=f.b.p[0]?f.b.p[0].k:null,r=f.b.p[0]?f.b.p[0].r:f.b.lo;f.b.p.forEach(x=>{x.k=k;x.r=r})}render()},
   blksave:()=>{const f=UI.page,D=TDAY(f.day);let b=normBlock(f.b);
     if(D){if(f.i!=null&&D.blocks[f.i]&&D.blocks[f.i].id===b.id)D.blocks[f.i]=b;else if(f.i==null&&!D.blocks.some(x=>x.id===b.id))D.blocks.push(b);else{const k=D.blocks.findIndex(x=>x.id===b.id);if(k>=0)D.blocks[k]=b}touch('state')}
     if(f.wi!=null&&UI.w){const x=UI.w.it[f.wi];if(x&&x.k==='emom'){const ok=x.ok;Object.assign(x,{v:b.v,n:b.n,its:clone(b.it),note:b.note,ok:Array.from({length:b.n},(_,k)=>!!ok[k])});x.r=Math.min(x.r,x.n);if(x.run){x.run=false;x.left=null}wPersist()}}
@@ -2197,6 +2201,7 @@ function trInput(el,commit){const P=UI.page;
     if(k==='rest'&&UI.w){const x=UI.w.it[+el.dataset.i];if(x){x.rest=v;wPersistSoon();if(commit){const bl=blockOf(UI.w.day,x.b);if(bl&&bl.rest!==v){bl.rest=v;touch('state')}}}}
     else if(k==='bv'&&P&&P.b)P.b.v=Math.max(10,v);else if(k==='brest'&&P&&P.b)P.b.rest=v;return true}
   if(el.dataset.bk&&P&&P.b){const k=el.dataset.bk,v=el.value,b=P.b;if(k==='n'){b.n=clampI(v,1,60,10);if(commit)render()}else if(k==='note')b.note=v;else if(k==='k'){const n=pnum(v);b.p.forEach(x=>x.k=n)}else b[k]=clampI(v,1,999,b[k]);return true}
+  if(el.dataset.bp&&P&&P.b&&P.b.p){const x=P.b.p[+el.dataset.j];if(x){const v=String(el.value).trim();x[el.dataset.bp]=el.dataset.bp==='k'?(v===''?null:pnum(v)):clampI(v,0,999,x.r)}return true}
   if(el.dataset.bi&&P&&P.b){const x=P.b.it[+el.dataset.i];if(x)x[el.dataset.bi]=el.dataset.bi==='k'?(pnum(el.value)||0):clampI(el.value,1,200,6);return true}
   if(el.dataset.rf&&P&&P.t==='run'){const R=P.r,k=el.dataset.rf;R[k]=el.value;if(commit&&k==='dur'){R.dur=fmtClock(el.value);el.value=R.dur}
     const sec=clockSec(fmtClock(R.dur)),km=pnum(R.km),pe=$('#rn-pace');if(pe)pe.textContent=sec&&km?hmsx(sec/km):'–';
