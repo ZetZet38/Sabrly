@@ -1,4 +1,4 @@
-// SABRLY_WIDGET v10
+// SABRLY_WIDGET v11
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
 // Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
@@ -1407,22 +1407,47 @@ function gLaps(F) {
 }
 const med = a => { const s = a.slice().sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
 const gMin = s => { const m = Math.round(s / 30) / 2; return (m < 1 ? Math.round(s) + ' s' : String(m).replace('.', ',') + ' min'); };
-// Intervalle erkennen: Runden mit Pause (strukturiertes Workout) oder die Lauf/Geh-Abschnitte der Uhr
-function gIntervals(laps, seg) {
-  let reps = null, rests = [], how = '';
+// Intervalle erkennen (Version GV). Zwei Quellen:
+// 1) Runden mit Pause (strukturiertes Workout der Uhr)
+// 2) Lauf/Geh-Abschnitte: nur echte Gehpausen (≥ 40 s) zählen, und mindestens zwei gleich lange Läufe müssen direkt
+//    aufeinander folgen. Kurzes Gehen an der Ampel macht aus einem lockeren Lauf keine Intervalle.
+// Was vor dem ersten bzw. nach dem letzten Intervall liegt, ist Ein- bzw. Auslaufen (roles).
+const GV = 2, GMINW = 40;
+const spread = (L, k) => { const v = L.map(x => +x[k] || 0), m = med(v); return m > 0 ? (Math.max(...v) - Math.min(...v)) / m : 9; };
+const within = (L, k, tol) => { const m = med(L.map(x => +x[k] || 0)); return m > 0 && L.every(x => Math.abs((+x[k] || 0) - m) <= m * tol); };
+const alike = L => L.length >= 2 && (within(L, 't', 0.25) || within(L, 'm', 0.15));
+function gAnalyze(laps, seg) {
+  laps = laps || [];
+  const mk = (reps, rests, how) => {
+    const dm = med(reps.map(x => x.m)), sm = spread(reps, 'm'), st = spread(reps, 't'), roundM = Math.abs(dm - Math.round(dm / 50) * 50) <= dm * 0.01;
+    // Strecken-Intervalle, wenn die Strecke deutlich gleichmäßiger ist als die Zeit (bei exaktem Gleichstand: runde Meterzahl)
+    const byDist = dm >= 100 && (sm < st / 2 || (sm <= 0.01 && st <= 0.01 && roundM));
+    const iv = { p: 'own', n: Math.min(30, reps.length), u: byDist ? 'm' : 'min', len: byDist ? Math.round(dm / 50) * 50 : Math.max(1, Math.round(med(reps.map(x => x.t)) / 60)),
+      pz: rests.length ? gMin(med(rests)) + ' ' + how : '', r: [] };
+    iv.r = reps.slice(0, 30).map(x => ({ v: byDist ? msx(x.t) : (x.m > 0 ? msx(x.t / (x.m / 1000)) : ''), h: x.h || 0 }));
+    return iv;
+  };
   const work = laps.filter(l => l.i === 0 || l.i === 5), rest = laps.filter(l => l.i === 1 || l.i === 4);
-  if (rest.length && work.length >= 2) { reps = work; rests = rest.map(l => l.t); how = 'Pause'; }
-  else if (seg) {
-    const runs = seg.filter(x => x.k === 'r'), md = med(runs.map(x => x.t)), main = runs.filter(x => Math.abs(x.t - md) <= md * 0.25);
-    if (main.length >= 2) { const a = seg.indexOf(main[0]), b = seg.indexOf(main[main.length - 1]); reps = main; rests = seg.slice(a, b).filter(x => x.k === 'w').map(x => x.t); how = 'gehen'; }
+  if (rest.length && work.length >= 2) return { iv: mk(work, rest.map(l => l.t), 'Pause'), roles: null };
+  if (!seg || !seg.length) return { iv: null, roles: null };
+  // Ketten von Läufen, die nur durch echte Gehpausen getrennt sind
+  const chains = []; let cur = [];
+  seg.forEach((x, i) => { if (x.k === 'r') cur.push(i); else if (x.t < GMINW && cur.length) { chains.push(cur); cur = []; } });
+  if (cur.length) chains.push(cur);
+  let best = null;
+  for (const c of chains) for (let a = 0; a < c.length; a++) for (let b = a + 1; b < c.length; b++) {
+    const sub = c.slice(a, b + 1), L = sub.map(i => seg[i]);
+    if (!alike(L)) continue;
+    const tot = L.reduce((s, x) => s + x.t, 0), rest = seg.slice(sub[0] + 1, sub[sub.length - 1]).filter(x => x.k !== 'r').reduce((s, x) => s + x.t, 0);
+    if (rest < tot * 0.08) continue; // eine einzelne Minute Gehen in einem langen Lauf ist keine Intervallpause
+    if (!best || sub.length > best.sub.length || (sub.length === best.sub.length && tot > best.tot)) best = { sub, tot };
   }
-  if (!reps || reps.length < 2) return null;
-  const ds = reps.map(x => x.m), dm = med(ds), byDist = how === 'Pause' && dm >= 100 && ds.every(x => Math.abs(x - dm) <= dm * 0.06);
-  const iv = { p: 'own', n: Math.min(30, reps.length), u: byDist ? 'm' : 'min', len: byDist ? Math.round(dm / 50) * 50 : Math.max(1, Math.round(med(reps.map(x => x.t)) / 60)),
-    pz: rests.length ? gMin(med(rests)) + ' ' + how : '', r: [] };
-  iv.r = reps.slice(0, 30).map(x => ({ v: byDist ? msx(x.t) : (x.m > 0 ? msx(x.t / (x.m / 1000)) : ''), h: x.h || 0 }));
-  return iv;
+  if (!best) return { iv: null, roles: null };
+  const A = best.sub[0], B = best.sub[best.sub.length - 1], reps = best.sub.map(i => seg[i]), rests = [];
+  for (let k = 0; k < best.sub.length - 1; k++) rests.push(seg.slice(best.sub[k] + 1, best.sub[k + 1]).reduce((s, x) => s + x.t, 0));
+  return { iv: mk(reps, rests, 'gehen'), roles: { a: A, b: B } };
 }
+function gRoles(seg, roles) { if (!seg) return seg; seg.forEach((x, i) => { delete x.p; if (roles && i < roles.a) x.p = 'e'; else if (roles && i > roles.b) x.p = 'a'; }); return seg; }
 const msx = s => { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + pad(s % 60); };
 function gPlanned(d) { const T = S.training, w = T && T.weeks && T.weeks[weekStart(d)], a = w && w.d && w.d[wd(d)]; return Array.isArray(a) ? a : []; }
 function gRun(a, F, d) {
@@ -1435,14 +1460,41 @@ function gRun(a, F, d) {
     const laps = gLaps(F); if (laps.length > 1) g.lap = laps;
     const tz = F.msgs.find(m => m.n === 216 && m.f[0] === 18);
     if (tz) { if (Array.isArray(tz.f[6])) g.zb = tz.f[6].slice(0, 6); if (tz.f[11]) g.mhr = tz.f[11]; if (tz.f[12]) g.rhr = tz.f[12]; }
-    iv = gIntervals(laps, seg);
+    const A = gAnalyze(laps, seg); iv = A.iv; gRoles(seg, A.roles);
   }
+  g.v = GV;
   const P = gPlanned(d), pI = P.includes('@I'), pL = P.includes('@L');
   const t = pI && !pL ? 'iv' : pL && !pI ? 'easy' : iv ? 'iv' : 'easy';
   const r = { id: 'g-' + g.id, t, dur: ri(a.duration), km: Math.round((+a.distance || 0) / 10) / 100, hr: ri(a.averageHR), max: ri(a.maxHR), g };
   if (iv) g.ivx = iv;
   if (t === 'iv') r.iv = iv || { p: 'own', n: 1, len: Math.max(1, Math.round(r.dur / 60)), u: 'min', pz: '', r: [{ v: r.km ? msx(r.dur / r.km) : '', h: r.hr }] };
   return r;
+}
+// schon importierte Läufe mit der aktuellen Erkennung neu auswerten (aus den gespeicherten Abschnitten, ohne Download).
+// Typ und Intervalle ändern sich nur, wenn sie noch automatisch gesetzt waren – nicht, wenn du sie selbst geändert hast.
+function gRedo(r, d) {
+  const g = r && r.g; if (!g || g.v === GV || (!g.seg && !g.lap && !g.ivx)) return null;
+  const ng = JSON.parse(JSON.stringify(g)), A = gAnalyze(ng.lap, ng.seg);
+  gRoles(ng.seg, A.roles); if (A.iv) ng.ivx = A.iv; else delete ng.ivx; ng.v = GV;
+  const nr = Object.assign({}, r, { g: ng }), auto = r.t === 'iv' && g.ivx && JSON.stringify(r.iv) === JSON.stringify(g.ivx);
+  if (auto) {
+    if (A.iv) nr.iv = A.iv;
+    else if (!gPlanned(d).includes('@I')) { nr.t = 'easy'; delete nr.iv; }
+  }
+  return nr;
+}
+async function gFix(d, id) {
+  const mk = mkey(d);
+  return retry(async () => {
+    const md = await getDoc(mk); if (!md) return false;
+    const obj = asObj(md), day = (obj.days || {})[d] || {}, runs = Array.isArray(day.run) ? day.run.slice() : [], i = runs.findIndex(r => r && r.id === id);
+    if (i < 0) return false;
+    const nr = gRedo(runs[i], d); if (!nr) return false;
+    runs[i] = nr;
+    await patchFields(mk, [[['days', d, 'run'], tval(runs)]], md.updateTime);
+    obj.days[d] = Object.assign({}, day, { run: runs }); LOGS[mk] = obj;
+    return true;
+  });
 }
 function gOther(a, k) {
   const o = gBase(a); o.k = k; o.dur = ri(a.duration); o.hr = ri(a.averageHR); o.max = ri(a.maxHR);
@@ -1547,6 +1599,10 @@ async function garminSync(force) {
       res.added.push(gLine(x.d, x.k, item));
       if (/^ok:/.test(w)) res.ticked.push(w.slice(3));
     }
+    // ältere Auswertung? neu auswerten (letzte 60 Tage)
+    const fixes = [];
+    for (let i = 0; i <= 60; i++) { const d = addDays(today(), -i); for (const r of ((dayGet(d) || {}).run || [])) if (r && r.g && r.g.v !== GV && (r.g.seg || r.g.lap || r.g.ivx)) fixes.push({ d, id: r.id }); }
+    for (const f of fixes.slice(0, force ? 40 : 3)) { if (!force && Date.now() - t0 > 15000) break; if (await gFix(f.d, f.id)) res.fixed = (res.fixed || 0) + 1; }
     L.total = (L.total || 0) + res.added.length; L.recent = res.added.concat(L.recent || []).slice(0, 6);
     await gStatus(L, { n: res.added.length, err: '' }); L.err = '';
   } catch (e) {
@@ -1568,8 +1624,9 @@ async function garminNow() {
     return;
   }
   if (r.err) { await info('Garmin', 'Abruf hat nicht geklappt.\n(' + r.err + ')'); return; }
-  const msg = r.added.length ? r.added.join('\n') + (r.ticked.length ? '\n\nAbgehakt: ' + r.ticked.filter((v, i, s) => s.indexOf(v) === i).join(', ') : '') + '\n\nIn Sabrly unter Training zu sehen.'
-    : 'Alle Trainings der letzten ' + GDAYS + ' Tage sind schon in Sabrly.';
+  const fx = r.fixed ? '\n\n' + r.fixed + (r.fixed === 1 ? ' Lauf' : ' Läufe') + ' neu ausgewertet.' : '';
+  const msg = (r.added.length ? r.added.join('\n') + (r.ticked.length ? '\n\nAbgehakt: ' + r.ticked.filter((v, i, s) => s.indexOf(v) === i).join(', ') : '') + '\n\nIn Sabrly unter Training zu sehen.'
+    : 'Alle Trainings der letzten ' + GDAYS + ' Tage sind schon in Sabrly.') + fx;
   await info(r.added.length ? '⌚ ' + r.added.length + (r.added.length === 1 ? ' Einheit' : ' Einheiten') + ' übernommen' : '⌚ Nichts Neues', msg);
 }
 async function garminMenu() {

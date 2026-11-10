@@ -624,9 +624,9 @@ body:has(.trest) .wrap{padding-bottom:70px}
 .hgrip svg{width:22px;height:22px}
 
 /* Garmin */
-.gcard .gk{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.gcard .gk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .gcard .gk>div{display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px;border-radius:14px;background:rgba(255,255,255,.05)}
-.gcard .gk b{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.gcard .gk>div{padding:10px 12px}.gcard .gk b{font-size:18px;font-weight:700;letter-spacing:-.01em}
 .gcard .gk span{font-size:12px;color:var(--muted);line-height:1.25}
 .gz{display:flex;height:10px;border-radius:6px;overflow:hidden;gap:2px;background:rgba(255,255,255,.06)}
 .gz i{display:block;min-width:3px}
@@ -648,6 +648,18 @@ body:has(.trest) .wrap{padding-bottom:70px}
 .thero.gah .gz{margin-top:10px}.thero.gah .gzl{margin-top:6px}
 .gtag{font-size:12px;opacity:.8}
 .glast{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted)}
+.gtop{display:flex;flex-direction:column;gap:14px}
+.gtd{display:flex;flex-direction:column;gap:3px;min-width:0}.gtd span{font-size:13px;color:var(--muted)}.gtd b{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.gbig{display:flex;align-items:baseline;gap:6px}.gbig b{font-size:48px;font-weight:750;letter-spacing:-.03em;line-height:1}.gbig span{font-size:18px;color:var(--muted)}
+.gq{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.gq>div{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid rgba(255,255,255,.08);min-width:0}
+.gq>div:nth-child(odd){padding-right:12px}.gq>div:nth-child(even){padding-left:12px;border-left:1px solid rgba(255,255,255,.08)}
+.gq b{font-size:24px;font-weight:700;letter-spacing:-.02em}.gq b small{font-size:13px;font-weight:500;color:var(--muted)}.gq span{font-size:12.5px;color:var(--muted)}
+.gseg>div.hd,.glap>div.hd{background:none;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:0;padding-bottom:0}
+.glap>div.w span:first-child{color:var(--muted);font-size:12px}
+.glap>div{grid-template-columns:74px 64px 48px minmax(0,1fr) 34px}
+.gside{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:10px;border:1px dashed rgba(255,255,255,.12);font-size:13px;color:var(--muted)}
+.gside b{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 
 .wrk{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px}
 .wrk>div{display:flex;flex-direction:column;gap:2px;padding:10px 10px 9px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line);min-width:0}
@@ -1684,18 +1696,34 @@ const gaName=x=>x.k==='str'?'Krafttraining':(x.n||'Training');
 function gaHero(d,x,lbl){const str=x.k==='str';
   return `<div class="thero gah" style="--c:${str?TCOL.g:TCOL.p}"><span class="label">${esc(lbl)} · ⌚ Garmin${x.st?' · '+esc(x.st):''}</span><h3>${esc(gaName(x))}</h3><span class="meta">${esc(gaMeta(x))}${x.te!=null?' · TE '+fk(x.te):''}</span>${zoneBar(x.z)}
     <div class="btns">${str&&d<=today()?`<button type="button" class="btn" data-a="wfree" data-d="${d}">Sätze nachtragen</button>`:''}<button type="button" class="btn" data-a="gahide" data-d="${d}" data-id="${esc(x.id)}">Ausblenden</button></div></div>`}
+// Ein-/Auslaufen und Hauptteil aus den Lauf/Geh-Abschnitten (p: 'e' Einlaufen, 'a' Auslaufen)
+const segSum=L=>{const R=L.filter(x=>x.k==='r'),W=L.filter(x=>x.k!=='r'),t=R.reduce((a,x)=>a+x.t,0),m=R.reduce((a,x)=>a+x.m,0);
+  return {t,m,h:t?Math.round(R.reduce((a,x)=>a+(x.h||0)*x.t,0)/t):0,w:W.reduce((a,x)=>a+x.t,0)}};
+function segParts(g){const S=Array.isArray(g&&g.seg)?g.seg:[];return {E:S.filter(x=>x.p==='e'),M:S.filter(x=>!x.p),A:S.filter(x=>x.p==='a')}}
+const segLine=(lb,L)=>{const s=segSum(L);return `${lb} ${msx(s.t)} · ${s.m} m${s.m&&s.t?' · '+msx(s.t/(s.m/1000))+' /km':''}${s.h?' · Ø '+s.h:''}${s.w?` · dazu ${msx(s.w)} gehen`:''}`};
+// Übersicht ganz oben: das Wichtigste auf einen Blick
+function gTop(R,sec,km){const g=R.g;if(!g)return '';const d=pdate(R.d),hr=+R.hr||0;
+  return `<div class="card glass gtop"><div class="gtd"><span>🏃 ${DL[wd(R.d)]}, ${d.getDate()}. ${MS[d.getMonth()]}${g.st?' · '+esc(g.st)+' Uhr':''}</span><b>${esc(g.n||'Lauf')}</b></div>
+    <div class="gbig"><b class="num">${km?fk(km):'–'}</b><span>km</span></div>
+    <div class="gq"><div><b class="num">${hr||'–'}<small> bpm</small></b><span>Ø Herzfrequenz</span></div><div><b class="num">${sec&&km?hmsx(sec/km):'–'}<small> /km</small></b><span>Ø Pace</span></div>
+      <div><b class="num">${sec?hmsx(sec):'–'}</b><span>Gesamtzeit</span></div><div><b class="num">${g.kcal||'–'}</b><span>Kalorien</span></div></div></div>`}
 // Lauf-Seite: alles, was die Uhr gemessen hat
-function gRunCard(r,ps){const g=r.g;if(!g)return '';const pace=ps?hmsx(ps):(r.km>0&&r.dur?hmsx(r.dur/r.km):'');
+function gRunCard(r){const g=r.g;if(!g)return '';
   const k=(v,l)=>v||v===0?`<div><b class="num">${v}</b><span>${l}</span></div>`:'';
-  let h=`<div class="card glass stack gcard" style="gap:12px"><div class="row between" style="gap:8px"><span class="label">⌚ Von Garmin${g.st?' · '+esc(g.st)+' Uhr':''}</span><span class="hint" style="text-align:right">${esc(g.n||'')}</span></div>
-    <div class="gk">${k(pace,'min/km')}${k(g.cad||'','Schritte/min')}${k(g.asc?g.asc+' m':'','Höhenmeter')}${k(g.kcal||'','kcal')}${k(g.te!=null?fk(g.te):'','Trainingseffekt')}${k(g.load||'','Belastung')}</div>
+  let h=`<div class="card glass stack gcard" style="gap:12px"><span class="label">⌚ Werte der Uhr</span>
+    <div class="gk">${k(g.cad||'','Schritte/min')}${k(g.asc?g.asc+' m':'','Höhenmeter')}${k(g.te!=null?fk(g.te):'','Trainingseffekt')}${k(g.load||'','Belastung')}</div>
     ${g.lbl?`<span class="hint">Wirkung laut Garmin: ${esc(gLbl(g.lbl))}${g.ate?' · anaerob '+fk(g.ate):''}</span>`:''}`;
   if(g.z)h+=`<span class="label">Pulszonen</span>${zoneBar(g.z,g.zb)}`;
   if(g.km&&g.km.length){const P=g.km.map(x=>x.m?x.t*1000/x.m:x.t),full=P.filter((p,i)=>!g.km[i].m),mx=Math.max(...full,1),mn=Math.min(...full,mx);
     h+=`<span class="label">Kilometer</span><div class="gkm"><div class="hd"><span>km</span><span></span><span>Pace</span><span>Puls</span></div>${g.km.map((x,i)=>{const p=P[i],w=x.m?20:mx===mn?100:40+(mx-p)/(mx-mn)*60;
       return `<div><span class="num">${x.m?fk(Math.round(x.m/10)/100):i+1}</span><i style="width:${w.toFixed(0)}%"></i><b class="num">${msx(p)}</b><small class="num">${x.h||'–'}</small></div>`}).join('')}</div>`}
-  if(g.seg&&g.seg.length)h+=`<span class="label">Laufen und Gehen</span><div class="gseg">${g.seg.map(x=>`<div class="${x.k==='r'?'r':'w'}"><span>${x.k==='r'?'Laufen':'Gehen'}</span><span class="num">${msx(x.t)}</span><span class="num">${x.m} m</span><span class="num">${x.m&&x.t?msx(x.t/(x.m/1000)):''}</span><span class="num">${x.h||''}</span></div>`).join('')}</div><span class="hint">Die Uhr erkennt selbst, wann du gehst. ${g.ivx?`Erkannt: ${ivName(g.ivx)}${g.ivx.pz?', dazwischen '+esc(g.ivx.pz):''}.`:''}</span>`;
-  if(g.lap&&g.lap.length>1)h+=`<details class="glap"><summary>Runden der Uhr (${g.lap.length})</summary>${g.lap.map((x,i)=>`<div><span>${i+1}.</span><span class="num">${fk(Math.round(x.m/10)/100)} km</span><span class="num">${msx(x.t)}</span><span class="num">${x.m?msx(x.t/(x.m/1000))+' /km':''}</span><span class="num">${x.h||''}</span></div>`).join('')}</details>`;
+  if(g.seg&&g.seg.length){const {E,M,A}=segParts(g);
+    h+=`<span class="label">Laufen und Gehen</span>${E.length?`<div class="gside"><b>Einlaufen</b><span>${esc(segLine('',E).trim())}</span></div>`:''}
+      <div class="gseg"><div class="hd"><span></span><span>Zeit</span><span>Strecke</span><span>Pace</span><span>Puls</span></div>${M.map(x=>`<div class="${x.k==='r'?'r':'w'}"><span>${x.k==='r'?'Laufen':'Gehen'}</span><span class="num">${msx(x.t)}</span><span class="num">${x.m} m</span><span class="num">${x.m&&x.t?msx(x.t/(x.m/1000)):''}</span><span class="num">${x.h||''}</span></div>`).join('')}</div>
+      ${A.length?`<div class="gside"><b>Auslaufen</b><span>${esc(segLine('',A).trim())}</span></div>`:''}
+      <span class="hint">Pace in min/km, Puls in bpm. Die Uhr erkennt selbst, wann du gehst.${g.ivx?` Erkannt: ${ivName(g.ivx)}${g.ivx.pz?', dazwischen '+esc(g.ivx.pz):''}${E.length||A.length?' – Ein- und Auslaufen stehen getrennt':''}.`:''}</span>`}
+  if(g.lap&&g.lap.length>1){const LI={1:'Pause',2:'Einlaufen',3:'Auslaufen',4:'Erholung'};
+    h+=`<details class="glap"><summary>Runden der Uhr (${g.lap.length})</summary><div class="hd"><span></span><span>Strecke</span><span>Zeit</span><span>Pace</span><span>Puls</span></div>${g.lap.map((x,i)=>`<div${LI[x.i]?' class="w"':''}><span>${LI[x.i]?LI[x.i]:i+1+'.'}</span><span class="num">${fk(Math.round(x.m/10)/100)} km</span><span class="num">${msx(x.t)}</span><span class="num">${x.m?msx(x.t/(x.m/1000)):''}</span><span class="num">${x.h||''}</span></div>`).join('')}</details>`}
   return h+'</div>'}
 function allSess(kind){const out=[];for(const k of Object.keys(LOGS).sort().reverse()){const days=LOGS[k]?.days||{};
   for(const d of Object.keys(days).sort().reverse()){const a=days[d]&&days[d][kind];if(Array.isArray(a))for(let i=a.length-1;i>=0;i--)if(a[i])out.push({d,s:a[i]})}}return out}
@@ -2035,8 +2063,9 @@ function runDraft(d,k,r){if(r)return {d,id:r.id,t:r.t,dur:hmsx(r.dur),km:fk(r.km
   return {d,id:null,t:k==='iv'?'iv':'easy',dur:'',km:'',hr:'',max:'',iv:{...IVP['3x8'],p:'3x8',r:Array.from({length:3},()=>({v:'',h:''}))}}}
 function pRun(){const f=UI.page,R=f.r,iv=R.t==='iv',T=TR(),sec=clockSec(R.dur),km=pnum(R.km),pace=sec&&km?sec/km:0,hr=+R.hr||0;
   let h=`<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Abbrechen</button><h2>${R.id?'Lauf ändern':'Lauf eintragen'}</h2><button type="button" class="r txtbtn pri" data-a="runsave">Sichern</button></div>
+  ${gTop(R,sec,km)}
   <div class="seg">${[['easy','Locker / Lang'],['iv','Intervalle']].map(([k,t])=>`<button type="button" class="${R.t===k?'on':''}" data-a="rtype" data-v="${k}">${t}</button>`).join('')}</div>
-  ${gRunCard(R,pace)}
+  ${gRunCard(R)}
   <div class="card glass stack" style="gap:12px"><div class="fgroup"><label class="label" for="rn-d">Datum</label><input class="tinput" type="date" id="rn-d" data-rf="d" value="${esc(R.d)}" max="${today()}"></div>
     <div class="tfgrid"><div class="fgroup"><label class="label" for="rn-dur">Dauer${iv?' gesamt':''}</label><input class="tinput num" id="rn-dur" data-rf="dur" value="${esc(R.dur)}" placeholder="h:mm:ss" inputmode="numeric" autocomplete="off"></div>
     <div class="fgroup"><label class="label" for="rn-km">Distanz${iv?' gesamt':''} (km)</label><input class="tinput num" id="rn-km" data-rf="km" value="${esc(R.km)}" placeholder="0,0" inputmode="decimal" autocomplete="off"></div>
@@ -2301,7 +2330,9 @@ function runText(d,r){const pace=r.km>0&&r.dur?hmsx(r.dur/r.km)+' /km':'';
     L.push('  Garmin: '+P.join(' · '));
     if(Array.isArray(g.z)&&g.z.some(Boolean))L.push('  Pulszonen: '+g.z.map((v,i)=>`Z${i+1}${zRange(g.zb,i)?' ('+zRange(g.zb,i)+')':''} ${msx(v)}`).join(' · ')+(g.mhr?' · HFmax '+g.mhr:'')+(g.rhr?' · Ruhepuls '+g.rhr:''));
     if(g.km&&g.km.length)L.push('  km-Splits (Pace, Ø-Puls): '+g.km.map((x,i)=>`${x.m?fk(Math.round(x.m/10)/100)+' km':'km '+(i+1)} ${msx(x.m?x.t*1000/x.m:x.t)}${x.h?' ('+x.h+')':''}`).join(' · '));
-    if(g.seg&&g.seg.length)L.push('  Laufen/Gehen (von der Uhr erkannt): '+g.seg.map(x=>`${x.k==='r'?'Laufen':'Gehen'} ${msx(x.t)}/${x.m} m${x.h?' ('+x.h+')':''}`).join(' · '));
+    if(g.seg&&g.seg.length){const {E,M,A}=segParts(g);if(E.length)L.push('  '+segLine('Einlaufen:',E));
+      L.push(`  ${E.length||A.length?'Hauptteil ':''}Laufen/Gehen (von der Uhr erkannt, Zeit/Strecke, Ø-Puls): `+M.map(x=>`${x.k==='r'?'Laufen':'Gehen'} ${msx(x.t)}/${x.m} m${x.h?' ('+x.h+')':''}`).join(' · '));
+      if(A.length)L.push('  '+segLine('Auslaufen:',A))}
     if(g.lap&&g.lap.length>1&&g.lap.some(l=>l.i===1||l.i===4||l.tr===0))L.push('  Runden: '+g.lap.map((x,i)=>`${i+1}) ${x.m} m in ${msx(x.t)}${x.h?' ('+x.h+')':''}`).join(' · '))}
   return L.join('\n')}
 function weekText(ws){const R=weekReview(ws),end=addDays(ws,6),T=TR(),L=[`Sabrly – Woche KW ${kw(ws)} (${pdate(ws).getDate()}.${pdate(ws).getMonth()+1}.–${pdate(end).getDate()}.${pdate(end).getMonth()+1}.${pdate(end).getFullYear()})`,''];

@@ -64,8 +64,10 @@ Der Schlüssel liegt nur im Schlüsselbund des iPhones, nie im Code oder in Fire
 
 - Das Widget prüft höchstens alle 20 Minuten auf neue Einheiten (2 pro Aktualisierung), „Jetzt abrufen“ im Skript holt alles der letzten 14 Tage.
 - Läufe werden Lauf-Einträge mit den Werten der Uhr (`run[].g`): km-Splits (aus der Aufzeichnung berechnet), Lauf/Geh-Abschnitte,
-  Runden, Pulszonen, Kadenz, Höhenmeter, Trainingseffekt. Intervalle erkennt Sabrly aus Runden mit Pause oder aus den Lauf/Geh-Abschnitten;
-  der Wochenplan entscheidet, ob ein Lauf als locker oder Intervall zählt. Ein selbst eingetragener Lauf am selben Tag bekommt die Werte dazu.
+  Runden, Pulszonen, Kadenz, Höhenmeter, Trainingseffekt. Intervalle erkennt Sabrly aus Runden mit Pause oder aus den Lauf/Geh-Abschnitten –
+  dort nur bei echten Gehpausen (≥ 40 s) zwischen mindestens zwei gleich langen, direkt aufeinanderfolgenden Läufen. Was davor bzw. danach liegt,
+  ist Ein- bzw. Auslaufen (`seg[].p` = 'e'/'a') und steht auf der Lauf-Seite getrennt. Der Wochenplan entscheidet, ob ein Lauf als locker oder
+  Intervall zählt. Läufe mit älterer Auswertung (`g.v` < 2) wertet das Widget automatisch neu aus; selbst geänderte Intervalle bleiben. Ein selbst eingetragener Lauf am selben Tag bekommt die Werte dazu.
 - Krafttraining und sonstige Einheiten (z. B. Indoor-Radfahren, ab 20 min; Gehen nicht) landen in `ga` und werden der Sabrly-Session
   mit der nächsten Startzeit zugeordnet. Gelöschte oder ausgeblendete Einheiten merkt sich der Tag in `gdel`.
 - Für heute und gestern hakt der Import den Lauf- bzw. Trainings-Habit ab, ältere Tage bleiben unverändert.
