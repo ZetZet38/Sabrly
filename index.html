@@ -1697,7 +1697,9 @@ function gaHero(d,x,lbl){const str=x.k==='str';
   return `<div class="thero gah" style="--c:${str?TCOL.g:TCOL.p}"><span class="label">${esc(lbl)} · ⌚ Garmin${x.st?' · '+esc(x.st):''}</span><h3>${esc(gaName(x))}</h3><span class="meta">${esc(gaMeta(x))}${x.te!=null?' · TE '+fk(x.te):''}</span>${zoneBar(x.z)}
     <div class="btns">${str&&d<=today()?`<button type="button" class="btn" data-a="wfree" data-d="${d}">Sätze nachtragen</button>`:''}<button type="button" class="btn" data-a="gahide" data-d="${d}" data-id="${esc(x.id)}">Ausblenden</button></div></div>`}
 // Ein-/Auslaufen und Hauptteil aus den Lauf/Geh-Abschnitten (p: 'e' Einlaufen, 'a' Auslaufen)
-const segSum=L=>{const R=L.filter(x=>x.k==='r'),W=L.filter(x=>x.k!=='r'),t=R.reduce((a,x)=>a+x.t,0),m=R.reduce((a,x)=>a+x.m,0);
+const SEGN={r:'Laufen',w:'Gehen',j:'Traben'};
+// Laufen und Traben zählen als Bewegung, Gehen getrennt
+const segSum=L=>{const R=L.filter(x=>x.k!=='w'),W=L.filter(x=>x.k==='w'),t=R.reduce((a,x)=>a+x.t,0),m=R.reduce((a,x)=>a+x.m,0);
   return {t,m,h:t?Math.round(R.reduce((a,x)=>a+(x.h||0)*x.t,0)/t):0,w:W.reduce((a,x)=>a+x.t,0)}};
 function segParts(g){const S=Array.isArray(g&&g.seg)?g.seg:[];return {E:S.filter(x=>x.p==='e'),M:S.filter(x=>!x.p),A:S.filter(x=>x.p==='a')}}
 const segLine=(lb,L)=>{const s=segSum(L);return `${lb} ${msx(s.t)} · ${s.m} m${s.m&&s.t?' · '+msx(s.t/(s.m/1000))+' /km':''}${s.h?' · Ø '+s.h:''}${s.w?` · dazu ${msx(s.w)} gehen`:''}`};
@@ -1717,11 +1719,13 @@ function gRunCard(r){const g=r.g;if(!g)return '';
   if(g.km&&g.km.length){const P=g.km.map(x=>x.m?x.t*1000/x.m:x.t),full=P.filter((p,i)=>!g.km[i].m),mx=Math.max(...full,1),mn=Math.min(...full,mx);
     h+=`<span class="label">Kilometer</span><div class="gkm"><div class="hd"><span>km</span><span></span><span>Pace</span><span>Puls</span></div>${g.km.map((x,i)=>{const p=P[i],w=x.m?20:mx===mn?100:40+(mx-p)/(mx-mn)*60;
       return `<div><span class="num">${x.m?fk(Math.round(x.m/10)/100):i+1}</span><i style="width:${w.toFixed(0)}%"></i><b class="num">${msx(p)}</b><small class="num">${x.h||'–'}</small></div>`}).join('')}</div>`}
-  if(g.seg&&g.seg.length){const {E,M,A}=segParts(g);
-    h+=`<span class="label">Laufen und Gehen</span>${E.length?`<div class="gside"><b>Einlaufen</b><span>${esc(segLine('',E).trim())}</span></div>`:''}
-      <div class="gseg"><div class="hd"><span></span><span>Zeit</span><span>Strecke</span><span>Pace</span><span>Puls</span></div>${M.map(x=>`<div class="${x.k==='r'?'r':'w'}"><span>${x.k==='r'?'Laufen':'Gehen'}</span><span class="num">${msx(x.t)}</span><span class="num">${x.m} m</span><span class="num">${x.m&&x.t?msx(x.t/(x.m/1000)):''}</span><span class="num">${x.h||''}</span></div>`).join('')}</div>
+  const W=(g.seg||[]).filter(x=>x.k==='w');
+  if(g.seg&&g.seg.length&&r.t!=='iv'){if(W.length)h+=`<span class="hint">${W.length} kurze Gehpause${W.length>1?'n':''}, zusammen ${msx(W.reduce((a,x)=>a+x.t,0))} – bei lockeren Läufen zählt der Lauf als Ganzes.</span>`}
+  else if(g.seg&&g.seg.length){const {E,M,A}=segParts(g);
+    h+=`<span class="label">${M.some(x=>x.k==='j')?'Intervalle und Traben':'Laufen und Gehen'}</span>${E.length?`<div class="gside"><b>Einlaufen</b><span>${esc(segLine('',E).trim())}</span></div>`:''}
+      <div class="gseg"><div class="hd"><span></span><span>Zeit</span><span>Strecke</span><span>Pace</span><span>Puls</span></div>${M.map(x=>`<div class="${x.k==='r'?'r':'w'}"><span>${SEGN[x.k]||'Laufen'}</span><span class="num">${msx(x.t)}</span><span class="num">${x.m} m</span><span class="num">${x.m&&x.t?msx(x.t/(x.m/1000)):''}</span><span class="num">${x.h||''}</span></div>`).join('')}</div>
       ${A.length?`<div class="gside"><b>Auslaufen</b><span>${esc(segLine('',A).trim())}</span></div>`:''}
-      <span class="hint">Pace in min/km, Puls in bpm. Die Uhr erkennt selbst, wann du gehst.${g.ivx?` Erkannt: ${ivName(g.ivx)}${g.ivx.pz?', dazwischen '+esc(g.ivx.pz):''}${E.length||A.length?' – Ein- und Auslaufen stehen getrennt':''}.`:''}</span>`}
+      <span class="hint">Pace in min/km, Puls in bpm. ${M.some(x=>x.k==='j')?'Schnelle Abschnitte und Traben erkennt Sabrly am Tempo.':'Die Uhr erkennt selbst, wann du gehst.'}${g.ivx?` Erkannt: ${ivName(g.ivx)}${g.ivx.pz?', dazwischen '+esc(g.ivx.pz):''}${E.length||A.length?' – Ein- und Auslaufen stehen getrennt':''}.`:''}</span>`}
   if(g.lap&&g.lap.length>1){const LI={1:'Pause',2:'Einlaufen',3:'Auslaufen',4:'Erholung'};
     h+=`<details class="glap"><summary>Runden der Uhr (${g.lap.length})</summary><div class="hd"><span></span><span>Strecke</span><span>Zeit</span><span>Pace</span><span>Puls</span></div>${g.lap.map((x,i)=>`<div${LI[x.i]?' class="w"':''}><span>${LI[x.i]?LI[x.i]:i+1+'.'}</span><span class="num">${fk(Math.round(x.m/10)/100)} km</span><span class="num">${msx(x.t)}</span><span class="num">${x.m?msx(x.t/(x.m/1000)):''}</span><span class="num">${x.h||''}</span></div>`).join('')}</details>`}
   return h+'</div>'}
@@ -2329,11 +2333,19 @@ function runText(d,r){const pace=r.km>0&&r.dur?hmsx(r.dur/r.km)+' /km':'';
       g.te!=null?'Trainingseffekt '+fk(g.te)+(g.ate?' / anaerob '+fk(g.ate):'')+(g.lbl?' ('+gLbl(g.lbl)+')':''):'',g.load?'Belastung '+g.load:'',g.vo2?'VO2max '+g.vo2:''].filter(Boolean);
     L.push('  Garmin: '+P.join(' · '));
     if(Array.isArray(g.z)&&g.z.some(Boolean))L.push('  Pulszonen: '+g.z.map((v,i)=>`Z${i+1}${zRange(g.zb,i)?' ('+zRange(g.zb,i)+')':''} ${msx(v)}`).join(' · ')+(g.mhr?' · HFmax '+g.mhr:'')+(g.rhr?' · Ruhepuls '+g.rhr:''));
-    if(g.km&&g.km.length)L.push('  km-Splits (Pace, Ø-Puls): '+g.km.map((x,i)=>`${x.m?fk(Math.round(x.m/10)/100)+' km':'km '+(i+1)} ${msx(x.m?x.t*1000/x.m:x.t)}${x.h?' ('+x.h+')':''}`).join(' · '));
-    if(g.seg&&g.seg.length){const {E,M,A}=segParts(g);if(E.length)L.push('  '+segLine('Einlaufen:',E));
-      L.push(`  ${E.length||A.length?'Hauptteil ':''}Laufen/Gehen (von der Uhr erkannt, Zeit/Strecke, Ø-Puls): `+M.map(x=>`${x.k==='r'?'Laufen':'Gehen'} ${msx(x.t)}/${x.m} m${x.h?' ('+x.h+')':''}`).join(' · '));
+    if(g.km&&g.km.length){const hc=g.km.some(x=>x.c),he=g.km.some(x=>x.e!=null);
+      L.push(`  km-Splits (Pace, Ø-Puls${hc?', Kadenz':''}${he?', Höhe ±m':''}): `+g.km.map((x,i)=>{const v=[x.h||'',hc&&x.c?x.c:'',he&&x.e!=null?(x.e>0?'+':'')+x.e:''].filter(z=>z!=='');
+        return `${x.m?fk(Math.round(x.m/10)/100)+' km':'km '+(i+1)} ${msx(x.m?x.t*1000/x.m:x.t)}${v.length?' ('+v.join(', ')+')':''}`}).join(' · '))}
+    const GW=(g.seg||[]).filter(x=>x.k==='w');
+    if(g.seg&&g.seg.length&&r.t!=='iv'){if(GW.length)L.push(`  Kurze Gehpausen: ${GW.map(x=>msx(x.t)).join(', ')} (zusammen ${msx(GW.reduce((a,x)=>a+x.t,0))})`)}
+    else if(g.seg&&g.seg.length){const {E,M,A}=segParts(g);if(E.length)L.push('  '+segLine('Einlaufen:',E));
+      L.push(`  ${E.length||A.length?'Hauptteil ':''}${M.some(x=>x.k==='j')?'Intervalle/Traben (am Tempo erkannt':'Laufen/Gehen (von der Uhr erkannt'}, Zeit/Strecke, Ø-Puls): `+M.map(x=>`${SEGN[x.k]||'Laufen'} ${msx(x.t)}/${x.m} m${x.h?' ('+x.h+(x.d!=null?', Puls '+(x.d>=0?'−':'+')+Math.abs(x.d)+' nach '+Math.min(60,x.t)+' s':'')+')':''}`).join(' · '));
       if(A.length)L.push('  '+segLine('Auslaufen:',A))}
-    if(g.lap&&g.lap.length>1&&g.lap.some(l=>l.i===1||l.i===4||l.tr===0))L.push('  Runden: '+g.lap.map((x,i)=>`${i+1}) ${x.m} m in ${msx(x.t)}${x.h?' ('+x.h+')':''}`).join(' · '))}
+    if(g.lap&&g.lap.length>1&&g.lap.some(l=>l.i===1||l.i===4||l.tr===0))L.push('  Runden: '+g.lap.map((x,i)=>`${i+1}) ${x.m} m in ${msx(x.t)}${x.h?' ('+x.h+')':''}`).join(' · '));
+    if(g.dc!=null)L.push(`  Aerobe Entkopplung (Pace:Puls, 2. zu 1. Hälfte, ohne erste 5 min): ${fk(g.dc)} %`);
+    if(r.hr&&r.km&&r.dur)L.push(`  Effizienz: ${fk(Math.round(r.km*1000/(r.dur/60)/r.hr*100)/100)} m/min je Herzschlag`);
+    const C=g.cv;if(C&&Array.isArray(C.p)&&C.p.length){const st=C.s||60,rows=C.p.map((p,i)=>`${Math.round((i+1)*st/60)}′ ${p?msx(p):'–'}/${(C.h&&C.h[i])||'–'}${C.c?'/'+(C.c[i]||'–'):''}${C.a?'/'+C.a[i]:''}`);
+      L.push(`  Verlauf je ${st%60?st+' s':st/60+' min'} (Minute: Pace/Puls${C.c?'/Kadenz':''}${C.a?'/Höhe m':''}):`);for(let i=0;i<rows.length;i+=10)L.push('   '+rows.slice(i,i+10).join(' · '))}}
   return L.join('\n')}
 function weekText(ws){const R=weekReview(ws),end=addDays(ws,6),T=TR(),L=[`Sabrly – Woche KW ${kw(ws)} (${pdate(ws).getDate()}.${pdate(ws).getMonth()+1}.–${pdate(end).getDate()}.${pdate(end).getMonth()+1}.${pdate(end).getFullYear()})`,''];
   if(R.per.length){L.push(`Habits: ${R.hp??'–'} % erfüllt${R.hpPrev!=null?' (Vorwoche '+R.hpPrev+' %)':''}`);R.per.forEach(o=>L.push(`- ${o.x.name}: ${fk(o.v)}/${o.T}${o.x.freq==='weekly'?' (Wochenziel)':''}`))}

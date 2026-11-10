@@ -67,7 +67,12 @@ Der Schlüssel liegt nur im Schlüsselbund des iPhones, nie im Code oder in Fire
   Runden, Pulszonen, Kadenz, Höhenmeter, Trainingseffekt. Intervalle erkennt Sabrly aus Runden mit Pause oder aus den Lauf/Geh-Abschnitten –
   dort nur bei echten Gehpausen (≥ 40 s) zwischen mindestens zwei gleich langen, direkt aufeinanderfolgenden Läufen. Was davor bzw. danach liegt,
   ist Ein- bzw. Auslaufen (`seg[].p` = 'e'/'a') und steht auf der Lauf-Seite getrennt. Der Wochenplan entscheidet, ob ein Lauf als locker oder
-  Intervall zählt. Läufe mit älterer Auswertung (`g.v` < 2) wertet das Widget automatisch neu aus; selbst geänderte Intervalle bleiben. Ein selbst eingetragener Lauf am selben Tag bekommt die Werte dazu.
+  Intervall zählt. Intervalle mit Trabpausen (die Uhr erkennt nur Gehen) findet Sabrly am Tempo: zwei klar getrennte Tempos (≥ 22 %),
+  mindestens 3 gleich lange schnelle Blöcke (2, wenn der Plan „Intervalle“ sagt). Bei lockeren Läufen zeigt die Lauf-Seite keine Tabelle,
+  nur die Summe der kurzen Gehpausen. Läufe mit älterer Auswertung (`g.v` < 3) lädt das Widget einmal neu; selbst geänderte Intervalle bleiben.
+- Für die Auswertung mit Claude speichert Sabrly je Lauf einen Minuten-Verlauf (`g.cv`: Pace, Puls, Kadenz, Höhe), die aerobe Entkopplung
+  (`g.dc`, nur bei Läufen ohne Intervalle), die Puls-Erholung in Gehpausen (`seg[].d`) sowie Kadenz und Höhenänderung je km.
+  „Für Claude kopieren“ nimmt alles mit. Ein selbst eingetragener Lauf am selben Tag bekommt die Werte dazu.
 - Krafttraining und sonstige Einheiten (z. B. Indoor-Radfahren, ab 20 min; Gehen nicht) landen in `ga` und werden der Sabrly-Session
   mit der nächsten Startzeit zugeordnet. Gelöschte oder ausgeblendete Einheiten merkt sich der Tag in `gdel`.
 - Für heute und gestern hakt der Import den Lauf- bzw. Trainings-Habit ab, ältere Tage bleiben unverändert.

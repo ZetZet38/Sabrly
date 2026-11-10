@@ -1,4 +1,4 @@
-// SABRLY_WIDGET v11
+// SABRLY_WIDGET v12
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
 // Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
@@ -1246,7 +1246,7 @@ function fitParse(b, keep, rec) {
       // komprimierter Zeitstempel im Kopf: 5 Bit Versatz zur letzten vollen Zeit
       if (f && (h & 0x80) && lastTs != null && f[253] == null) { const o = h & 0x1F; let ts = (lastTs & ~0x1F) + o; if (o < (lastTs & 0x1F)) ts += 0x20; f[253] = ts; }
       if (f && f[253] != null) lastTs = f[253];
-      if (isRec) { recs++; for (const k of Object.keys(f)) recFields[k] = 1; if (!firstRec) firstRec = f; if (rec) R.push([f[253], f[5], f[3]]); }
+      if (isRec) { recs++; for (const k of Object.keys(f)) recFields[k] = 1; if (!firstRec) firstRec = f; if (rec) R.push([f[253], f[5], f[3], f[4] != null ? f[4] + (f[53] || 0) / 128 : null, f[78] != null ? f[78] / 5 - 500 : f[2] != null ? f[2] / 5 - 500 : null]); }
       if (want) msgs.push({ n: d.n, f });
     }
     p = end + 2;
@@ -1381,25 +1381,64 @@ function gBase(a) {
   if (z.some(Boolean)) o.z = z;
   return o;
 }
-// km-Splits aus den Datensätzen: bewegte Zeit (Lücken > 10 s = Pause) und Ø-Puls je Kilometer
+// km-Splits aus den Datensätzen: bewegte Zeit (Lücken > 10 s = Pause), Ø-Puls, Kadenz (Schritte/min) und Höhenänderung je Kilometer
 function kmSplits(rec) {
-  const out = []; let mt = 0, pt = null, pd = 0, segT = 0, hs = 0, hn = 0, next = 1000;
-  for (const [t, dc, h] of rec) {
+  const out = []; let mt = 0, pt = null, pd = 0, segT = 0, hs = 0, hn = 0, cs = 0, cn = 0, a0 = null, la = null, next = 1000;
+  const one = (t, x) => { const o = { t: Math.round(t), h: hn ? Math.round(hs / hn) : 0 }; if (cn) o.c = Math.round(cs / cn * 2); if (a0 != null && la != null) o.e = Math.round(la - a0); return Object.assign(o, x || {}); };
+  for (const [t, dc, h, c, al] of rec) {
     if (t == null) continue;
     const dt = pt != null ? t - pt : 0, step = dt > 0 && dt <= 10 ? dt : 0;
     if (h) { hs += h; hn++; }
+    if (c > 20) { cs += c; cn++; }
+    if (al != null) { la = al; if (a0 == null) a0 = al; }
     if (dc == null) { mt += step; pt = t; continue; }
     const d = dc / 100;
-    while (d >= next) { const fr = d > pd ? (next - pd) / (d - pd) : 1, at = mt + step * fr; out.push({ t: Math.round(at - segT), h: hn ? Math.round(hs / hn) : 0 }); segT = at; hs = 0; hn = 0; next += 1000; }
+    while (d >= next) { const fr = d > pd ? (next - pd) / (d - pd) : 1, at = mt + step * fr; out.push(one(at - segT)); segT = at; hs = 0; hn = 0; cs = 0; cn = 0; a0 = la; next += 1000; }
     mt += step; pt = t; pd = Math.max(pd, d);
   }
-  const rest = pd - (next - 1000); if (rest >= 50 && out.length < 200) out.push({ t: Math.round(mt - segT), h: hn ? Math.round(hs / hn) : 0, m: Math.round(rest) });
+  const rest = pd - (next - 1000); if (rest >= 50 && out.length < 200) out.push(one(mt - segT, { m: Math.round(rest) }));
   return out.slice(0, 200);
 }
+// Verlauf für die Auswertung: je Minute bewegter Zeit (bei langen Läufen gröber, höchstens 120 Punkte) Pace, Puls, Kadenz, Höhe
+function gCurve(rec) {
+  let total = 0, pt = null;
+  for (const r of rec) { const t = r[0]; if (t == null) continue; if (pt != null) { const dt = t - pt; if (dt > 0 && dt <= 10) total += dt; } pt = t; }
+  if (total < 300) return null;
+  const s = 60 * Math.max(1, Math.ceil(total / 60 / 120)), P = [], H = [], C = [], A = [];
+  let mt = 0, bEnd = s, d0 = null, ld = null, hs = 0, hn = 0, cs = 0, cn = 0, la = null; pt = null;
+  const flush = len => { const dist = ld != null && d0 != null ? (ld - d0) / 100 : 0; P.push(dist >= 15 ? Math.round(len / (dist / 1000)) : 0); H.push(hn ? Math.round(hs / hn) : 0); C.push(cn ? Math.round(cs / cn * 2) : 0); A.push(la != null ? Math.round(la) : 0); d0 = ld; hs = 0; hn = 0; cs = 0; cn = 0; };
+  for (const [t, dc, h, c, al] of rec) {
+    if (t == null) continue;
+    if (pt != null) { const dt = t - pt; if (dt > 0 && dt <= 10) mt += dt; }
+    pt = t;
+    if (dc != null) { if (d0 == null) d0 = dc; ld = dc; }
+    if (h) { hs += h; hn++; } if (c > 20) { cs += c; cn++; } if (al != null) la = al;
+    while (mt >= bEnd) { flush(s); bEnd += s; }
+  }
+  if (mt - (bEnd - s) >= 20) flush(mt - (bEnd - s));
+  const o = { s, p: P, h: H }; if (C.some(Boolean)) o.c = C; if (A.some(Boolean)) o.a = A;
+  return o;
+}
+// Aerobe Entkopplung (Pace:Puls): Effizienz der 2. Hälfte gegenüber der 1. (ohne die ersten 5 min). Positiv = Puls driftet hoch.
+function gDecouple(rec) {
+  const pts = []; let mt = 0, pt = null;
+  for (const [t, dc, h] of rec) { if (t == null) continue; if (pt != null) { const dt = t - pt; if (dt > 0 && dt <= 10) mt += dt; } pt = t; if (dc != null && h) pts.push([mt, dc / 100, h]); }
+  if (pts.length < 10) return null;
+  const T = pts[pts.length - 1][0], skip = T >= 25 * 60 ? 300 : 0;
+  if (T - skip < 20 * 60) return null;
+  const mid = skip + (T - skip) / 2, ef = A => { if (A.length < 2) return null; const dt = A[A.length - 1][0] - A[0][0], dd = A[A.length - 1][1] - A[0][1], hr = A.reduce((x, p) => x + p[2], 0) / A.length; return dt > 0 && dd > 0 && hr > 0 ? dd / dt / hr : null; };
+  const e1 = ef(pts.filter(p => p[0] >= skip && p[0] < mid)), e2 = ef(pts.filter(p => p[0] >= mid));
+  return e1 && e2 ? Math.round((e1 - e2) / e1 * 1000) / 10 : null;
+}
+// Puls zu einem Zeitpunkt (nächster Datensatz)
+function hrAt(rec, ts) { let lo = 0, hi = rec.length - 1; if (hi < 0) return null; while (lo < hi) { const m = (lo + hi) >> 1; if ((rec[m][0] || 0) < ts) lo = m + 1; else hi = m; } for (let k = lo; k >= Math.max(0, lo - 5); k--) if (rec[k][2]) return rec[k][2]; return rec[lo][2] || null; }
 // Lauf/Geh-Abschnitte, die die Uhr selbst erkennt (split 17 Laufen, 18 Gehen)
 function gSegs(F) {
+  const R = F.rec || [];
   const L = F.msgs.filter(m => m.n === 312 && (m.f[0] === 17 || m.f[0] === 18)).map(m => m.f).sort((a, b) => (a[9] || 0) - (b[9] || 0))
-    .map(f => ({ k: f[0] === 17 ? 'r' : 'w', t: ri((f[2] != null ? f[2] : f[1]) / 1000), m: ri((f[3] || 0) / 100), h: ri(f[15]) })).filter(x => x.t > 0);
+    .map(f => { const x = { k: f[0] === 17 ? 'r' : 'w', t: ri((f[2] != null ? f[2] : f[1]) / 1000), m: ri((f[3] || 0) / 100), h: ri(f[15]) };
+      if (x.k === 'w' && x.t >= 30 && f[9] != null && R.length) { const el = (f[1] != null ? f[1] : f[2] || 0) / 1000, a = hrAt(R, f[9]), b = hrAt(R, f[9] + Math.min(60, el)); if (a && b) x.d = a - b; }
+      return x; }).filter(x => x.t > 0);
   return L.some(x => x.k === 'w' && x.t >= 20) && L.some(x => x.k === 'r') ? L.slice(0, 60) : null;
 }
 function gLaps(F) {
@@ -1412,12 +1451,12 @@ const gMin = s => { const m = Math.round(s / 30) / 2; return (m < 1 ? Math.round
 // 2) Lauf/Geh-Abschnitte: nur echte Gehpausen (≥ 40 s) zählen, und mindestens zwei gleich lange Läufe müssen direkt
 //    aufeinander folgen. Kurzes Gehen an der Ampel macht aus einem lockeren Lauf keine Intervalle.
 // Was vor dem ersten bzw. nach dem letzten Intervall liegt, ist Ein- bzw. Auslaufen (roles).
-const GV = 2, GMINW = 40;
+const GV = 3, GMINW = 40;
 const spread = (L, k) => { const v = L.map(x => +x[k] || 0), m = med(v); return m > 0 ? (Math.max(...v) - Math.min(...v)) / m : 9; };
 const within = (L, k, tol) => { const m = med(L.map(x => +x[k] || 0)); return m > 0 && L.every(x => Math.abs((+x[k] || 0) - m) <= m * tol); };
 const alike = L => L.length >= 2 && (within(L, 't', 0.25) || within(L, 'm', 0.15));
-function gAnalyze(laps, seg) {
-  laps = laps || [];
+function gAnalyze(laps, seg, minReps) {
+  laps = laps || []; minReps = minReps || 2;
   const mk = (reps, rests, how) => {
     const dm = med(reps.map(x => x.m)), sm = spread(reps, 'm'), st = spread(reps, 't'), roundM = Math.abs(dm - Math.round(dm / 50) * 50) <= dm * 0.01;
     // Strecken-Intervalle, wenn die Strecke deutlich gleichmäßiger ist als die Zeit (bei exaktem Gleichstand: runde Meterzahl)
@@ -1437,7 +1476,7 @@ function gAnalyze(laps, seg) {
   let best = null;
   for (const c of chains) for (let a = 0; a < c.length; a++) for (let b = a + 1; b < c.length; b++) {
     const sub = c.slice(a, b + 1), L = sub.map(i => seg[i]);
-    if (!alike(L)) continue;
+    if (sub.length < minReps || !alike(L)) continue;
     const tot = L.reduce((s, x) => s + x.t, 0), rest = seg.slice(sub[0] + 1, sub[sub.length - 1]).filter(x => x.k !== 'r').reduce((s, x) => s + x.t, 0);
     if (rest < tot * 0.08) continue; // eine einzelne Minute Gehen in einem langen Lauf ist keine Intervallpause
     if (!best || sub.length > best.sub.length || (sub.length === best.sub.length && tot > best.tot)) best = { sub, tot };
@@ -1445,37 +1484,76 @@ function gAnalyze(laps, seg) {
   if (!best) return { iv: null, roles: null };
   const A = best.sub[0], B = best.sub[best.sub.length - 1], reps = best.sub.map(i => seg[i]), rests = [];
   for (let k = 0; k < best.sub.length - 1; k++) rests.push(seg.slice(best.sub[k] + 1, best.sub[k + 1]).reduce((s, x) => s + x.t, 0));
-  return { iv: mk(reps, rests, 'gehen'), roles: { a: A, b: B } };
+  const jog = seg.slice(A + 1, B).some(x => x.k === 'j');
+  return { iv: mk(reps, rests, jog ? 'traben' : 'gehen'), roles: { a: A, b: B } };
+}
+// Intervalle mit Trabpausen: die Uhr erkennt nur Gehen, darum zusätzlich am Tempo – schnelle und langsame Blöcke.
+// Zwei klar getrennte Tempos (≥ 22 % Unterschied), Blöcke unter 25 s werden dem Nachbarn zugeschlagen.
+function gPaceSegs(rec) {
+  const P = []; let mt = 0, pt = null;
+  for (const [t, dc, h] of rec) { if (t == null || dc == null) continue; if (pt != null) { const dt = t - pt; if (dt > 0 && dt <= 10) mt += dt; } pt = t; P.push([mt, dc / 100, h || 0]); }
+  const n = P.length; if (n < 300 || mt < 900) return null;
+  const v = new Array(n); let a = 0, b = 0;
+  for (let i = 0; i < n; i++) { while (P[i][0] - P[a][0] > 10) a++; if (b < i) b = i; while (b + 1 < n && P[b + 1][0] - P[i][0] <= 10) b++; const dt = P[b][0] - P[a][0]; v[i] = dt >= 6 ? (P[b][1] - P[a][1]) / dt : null; }
+  const vs = v.filter(x => x != null && x > 0.8).sort((x, y) => x - y); if (vs.length < 200) return null;
+  let c1 = vs[Math.floor(vs.length * 0.25)], c2 = vs[Math.floor(vs.length * 0.75)];
+  for (let k = 0; k < 15; k++) { const th = (c1 + c2) / 2; let s1 = 0, n1 = 0, s2 = 0, n2 = 0; for (const x of vs) { if (x < th) { s1 += x; n1++; } else { s2 += x; n2++; } } if (!n1 || !n2) return null; c1 = s1 / n1; c2 = s2 / n2; }
+  if ((c2 - c1) / c2 < 0.22) return null;
+  const th = (c1 + c2) / 2; let B = [];
+  for (let i = 0; i < n; i++) { const L = B[B.length - 1], f = v[i] == null ? (L ? L.f : false) : v[i] >= th; if (L && L.f === f) L.e = i; else B.push({ f, s: i, e: i }); }
+  const dur = x => P[x.e][0] - P[x.s][0] + 1, join = A => A.reduce((acc, x) => { const l = acc[acc.length - 1]; if (l && l.f === x.f) l.e = x.e; else acc.push(Object.assign({}, x)); return acc; }, []);
+  for (let guard = 0; guard < 5000 && B.length > 1; guard++) {
+    let k = -1, md = 25; for (let i = 0; i < B.length; i++) { const d = dur(B[i]); if (d < md) { md = d; k = i; } }
+    if (k < 0) break;
+    const j = k === 0 ? 1 : k === B.length - 1 ? k - 1 : (dur(B[k - 1]) >= dur(B[k + 1]) ? k - 1 : k + 1), lo = Math.min(k, j), hi = Math.max(k, j);
+    B.splice(lo, 2, { f: B[j].f, s: B[lo].s, e: B[hi].e }); B = join(B);
+  }
+  const seg = B.map((x, k) => { const e = k + 1 < B.length ? B[k + 1].s : n - 1, t = P[e][0] - P[x.s][0], m = P[e][1] - P[x.s][1]; let hs = 0, hn = 0; for (let i = x.s; i < Math.max(e, x.s + 1); i++) if (P[i][2]) { hs += P[i][2]; hn++; }
+    return { k: x.f ? 'r' : (t > 0 && m / t < 1.75 ? 'w' : 'j'), t: Math.round(t), m: Math.round(m), h: hn ? Math.round(hs / hn) : 0 }; }).filter(x => x.t > 0);
+  return seg.length >= 3 ? seg.slice(0, 80) : null;
 }
 function gRoles(seg, roles) { if (!seg) return seg; seg.forEach((x, i) => { delete x.p; if (roles && i < roles.a) x.p = 'e'; else if (roles && i > roles.b) x.p = 'a'; }); return seg; }
 const msx = s => { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + pad(s % 60); };
 function gPlanned(d) { const T = S.training, w = T && T.weeks && T.weeks[weekStart(d)], a = w && w.d && w.d[wd(d)]; return Array.isArray(a) ? a : []; }
+const GFIT = ['km', 'seg', 'lap', 'zb', 'mhr', 'rhr', 'ivx', 'cv', 'dc'];
+function gFitParts(F, planI) {
+  const o = {}, km = kmSplits(F.rec); if (km.length) o.km = km;
+  let seg = gSegs(F);
+  const laps = gLaps(F); if (laps.length > 1) o.lap = laps;
+  const tz = F.msgs.find(m => m.n === 216 && m.f[0] === 18);
+  if (tz) { if (Array.isArray(tz.f[6])) o.zb = tz.f[6].slice(0, 6); if (tz.f[11]) o.mhr = tz.f[11]; if (tz.f[12]) o.rhr = tz.f[12]; }
+  let A = gAnalyze(laps, seg);
+  if (!A.iv) {
+    const ps = gPaceSegs(F.rec), B = ps ? gAnalyze([], ps, planI ? 2 : 3) : null;
+    if (B && B.iv) { const part = ps.slice(B.roles.a, B.roles.b + 1), R = part.filter(x => x.k === 'r'), J = part.filter(x => x.k !== 'r'), sp = L => L.reduce((s, x) => s + x.m, 0) / Math.max(1, L.reduce((s, x) => s + x.t, 0));
+      if (J.length && (sp(R) - sp(J)) / sp(R) >= 0.22) { seg = ps; A = B; } }
+  }
+  if (seg) o.seg = seg;
+  gRoles(seg, A.roles); if (A.iv) o.ivx = A.iv;
+  const cv = gCurve(F.rec); if (cv) o.cv = cv;
+  if (!A.iv) { const dc = gDecouple(F.rec); if (dc != null) o.dc = dc; }
+  return o;
+}
 function gRun(a, F, d) {
   const g = gBase(a), add = (k, v) => { if (v) g[k] = v; };
   add('cad', ri(a.averageRunningCadenceInStepsPerMinute)); add('asc', ri(a.elevationGain)); add('stl', ri(a.avgStrideLength)); add('vo2', ri(a.vO2MaxValue));
-  let iv = null;
-  if (F) {
-    const km = kmSplits(F.rec); if (km.length) g.km = km;
-    const seg = gSegs(F); if (seg) g.seg = seg;
-    const laps = gLaps(F); if (laps.length > 1) g.lap = laps;
-    const tz = F.msgs.find(m => m.n === 216 && m.f[0] === 18);
-    if (tz) { if (Array.isArray(tz.f[6])) g.zb = tz.f[6].slice(0, 6); if (tz.f[11]) g.mhr = tz.f[11]; if (tz.f[12]) g.rhr = tz.f[12]; }
-    const A = gAnalyze(laps, seg); iv = A.iv; gRoles(seg, A.roles);
-  }
-  g.v = GV;
   const P = gPlanned(d), pI = P.includes('@I'), pL = P.includes('@L');
+  if (F) Object.assign(g, gFitParts(F, pI));
+  const iv = g.ivx || null;
+  g.v = GV;
   const t = pI && !pL ? 'iv' : pL && !pI ? 'easy' : iv ? 'iv' : 'easy';
   const r = { id: 'g-' + g.id, t, dur: ri(a.duration), km: Math.round((+a.distance || 0) / 10) / 100, hr: ri(a.averageHR), max: ri(a.maxHR), g };
-  if (iv) g.ivx = iv;
   if (t === 'iv') r.iv = iv || { p: 'own', n: 1, len: Math.max(1, Math.round(r.dur / 60)), u: 'min', pz: '', r: [{ v: r.km ? msx(r.dur / r.km) : '', h: r.hr }] };
   return r;
 }
 // schon importierte Läufe mit der aktuellen Erkennung neu auswerten (aus den gespeicherten Abschnitten, ohne Download).
 // Typ und Intervalle ändern sich nur, wenn sie noch automatisch gesetzt waren – nicht, wenn du sie selbst geändert hast.
-function gRedo(r, d) {
-  const g = r && r.g; if (!g || g.v === GV || (!g.seg && !g.lap && !g.ivx)) return null;
-  const ng = JSON.parse(JSON.stringify(g)), A = gAnalyze(ng.lap, ng.seg);
-  gRoles(ng.seg, A.roles); if (A.iv) ng.ivx = A.iv; else delete ng.ivx; ng.v = GV;
+function gRedo(r, d, F) {
+  const g = r && r.g; if (!g || g.v === GV) return null;
+  let ng = JSON.parse(JSON.stringify(g)), A;
+  if (F) { for (const k of GFIT) delete ng[k]; Object.assign(ng, gFitParts(F, gPlanned(d).includes('@I'))); A = { iv: ng.ivx || null }; }
+  else { A = gAnalyze(ng.lap, ng.seg); gRoles(ng.seg, A.roles); if (A.iv) ng.ivx = A.iv; else delete ng.ivx; }
+  ng.v = GV;
   const nr = Object.assign({}, r, { g: ng }), auto = r.t === 'iv' && g.ivx && JSON.stringify(r.iv) === JSON.stringify(g.ivx);
   if (auto) {
     if (A.iv) nr.iv = A.iv;
@@ -1483,13 +1561,13 @@ function gRedo(r, d) {
   }
   return nr;
 }
-async function gFix(d, id) {
+async function gFix(d, id, F) {
   const mk = mkey(d);
   return retry(async () => {
     const md = await getDoc(mk); if (!md) return false;
     const obj = asObj(md), day = (obj.days || {})[d] || {}, runs = Array.isArray(day.run) ? day.run.slice() : [], i = runs.findIndex(r => r && r.id === id);
     if (i < 0) return false;
-    const nr = gRedo(runs[i], d); if (!nr) return false;
+    const nr = gRedo(runs[i], d, F); if (!nr) return false;
     runs[i] = nr;
     await patchFields(mk, [[['days', d, 'run'], tval(runs)]], md.updateTime);
     obj.days[d] = Object.assign({}, day, { run: runs }); LOGS[mk] = obj;
@@ -1601,8 +1679,14 @@ async function garminSync(force) {
     }
     // ältere Auswertung? neu auswerten (letzte 60 Tage)
     const fixes = [];
-    for (let i = 0; i <= 60; i++) { const d = addDays(today(), -i); for (const r of ((dayGet(d) || {}).run || [])) if (r && r.g && r.g.v !== GV && (r.g.seg || r.g.lap || r.g.ivx)) fixes.push({ d, id: r.id }); }
-    for (const f of fixes.slice(0, force ? 40 : 3)) { if (!force && Date.now() - t0 > 15000) break; if (await gFix(f.d, f.id)) res.fixed = (res.fixed || 0) + 1; }
+    for (let i = 0; i <= 60; i++) { const d = addDays(today(), -i); for (const r of ((dayGet(d) || {}).run || [])) if (r && r.g && r.g.id && r.g.v !== GV) fixes.push({ d, id: r.id, gid: String(r.g.id) }); }
+    for (const f of fixes.slice(0, force ? 40 : 1)) {
+      if (!force && Date.now() - t0 > 12000) break;
+      let F = null;
+      try { const r = await gReq('/download-service/files/activity/' + f.gid, 'application/zip, application/x-zip-compressed, application/octet-stream', true);
+        if (r.status === 200 && r.body) F = fitParse(unzipFit(r.body.getBytes()).bytes, n => n === 19 || n === 216 || n === 312, true); } catch (e) {}
+      if (await gFix(f.d, f.id, F)) res.fixed = (res.fixed || 0) + 1;
+    }
     L.total = (L.total || 0) + res.added.length; L.recent = res.added.concat(L.recent || []).slice(0, 6);
     await gStatus(L, { n: res.added.length, err: '' }); L.err = '';
   } catch (e) {
