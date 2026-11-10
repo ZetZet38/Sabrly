@@ -47,3 +47,11 @@ Die Woche wird pro Woche geplant (mit Schicht pro Tag). Im Training: Sätze abha
 ⇄ für Alternativen. Vorschläge nach doppelter Progression, Plateau-Hinweis ab 5 Einheiten ohne Fortschritt.
 Läufe (locker/lang oder Intervalle nach Zeit oder Strecke) mit Auswertung „Pace bei Puls unter …“, Kilometer pro KW und Intervall-Verlauf.
 Nach dem Speichern wird der Habit „Training“ (bzw. „Laufen“) automatisch abgehakt.
+Am Ende der Pause gibt es einen kurzen Ton und der Bildschirm leuchtet grün auf; während des Trainings bleibt der Bildschirm an (beides unter Training → ⚙︎).
+„Für Claude kopieren“ (Woche, einzelnes Training, einzelner Lauf) erzeugt einen kompakten Text mit allen Sätzen, Gewichten, Läufen und Habits zum Einfügen in einen Chat.
+
+## Wochenrückblick
+
+Sonntags (und montags für die vergangene Woche) zeigt Heute einen Rückblick: Habits in % mit Vergleich zur Vorwoche, Training, Kilometer,
+Stimmung, was gut lief und was ausbaufähig ist – mit „Nächste Woche planen“. Das Widget plant dazu sonntags um 18 Uhr eine Mitteilung
+„Woche planen“ mit Kurzfassung (abschaltbar unter Mehr → Ansicht; entfällt, wenn die nächste Woche schon geplant ist).

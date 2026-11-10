@@ -1,4 +1,4 @@
-// SABRLY_WIDGET v7
+// SABRLY_WIDGET v8
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
 // Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
@@ -85,7 +85,8 @@ function normalizeState(s) {
   return {
     habits, todos, quotes: Array.isArray(s.quotes) ? s.quotes : [],
     settings: { dayStart: Math.max(0, Math.min(6, +((s.settings || {}).dayStart) || 0)), userName: String((s.settings || {}).userName || ''),
-      prayer: (s.settings && s.settings.prayer && typeof s.settings.prayer === 'object') ? s.settings.prayer : null }
+      prayer: (s.settings && s.settings.prayer && typeof s.settings.prayer === 'object') ? s.settings.prayer : null, weekNotify: (s.settings || {}).weekNotify !== false },
+    training: (s.training && typeof s.training === 'object') ? s.training : null
   };
 }
 
@@ -459,6 +460,47 @@ async function syncPrayerNotifs() {
       await n.schedule();
     }
     fm.writeString(p, JSON.stringify(want));
+  } catch (e) {}
+}
+// Wochenrückblick (kurz) – gleiche Rechnung wie in der App
+function weekReview(ws) {
+  const t = today(), days = []; for (let i = 0; i < 7; i++) { const d = addDays(ws, i); if (d <= t) days.push(d); }
+  const pct = w => { const L = []; for (let i = 0; i < 7; i++) { const d = addDays(w, i); if (d > t) break; if (active(d).length) L.push(dayScore(d)); } return L.length ? Math.round(L.reduce((a, b) => a + b, 0) / L.length * 100) : null; };
+  const last = days[days.length - 1] || ws;
+  const per = S.habits.filter(x => !x.archived && x.created <= last).map(x => {
+    if (x.freq === 'weekly') { const c = weekCount(x, ws, last); return { x, v: c, T: x.target, p: c / x.target }; }
+    let v = 0, T = 0; for (const d of days) if (x.created <= d && scheduled(x, d)) { T++; v += frac(x, d); } return { x, v, T, p: T ? v / T : 1 };
+  }).filter(o => o.T > 0);
+  let tr = 0, runs = 0, km = 0; const ms = [];
+  for (const d of days) { const e = dayGet(d) || {}; if (Array.isArray(e.tr)) tr += e.tr.length; if (Array.isArray(e.run)) { runs += e.run.length; e.run.forEach(r => { km += +r.km || 0; }); } if (e.mood) ms.push(e.mood); }
+  return { hp: pct(ws), hpPrev: pct(addDays(ws, -7)), weak: per.filter(o => o.p < 0.6).sort((a, b) => a.p - b.p).slice(0, 2), good: per.filter(o => o.p >= 1).length, n: per.length,
+    tr, runs, km: Math.round(km * 10) / 10, mood: ms.length ? Math.round(ms.reduce((a, b) => a + b, 0) / ms.length) : 0 };
+}
+function weekText(R) {
+  const a = [];
+  if (R.hp != null) a.push('Habits ' + R.hp + ' %' + (R.hpPrev != null ? ' (Vorwoche ' + R.hpPrev + ' %)' : ''));
+  if (S.training) a.push('Training ' + R.tr + (R.runs ? ' · Läufe ' + R.runs + ' · ' + String(R.km).replace('.', ',') + ' km' : ''));
+  if (R.mood) a.push('Stimmung ' + MOODS[R.mood - 1]);
+  let t = a.join(' · ');
+  if (R.weak.length) t += '\nAusbaufähig: ' + R.weak.map(o => o.x.name).join(', ');
+  else if (R.n && R.good === R.n) t += '\nAlle Habits geschafft 💪';
+  return t + '\nÖffne Sabrly und plane die nächste Woche.';
+}
+// Sonntag 18 Uhr: „Woche planen“ mit kurzem Rückblick. Wird bei jeder Aktualisierung neu berechnet, entfällt wenn schon geplant.
+async function syncWeekNotif() {
+  try {
+    const fm = FileManager.local(), p = fm.joinPath(fm.documentsDirectory(), 'sabrly-week.json');
+    let prev = null; try { if (fm.fileExists(p)) prev = JSON.parse(fm.readString(p)); } catch (e) {}
+    const t = today(), ws = weekStart(t), at = pdate(addDays(ws, 6)).getTime() + 18 * 3600e3, nws = addDays(ws, 7), T = S.training;
+    const planned = !!(T && T.weeks && T.weeks[nws] && Object.values(T.weeks[nws].d || {}).some(a => Array.isArray(a) && a.length));
+    let want = null;
+    if (S.settings.weekNotify && at > Date.now() + 30000 && !planned && (S.habits.length || T)) want = { id: 'sabrly-week-' + ws, at, ws, title: '📅 Woche planen', body: weekText(weekReview(ws)) };
+    if (prev && prev.id && (!want || prev.id !== want.id)) Notification.removePending([prev.id]);
+    if (want && (!prev || prev.id !== want.id || prev.body !== want.body || prev.at !== want.at)) {
+      const n = new Notification(); n.identifier = want.id; n.title = want.title; n.body = want.body; n.threadIdentifier = 'sabrly-woche';
+      n.sound = 'default'; n.userInfo = { sabrly: 'w', ws }; n.setTriggerDate(new Date(want.at)); await n.schedule();
+    }
+    if (want || prev) fm.writeString(p, JSON.stringify(want));
   } catch (e) {}
 }
 // nächste Gebetszeit heute (damit das Widget pünktlich aktualisiert)
@@ -921,7 +963,7 @@ async function getWidget(fam, param) {
     if (!data) return messageWidget(fam, 'Keine Verbindung', 'Das Widget lädt deine Daten, sobald du online bist.');
   }
   S = normalizeState(data.state); LOGS = data.logs || {};
-  await ensureTimes(); if (!stale) await syncPrayerNotifs();
+  await ensureTimes(); if (!stale) { await syncPrayerNotifs(); await syncWeekNotif(); }
   return build(fam, data, stale, param);
 }
 /* ---------- Aktionen in der Scriptable-App (nach einem Tipp aufs Widget) ---------- */
@@ -951,7 +993,7 @@ async function showResult(r) {
     catch (e) { await info('Rückgängig ging nicht', String(e.message) === 'CONFLICT' ? 'In der Zwischenzeit wurde in Sabrly etwas geändert. Mach es bitte dort.' : errText(e)); }
   }
 }
-async function loadAll() { const d = await loadRemote(); if (!d.state) throw new Error('NODATA'); saveCache(d); S = normalizeState(d.state); LOGS = d.logs || {}; await ensureTimes(); await syncPrayerNotifs(); return d; }
+async function loadAll() { const d = await loadRemote(); if (!d.state) throw new Error('NODATA'); saveCache(d); S = normalizeState(d.state); LOGS = d.logs || {}; await ensureTimes(); await syncPrayerNotifs(); await syncWeekNotif(); return d; }
 const openToday = t => active(t).filter(h => !isDone(h, t) && !(h.freq === 'weekly' && weekCount(h, weekStart(t), t) >= h.target));
 function habitLabel(h, t) {
   if (prayerHabit() === h) { const tg = prayerTarget(); if (tg && !tg.done) return h.emoji + '  ' + h.name + ' · ' + pLabel(tg.i) + (tg.lock ? ' ab ' + hmM(tg.s) : tg.yest ? ' (gestern)' : '') + '  (' + hv(h, t) + '/5)'; }
@@ -1072,6 +1114,10 @@ async function main() {
     a.addAction('Gebetet ✓'); a.addCancelAction('Später');
     if (await a.presentAlert() === 0) return prayerFromNotif(String(ui.d), +ui.i);
     return;
+  }
+  if (ui && ui.sabrly === 'w') {
+    const a = new Alert(); a.title = '📅 Woche planen'; a.message = String(N.body || '') + '\n\nDie Planung machst du in Sabrly: Training → Woche planen → Nächste.';
+    a.addAction('OK'); await a.presentAlert(); return;
   }
   const P = (args && args.queryParameters) || {};
   if (P.a) return handleLink(P);
