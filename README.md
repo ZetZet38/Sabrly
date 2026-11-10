@@ -55,3 +55,11 @@ Am Ende der Pause gibt es einen kurzen Ton und der Bildschirm leuchtet grün auf
 Sonntags (und montags für die vergangene Woche) zeigt Heute einen Rückblick: Habits in % mit Vergleich zur Vorwoche, Training, Kilometer,
 Stimmung, was gut lief und was ausbaufähig ist – mit „Nächste Woche planen“. Das Widget plant dazu sonntags um 18 Uhr eine Mitteilung
 „Woche planen“ mit Kurzfassung (abschaltbar unter Mehr → Ansicht; entfällt, wenn die nächste Woche schon geplant ist).
+
+## Garmin (in Arbeit)
+
+Im Scriptable-Skript gibt es „⌚ Garmin-Test“. Es nutzt die Garmin Personal API mit einem eigenen Schlüssel
+(Garmin Connect im Browser → Einstellungen → Personal API Key, direkt: connect.garmin.com/app/settings/personalApiToken).
+Der Schlüssel liegt nur im Schlüsselbund des iPhones, nie im Code oder in Firestore. Der Test lädt die letzten 20 Trainings,
+die Detail-Endpunkte und die Original-Aufzeichnung (ZIP → FIT, Runden und Sätze werden im Skript ausgelesen) und kopiert einen
+Bericht ohne Standort- und Personendaten in die Zwischenablage. Darauf baut der automatische Import der Trainingseinheiten auf.

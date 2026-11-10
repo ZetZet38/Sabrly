@@ -1,4 +1,4 @@
-// SABRLY_WIDGET v8
+// SABRLY_WIDGET v9
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
 // Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
@@ -12,6 +12,8 @@
 //   monat         Monatskalender mit Erfüllung pro Tag
 //   serie         längste Serie (serie: Lesen für einen bestimmten Habit)
 //   stimmung      Stimmung des Tages
+// In der Scriptable-App: „⌚ Garmin-Test“ lädt deine letzten Trainings über die Garmin Personal API
+// (Schlüssel aus Garmin Connect → Einstellungen → Personal API Key, gespeichert nur im Schlüsselbund).
 
 const CFG = {
   apiKey: 'AIzaSyDigyr-IMs9guXwfa-o-fs5CLmZ9INUGdc',
@@ -173,7 +175,7 @@ async function login() {
   Keychain.set(K.exp, String(Date.now() + (Number(j.expiresIn || 3600) - 120) * 1000));
   return true;
 }
-function logout() { for (const k of Object.values(K)) if (Keychain.contains(k)) Keychain.remove(k); const fm = FileManager.local(), p = cachePath(); if (fm.fileExists(p)) fm.remove(p); }
+function logout() { for (const k of Object.values(K)) if (Keychain.contains(k)) Keychain.remove(k); garminForget(); const fm = FileManager.local(), p = cachePath(); if (fm.fileExists(p)) fm.remove(p); }
 async function idToken() {
   const id = kget(K.id), exp = Number(kget(K.exp) || 0);
   if (id && exp > Date.now()) return id;
@@ -1093,6 +1095,272 @@ async function handleLink(P) {
   if (P.a === 'aufgaben') return pickTodo();
   return pickToday();
 }
+/* ---------- Garmin (Personal API): Schlüssel nur im Schlüsselbund dieses iPhones ---------- */
+const GK = { key: 'sabrly.garmin.key', tok: 'sabrly.garmin.tok', texp: 'sabrly.garmin.texp' };
+const GBASE = 'https://personal.connectapi.garmin.com';
+function garminForget() { for (const k of Object.values(GK)) if (Keychain.contains(k)) Keychain.remove(k); }
+function jwtExp(t) {
+  try { let s = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const j = JSON.parse(Data.fromBase64String(s).toRawString()); if (j && +j.exp > 0) return +j.exp * 1000; } catch (e) {}
+  return Date.now() + 20 * 3600e3;
+}
+async function gToken(force) {
+  const t = kget(GK.tok), exp = Number(kget(GK.texp) || 0);
+  if (!force && t && exp - 3600e3 > Date.now()) return t;
+  const key = kget(GK.key); if (!key) throw new Error('GKEY 0');
+  const r = new Request(GBASE + '/personalapitoken-service/personal-api/personal-api-key/token');
+  r.method = 'POST'; r.headers = { Accept: '*/*', Authorization: 'ApiKey ' + key }; r.timeoutInterval = 20;
+  const txt = String((await r.loadString()) || '').trim(), st = r.response ? r.response.statusCode : 0;
+  if (st === 400 || st === 401 || st === 403) throw new Error('GKEY ' + st);
+  if (st !== 200) throw new Error('Garmin antwortet mit Status ' + st + (txt ? ': ' + txt.slice(0, 160) : ''));
+  if (txt.split('.').length !== 3) throw new Error('Garmin hat kein gültiges Token geliefert.');
+  Keychain.set(GK.tok, txt); Keychain.set(GK.texp, String(jwtExp(txt)));
+  return txt;
+}
+async function gReq(path, accept, bin) {
+  for (let n = 0; n < 2; n++) {
+    const tok = await gToken(n > 0);
+    const r = new Request(GBASE + path); r.headers = { Accept: accept || 'application/json', Authorization: 'Bearer ' + tok }; r.timeoutInterval = 40;
+    const body = bin ? await r.load() : await r.loadString();
+    const st = r.response ? r.response.statusCode : 0;
+    if (st === 401 && n === 0) { if (Keychain.contains(GK.tok)) Keychain.remove(GK.tok); continue; }
+    return { status: st, body };
+  }
+}
+async function gJSON(path) { const r = await gReq(path); let json = null; try { json = JSON.parse(r.body); } catch (e) {} return { status: r.status, json, text: String(r.body || '') }; }
+
+// ZIP + inflate (RFC 1951), klein und ohne Bibliothek – Garmin liefert die Aufzeichnung als ZIP
+const ZL = { lb: [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258], le: [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0],
+  db: [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577], de: [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13] };
+function inflateRaw(src, start, size) {
+  let pos = start; const end = start + size; let bb = 0, bc = 0; const out = [];
+  const bits = n => { while (bc < n) { if (pos >= end) throw new Error('ZIP unvollständig'); bb |= src[pos++] << bc; bc += 8; } const v = bb & ((1 << n) - 1); bb >>>= n; bc -= n; return v; };
+  const huff = lens => { const count = new Array(16).fill(0), offs = new Array(16).fill(0), symbol = []; for (const l of lens) count[l]++; count[0] = 0;
+    for (let i = 1; i < 16; i++) offs[i] = offs[i - 1] + count[i - 1]; lens.forEach((l, s) => { if (l) symbol[offs[l]++] = s; }); return { count, symbol }; };
+  const dec = h => { let code = 0, first = 0, index = 0; for (let len = 1; len < 16; len++) { code |= bits(1); const c = h.count[len]; if (code - c < first) return h.symbol[index + code - first]; index += c; first = (first + c) << 1; code <<= 1; } throw new Error('ZIP beschädigt'); };
+  let fixL = null, fixD = null, last = 0;
+  while (!last) {
+    last = bits(1); const type = bits(2);
+    if (type === 0) {
+      bb = 0; bc = 0; if (pos + 4 > end) throw new Error('ZIP unvollständig');
+      const len = src[pos] | src[pos + 1] << 8; pos += 4; if (pos + len > end) throw new Error('ZIP unvollständig');
+      for (let i = 0; i < len; i++) out.push(src[pos++]);
+      continue;
+    }
+    let L, D;
+    if (type === 1) {
+      if (!fixL) { const l = []; for (let i = 0; i < 288; i++) l.push(i < 144 ? 8 : i < 256 ? 9 : i < 280 ? 7 : 8); fixL = huff(l); fixD = huff(new Array(30).fill(5)); }
+      L = fixL; D = fixD;
+    } else if (type === 2) {
+      const nl = bits(5) + 257, nd = bits(5) + 1, nc = bits(4) + 4, ord = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15], cl = new Array(19).fill(0);
+      for (let i = 0; i < nc; i++) cl[ord[i]] = bits(3);
+      const ch = huff(cl), lens = [];
+      while (lens.length < nl + nd) {
+        const s = dec(ch);
+        if (s < 16) lens.push(s);
+        else if (s === 16) { if (!lens.length) throw new Error('ZIP beschädigt'); const p = lens[lens.length - 1]; for (let r = 3 + bits(2); r > 0; r--) lens.push(p); }
+        else { for (let r = s === 17 ? 3 + bits(3) : 11 + bits(7); r > 0; r--) lens.push(0); }
+      }
+      L = huff(lens.slice(0, nl)); D = huff(lens.slice(nl, nl + nd));
+    } else throw new Error('ZIP beschädigt');
+    for (;;) {
+      const s = dec(L);
+      if (s < 256) out.push(s);
+      else if (s === 256) break;
+      else {
+        const li = s - 257; if (li >= 29) throw new Error('ZIP beschädigt');
+        const len = ZL.lb[li] + bits(ZL.le[li]), di = dec(D); if (di >= 30) throw new Error('ZIP beschädigt');
+        const dist = ZL.db[di] + bits(ZL.de[di]); if (dist > out.length) throw new Error('ZIP beschädigt');
+        for (let i = 0; i < len; i++) out.push(out[out.length - dist]);
+      }
+    }
+  }
+  return out;
+}
+const u16 = (b, p) => b[p] | b[p + 1] << 8, u32 = (b, p) => b[p] + b[p + 1] * 256 + b[p + 2] * 65536 + b[p + 3] * 16777216;
+// liefert die erste .fit-Datei aus einem ZIP (oder die Bytes selbst, wenn es schon eine FIT-Datei ist)
+function unzipFit(b) {
+  const isFit = (a, p) => a.length > p + 12 && String.fromCharCode(a[p + 8], a[p + 9], a[p + 10], a[p + 11]) === '.FIT';
+  if (isFit(b, 0)) return { name: '(direkt)', bytes: b };
+  if (u32(b, 0) !== 0x04034b50) throw new Error('Keine ZIP- und keine FIT-Datei');
+  let e = -1; for (let i = b.length - 22; i >= Math.max(0, b.length - 65557); i--) if (u32(b, i) === 0x06054b50) { e = i; break; }
+  const files = [];
+  if (e >= 0) {
+    let p = u32(b, e + 16); const n = u16(b, e + 10);
+    for (let k = 0; k < n && u32(b, p) === 0x02014b50; k++) {
+      const nl = u16(b, p + 28), xl = u16(b, p + 30), cl = u16(b, p + 32);
+      files.push({ m: u16(b, p + 10), cs: u32(b, p + 20), us: u32(b, p + 24), lo: u32(b, p + 42), name: String.fromCharCode(...b.slice(p + 46, p + 46 + nl)) });
+      p += 46 + nl + xl + cl;
+    }
+  } else files.push({ m: u16(b, 8), cs: u32(b, 18), us: u32(b, 22), lo: 0, name: String.fromCharCode(...b.slice(30, 30 + u16(b, 26))) });
+  const f = files.find(x => /\.fit$/i.test(x.name)) || files[0]; if (!f) throw new Error('ZIP ist leer');
+  const d = f.lo + 30 + u16(b, f.lo + 26) + u16(b, f.lo + 28);
+  if (f.m === 0) return { name: f.name, bytes: b.slice(d, d + f.cs) };
+  if (f.m !== 8) throw new Error('ZIP-Verfahren ' + f.m + ' wird nicht unterstützt');
+  return { name: f.name, bytes: inflateRaw(b, d, f.cs) };
+}
+
+// FIT-Datei lesen: alle Nachrichten als { n: Nachrichtennummer, f: { Feldnummer: Wert } }
+const FIT_EPOCH = 631065600;
+function fitParse(b, keep) {
+  const SZ = [1, 1, 1, 2, 2, 4, 4, 1, 4, 8, 1, 2, 4, 1, 8, 8, 8], msgs = [], counts = {}, recFields = {};
+  let p = 0, firstRec = null, recs = 0;
+  const num = (q, t, le) => {
+    const s = SZ[t]; if (s === 1) { const v = b[q]; if (t === 1) return v === 0x7F ? null : (v << 24 >> 24); if (t === 10) return v === 0 ? null : v; return v === 0xFF ? null : v; }
+    if (t === 8 || t === 9) { let all = true; for (let i = 0; i < s; i++) if (b[q + i] !== 0xFF) all = false; if (all) return null; const dv = new DataView(new ArrayBuffer(s)); for (let i = 0; i < s; i++) dv.setUint8(i, b[q + i]); return t === 8 ? dv.getFloat32(0, le) : dv.getFloat64(0, le); }
+    if (s === 8) return null;
+    let v = 0; for (let i = 0; i < s; i++) v += b[q + (le ? i : s - 1 - i)] * Math.pow(256, i);
+    if (t === 3) return v === 0x7FFF ? null : (v >= 0x8000 ? v - 0x10000 : v);
+    if (t === 5) return v === 0x7FFFFFFF ? null : (v >= 0x80000000 ? v - 0x100000000 : v);
+    if (t === 11 || t === 12) return v === 0 ? null : v;
+    return v === Math.pow(256, s) - 1 ? null : v;
+  };
+  const str = (q, n) => { const a = []; for (let i = 0; i < n && b[q + i]; i++) a.push(b[q + i]); let s = String.fromCharCode(...a); try { s = decodeURIComponent(escape(s)); } catch (e) {} return s; };
+  while (p + 12 <= b.length) {
+    const hs = b[p]; if ((hs !== 12 && hs !== 14) || String.fromCharCode(b[p + 8], b[p + 9], b[p + 10], b[p + 11]) !== '.FIT') break;
+    let q = p + hs; const end = Math.min(b.length, q + u32(b, p + 4)), defs = {};
+    while (q < end) {
+      const h = b[q++];
+      if (!(h & 0x80) && (h & 0x40)) {
+        const le = b[q + 1] === 0, n = le ? u16(b, q + 2) : (b[q + 2] << 8 | b[q + 3]), nf = b[q + 4]; q += 5;
+        const fields = []; for (let i = 0; i < nf; i++) { fields.push([b[q], b[q + 1], b[q + 2] & 0x1F]); q += 3; }
+        let dev = 0; if (h & 0x20) { const nd = b[q++]; for (let i = 0; i < nd; i++) { dev += b[q + 1]; q += 3; } }
+        defs[h & 0x0F] = { n, le, fields, dev };
+        continue;
+      }
+      const d = defs[(h & 0x80) ? (h >> 5) & 3 : h & 0x0F]; if (!d) throw new Error('FIT beschädigt');
+      counts[d.n] = (counts[d.n] || 0) + 1;
+      const want = keep(d.n), isRec = d.n === 20, f = want || isRec ? {} : null;
+      for (const [fn, size, t] of d.fields) {
+        if (f) {
+          const es = SZ[t] || 1;
+          if (t === 7) f[fn] = str(q, size);
+          else if (t !== 13 && size >= es && size % es === 0) {
+            if (size === es) { const v = num(q, t, d.le); if (v !== null) f[fn] = v; }
+            else { const a = []; for (let i = 0; i < size; i += es) { const v = num(q + i, t, d.le); if (v !== null) a.push(v); } if (a.length) f[fn] = a; }
+          }
+        }
+        q += size;
+      }
+      q += d.dev;
+      if (isRec) { recs++; for (const k of Object.keys(f)) recFields[k] = 1; if (!firstRec) firstRec = f; }
+      if (want) msgs.push({ n: d.n, f });
+    }
+    p = end + 2;
+  }
+  return { msgs, counts, recs, recFields: Object.keys(recFields).map(Number), firstRec };
+}
+
+const GMS = { 0: 'file_id', 12: 'sport', 18: 'session', 19: 'lap', 20: 'record', 21: 'event', 22: 'source', 23: 'device_info', 26: 'workout', 27: 'workout_step', 34: 'activity', 49: 'file_creator', 72: 'training_file', 78: 'hrv', 101: 'length', 104: 'device_aux_battery', 113: 'gps_metadata?', 140: 'physiological?', 141: 'mesg141', 206: 'field_description', 207: 'developer_data_id', 216: 'time_in_zone', 225: 'set', 227: 'stress_level', 285: 'jump', 312: 'split', 313: 'split_summary', 325: 'mesg325' };
+const GPOS = { 0: [3], 18: [3, 4, 29, 30, 31, 32, 38, 39], 19: [3, 4, 5, 6, 27, 28, 29, 30], 20: [0, 1], 312: [17, 18, 19, 20, 21, 22, 23, 24] };
+const gClean = (n, f) => { const o = {}; for (const [k, v] of Object.entries(f)) if (!(GPOS[n] || []).includes(+k)) o[k] = v; return o; };
+const gT = s => { const d = new Date((s + FIT_EPOCH) * 1000); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '. ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); };
+const gDur = s => { if (s == null || isNaN(s)) return '–'; s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + pad(m) : m) + ':' + pad(x); };
+const gPace = v => v > 0.3 ? gDur(1000 / v) + '/km' : '–';
+const INT = ['active', 'rest', 'warmup', 'cooldown', 'recovery', 'interval', 'other'], TRIG = ['manual', 'time', 'distance', 'posStart', 'posLap', 'posWpt', 'posMarked', 'sessionEnd', 'equipment'];
+function lapLine(i, f) {
+  const sp = f[110] != null ? f[110] / 1000 : f[13] != null ? f[13] / 1000 : null, dist = f[9] != null ? f[9] / 100 : null, tt = f[8] != null ? f[8] / 1000 : f[7] != null ? f[7] / 1000 : null;
+  return '#' + (i + 1) + ' ' + (INT[f[23]] || (f[23] == null ? '?' : f[23])) + '/' + (TRIG[f[24]] || (f[24] == null ? '?' : f[24])) + ' · ' + (dist != null ? Math.round(dist) + ' m' : '– m') + ' · ' + gDur(tt) + ' · ' + gPace(sp)
+    + ' · HF ' + (f[15] != null ? f[15] : '–') + '/' + (f[16] != null ? f[16] : '–') + (f[17] != null ? ' · Kad ' + (f[17] * 2 + (f[80] ? Math.round(f[80] / 64) : 0)) : '') + (f[71] != null ? ' · Schritt ' + f[71] : '') + (f[2] != null ? ' · ' + gT(f[2]) : '');
+}
+function fitReport(bytes) {
+  const z = unzipFit(bytes), keepN = new Set([0, 12, 18, 19, 26, 27, 216, 225, 312, 313]), F = fitParse(z.bytes, n => keepN.has(n)), L = [];
+  L.push('FIT: ' + z.name + ' · ' + z.bytes.length + ' B · ' + Object.entries(F.counts).map(([n, c]) => (GMS[n] || 'mesg' + n) + ' ' + c).join(', '));
+  const by = n => F.msgs.filter(m => m.n === n).map(m => m.f);
+  for (const f of by(0)) { const o = gClean(0, f); delete o[3]; L.push('file_id: ' + JSON.stringify(o)); }
+  for (const f of by(12)) L.push('sport: ' + JSON.stringify(f));
+  for (const f of by(18)) L.push('session: ' + JSON.stringify(gClean(18, f)));
+  const laps = by(19); L.push('Runden: ' + laps.length);
+  laps.slice(0, 60).forEach((f, i) => L.push('  ' + lapLine(i, f)));
+  laps.slice(0, 2).forEach((f, i) => L.push('  roh #' + (i + 1) + ': ' + JSON.stringify(gClean(19, f))));
+  for (const n of [26, 27, 312, 313, 216]) { const a = by(n); if (a.length) { L.push(GMS[n] + ' (' + a.length + '):'); a.slice(0, 40).forEach(f => L.push('  ' + JSON.stringify(gClean(n, f)))); } }
+  const sets = by(225); if (sets.length) { L.push('set (' + sets.length + '):'); sets.slice(0, 80).forEach(f => L.push('  ' + JSON.stringify(f))); }
+  L.push('record: ' + F.recs + ' · Felder ' + F.recFields.join(',') + (F.firstRec ? ' · erstes ' + JSON.stringify(gClean(20, F.firstRec)) : ''));
+  return L.join('\n');
+}
+
+// Bericht für Claude: Felder ohne Standort, Namen von Personen oder Geräte-IDs
+const GRED = /latitude|longitude|polyline|owner|userprofile|profileid|^userid$|displayname|fullname|deviceid|serialnumber|uuid|locationname|geopoint|image|email|^(start|end|nec|swc)?(lat|lon|long|lng)$|Lat$|Lon$|Long$/i;
+function gRedact(x, d) {
+  if (Array.isArray(x)) return x.slice(0, 60).map(v => gRedact(v, (d || 0) + 1));
+  if (x && typeof x === 'object') { const o = {}; for (const [k, v] of Object.entries(x)) if (!GRED.test(k) && v !== null) o[k] = gRedact(v, (d || 0) + 1); return o; }
+  return x;
+}
+const gCut = (s, n) => s.length > n ? s.slice(0, n) + ' …(' + (s.length - n) + ' Zeichen gekürzt)' : s;
+const gKind = a => { const t = String((a.activityType && a.activityType.typeKey) || ''); return /run/.test(t) ? 'run' : /strength/.test(t) ? 'str' : 'other'; };
+async function garminReport() {
+  const L = [], now = new Date();
+  L.push('SABRLY GARMIN-TEST v1 · ' + iso(now) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()));
+  await gToken(false);
+  L.push('Token: ok · gültig bis ' + new Date(Number(kget(GK.texp) || 0)).toISOString());
+  const list = await gJSON('/activitylist-service/activities/search/activities?start=0&limit=20');
+  L.push('Liste: Status ' + list.status);
+  const acts = Array.isArray(list.json) ? list.json : [];
+  if (!acts.length) { L.push(gCut(list.text, 800)); return L.join('\n'); }
+  for (const a of acts) L.push('  ' + String(a.startTimeLocal || '').slice(0, 16) + ' | ' + ((a.activityType && a.activityType.typeKey) || '?') + ' | ' + (a.activityName || '') + ' | '
+    + (a.distance ? (a.distance / 1000).toFixed(2) + ' km' : '–') + ' | ' + gDur(a.duration) + ' | HF ' + (a.averageHR || '–') + '/' + (a.maxHR || '–') + ' | Runden ' + (a.lapCount == null ? '–' : a.lapCount) + ' | id ' + a.activityId);
+  const pick = [], add = a => { if (a && !pick.includes(a)) pick.push(a); };
+  add(acts.find(a => gKind(a) === 'run'));
+  add(acts.find(a => gKind(a) === 'run' && ((a.lapCount || 0) > 1 && (a.splitSummaries || []).some(s => /INTERVAL/.test(String(s.splitType || ''))) || a.workoutId)));
+  add(acts.find(a => gKind(a) === 'str'));
+  add(acts.find(a => gKind(a) === 'other'));
+  for (const a of pick.slice(0, 4)) {
+    const id = a.activityId;
+    L.push('', '=== ' + ((a.activityType && a.activityType.typeKey) || '?') + ' · ' + (a.activityName || '') + ' · ' + String(a.startTimeLocal || '') + ' · id ' + id + ' ===');
+    L.push('[Liste] ' + gCut(JSON.stringify(gRedact(a)), 6000));
+    for (const [lab, path, n] of [['Detail', '', 5000], ['workouts', '/workouts', 1500], ['splits', '/splits', 1500], ['typedsplits', '/typedsplits', 1500], ['exerciseSets', '/exerciseSets', 2500], ['hrTimeInZones', '/hrTimeInZones', 800]]) {
+      try { const r = await gJSON('/activity-service/activity/' + id + path); L.push('[' + lab + '] Status ' + r.status + ' · ' + gCut(r.json != null ? JSON.stringify(gRedact(r.json)) : r.text, n)); }
+      catch (e) { L.push('[' + lab + '] Fehler: ' + e.message); }
+    }
+    try {
+      const r = await gReq('/download-service/files/activity/' + id, 'application/zip, application/x-zip-compressed, application/octet-stream', true);
+      if (r.status !== 200 || !r.body) L.push('[Aufzeichnung] Status ' + r.status);
+      else { const bytes = r.body.getBytes(); L.push('[Aufzeichnung] Status 200 · ' + bytes.length + ' B'); L.push(fitReport(bytes)); }
+    } catch (e) { L.push('[Aufzeichnung] Fehler: ' + e.message); }
+  }
+  return L.join('\n');
+}
+async function garminAskKey() {
+  const a = new Alert(); a.title = '⌚ Garmin-Schlüssel';
+  a.message = 'Füge den Schlüssel aus Garmin Connect ein (Einstellungen → Personal API Key). Er wird nur im Schlüsselbund dieses iPhones gespeichert.';
+  a.addSecureTextField('Schlüssel', ''); a.addAction('Speichern'); a.addAction('Aus Zwischenablage einfügen'); a.addCancelAction('Abbrechen');
+  const i = await a.presentAlert(); if (i === -1) return false;
+  let k = i === 1 ? String(Pasteboard.pasteString() || '') : String(a.textFieldValue(0) || '');
+  k = k.replace(/\s+/g, '');
+  if (k.length < 16) { await info('Kein Schlüssel', 'Das sieht nicht nach einem Garmin-Schlüssel aus. Kopiere ihn vollständig und versuche es nochmal.'); return false; }
+  if (i === 1) Pasteboard.copyString(' ');
+  garminForget(); Keychain.set(GK.key, k);
+  return true;
+}
+async function garminTest() {
+  let rep;
+  try { rep = await garminReport(); }
+  catch (e) {
+    const m = String(e.message || e);
+    if (/^GKEY/.test(m)) {
+      const a = new Alert(); a.title = 'Schlüssel abgelehnt'; a.message = 'Garmin nimmt den Schlüssel nicht an (' + m.replace('GKEY ', 'Status ') + '). Vielleicht ist er unvollständig kopiert oder abgelaufen.';
+      a.addAction('Neuen Schlüssel eingeben'); a.addCancelAction('Abbrechen');
+      if (await a.presentAlert() === 0 && await garminAskKey()) return garminTest();
+      return;
+    }
+    rep = 'SABRLY GARMIN-TEST v1\nFehler: ' + m;
+  }
+  Pasteboard.copyString(rep);
+  const a = new Alert(); a.title = '✓ Bericht kopiert';
+  a.message = 'Füge ihn jetzt im Chat bei Claude ein (lange tippen → Einsetzen). Er enthält deine letzten Trainings, aber keine Standortdaten und nicht deinen Schlüssel.';
+  a.addAction('OK'); a.addAction('Bericht ansehen');
+  if (await a.presentAlert() === 1) await QuickLook.present(rep, true);
+}
+async function garminMenu() {
+  if (!kget(GK.key)) { if (await garminAskKey()) return garminTest(); return; }
+  const a = new Alert(); a.title = '⌚ Garmin';
+  a.message = 'Der Test lädt deine letzten Trainings von Garmin und erstellt einen Bericht für Claude. Dein Schlüssel bleibt auf diesem iPhone.';
+  a.addAction('Test starten'); a.addAction('Schlüssel ersetzen'); a.addDestructiveAction('Schlüssel löschen'); a.addCancelAction('Abbrechen');
+  const i = await a.presentAlert();
+  if (i === 0) return garminTest();
+  if (i === 1) { if (await garminAskKey()) return garminTest(); return; }
+  if (i === 2) { garminForget(); await info('Gelöscht', 'Der Garmin-Schlüssel ist von diesem iPhone entfernt.'); }
+}
+
 async function main() {
   const inWidget = config.runsInWidget || config.runsInAccessoryWidget;
   if (inWidget) {
@@ -1130,14 +1398,16 @@ async function main() {
     ['Übersicht (klein)', 'small', ''], ['Aufgaben (mittel)', 'medium', 'aufgaben'], ['Vers (mittel)', 'medium', 'vers'], ['Vers (groß)', 'large', 'vers'], ['Monat (mittel)', 'medium', 'monat'],
     ['Monat (groß)', 'large', 'monat'], ['Serie (klein)', 'small', 'serie'], ['Stimmung (klein)', 'small', 'stimmung'], ['Sperrbildschirm', 'accessoryRectangular', '']];
   a.addAction('✓  Heute abhaken');
+  a.addAction('⌚  Garmin-Test');
   for (const [l] of opts) a.addAction('Vorschau: ' + l);
   a.addDestructiveAction('Abmelden');
   a.addCancelAction('Fertig');
   const i = await a.presentAlert();
   if (i === -1) return;
   if (i === 0) return pickToday();
-  if (i === opts.length + 1) { logout(); await info('Abgemeldet', 'Das Widget zeigt nichts mehr an, bis du dich wieder anmeldest.'); return; }
-  const [, fam, param] = opts[i - 1];
+  if (i === 1) return garminMenu();
+  if (i === opts.length + 2) { logout(); await info('Abgemeldet', 'Das Widget zeigt nichts mehr an, bis du dich wieder anmeldest.'); return; }
+  const [, fam, param] = opts[i - 2];
   await present(await getWidget(fam, param), fam);
 }
 await main();
