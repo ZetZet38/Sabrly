@@ -447,9 +447,8 @@ code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;backgro
 .tsheet .tpl-big{background:rgba(255,255,255,.05);border:1px solid var(--line)}
 .ttags{display:flex;flex-wrap:wrap;gap:6px}
 .ttag{--c:var(--accent);display:inline-block;max-width:100%;font-size:10.5px;font-weight:700;padding:2px 6px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  background:transparent;color:var(--c);box-shadow:inset 0 0 0 1.5px var(--c)}
-.ttag.ok{background:var(--c);color:#06140F;box-shadow:none}
-.ttag.rest{background:rgba(255,255,255,.06);color:var(--faint);box-shadow:none}
+  background:color-mix(in srgb,var(--c) var(--ta,17%),transparent);color:var(--c)}
+.ttag.rest{background:rgba(255,255,255,.06);color:var(--faint)}
 .tpl-big .ttag{font-size:12px;padding:4px 8px}
 .twk{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .twd{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 2px 9px;border-radius:14px;min-width:0;color:var(--fg)}
@@ -1569,7 +1568,9 @@ const LIB={
    Baustein: {k:'ex',id,e,p:[{k,r}],lo,hi,rest,note} oder {k:'emom',id,v(Sek.),n(Runden),it:[{e,r,k}],note}
    Pro Tag in LOGS: tr:[{id,day,n,st,en,feel,x:[{b,e,s:[{k,r}]} | {b,em:{v,n,it,ok}}]}], run:[{id,t,dur,km,hr,max,iv}]
    Firestore kennt keine Arrays in Arrays – darum überall Objekte in Listen. */
-const TCOL={g:'#46E0AE',b:'#6FA4FF',o:'#F2A93B',p:'#B48CFF',r:'#FF7A85',y:'#E3D26F'};
+const TCOL={g:'#46E0AE',b:'#6FA4FF',o:'#FF9F4A',p:'#B48CFF',r:'#FF7A85',y:'#E3D26F'};
+// Orange und Gelb wirken als getönte Fläche auf dunklem Grund bräunlich – etwas mehr Tönung gleicht das aus
+const TTA={o:'22%',y:'22%'};
 const RUNK={'@L':{n:'Lauf locker',s:'Lauf',col:'b'},'@I':{n:'Intervalle',s:'Int.',col:'o'}};
 const clampI=(v,a,b,d)=>{v=Math.round(+v);return Number.isFinite(v)?Math.max(a,Math.min(b,v)):d};
 const fk=v=>v==null||v===''?'':String(Math.round(+v*100)/100).replace('.',',');
@@ -1673,13 +1674,14 @@ function fmtClock(v){v=String(v||'').trim();if(!v)return '';let p;
 const clockSec=v=>{const a=String(v||'').split(':').map(x=>+x||0);return a.length===3?a[0]*3600+a[1]*60+a[2]:a.length===2?a[0]*60+a[1]:+a[0]||0};
 
 /* ---------- Training: Ansichten ---------- */
-function tagHTML(id,done){return `<span class="ttag${done?' ok':''}" style="--c:${itemCol(id)}">${esc(RUNK[id]?RUNK[id].s:shortName(itemName(id)))}</span>`}
+const itemKey=id=>RUNK[id]?RUNK[id].col:(TDAY(id)?.col||'g');
+function tagHTML(id,done){const k=itemKey(id);return `<span class="ttag${done?' ok':''}" style="--c:${TCOL[k]}${TTA[k]?';--ta:'+TTA[k]:''}">${done?'✓ ':''}${esc(RUNK[id]?RUNK[id].s:shortName(itemName(id)))}</span>`}
 const doneItem=(d,id)=>RUNK[id]?runsOf(d).some(r=>(r.t==='iv')===(id==='@I')):sessOf(d).some(s=>s.day===id);
 function weekCounts(ws){let kp=0,kd=0,lp=0,ld=0;for(let i=0;i<7;i++){const d=addDays(ws,i);for(const id of planDay(ws,i)){if(RUNK[id])lp++;else kp++}kd+=sessOf(d).length;ld+=runsOf(d).length}return {kp,kd,lp,ld}}
 function vTSetup(){
   return `<div class="sec-h" style="margin-top:6px"><h1>Training</h1></div>
   <div class="card glass stack" style="gap:8px"><b style="font-size:17px">Wie trainierst du?</b><span class="hint" style="font-size:14px">Wähle eine Vorlage. Danach kannst du alles ändern: Tage, Übungen, Sätze, Pausen und eigene Übungen.</span></div>
-  ${TPLS.map(t=>`<button type="button" class="tpl-big glass press" data-a="tsetup" data-v="${t.id}"><b>${esc(t.n)}</b><span>${esc(t.d)}</span>${t.days.length?`<span class="ttags">${t.days.map(d=>`<span class="ttag" style="--c:${TCOL[d.col]}">${esc(d.name)}</span>`).join('')}</span>`:''}</button>`).join('')}`}
+  ${TPLS.map(t=>`<button type="button" class="tpl-big glass press" data-a="tsetup" data-v="${t.id}"><b>${esc(t.n)}</b><span>${esc(t.d)}</span>${t.days.length?`<span class="ttags">${t.days.map(d=>`<span class="ttag" style="--c:${TCOL[d.col]}${TTA[d.col]?';--ta:'+TTA[d.col]:''}">${esc(d.name)}</span>`).join('')}</span>`:''}</button>`).join('')}`}
 function vTraining(){const T=TR();if(!T)return vTSetup();wRestore();
   const t=today(),sel=UI.tsel||t,ws=weekStart(sel),de=pdate(addDays(ws,6)),dsd=pdate(ws);
   let h=`<div class="ttop"><div style="min-width:0"><h1>Training</h1><span class="sub">KW ${kw(ws)} · ${dsd.getDate()}. ${MS[dsd.getMonth()]} – ${de.getDate()}. ${MS[de.getMonth()]}</span></div><div class="wknav"><button type="button" class="rbtn" data-a="tweek" data-dir="-1" aria-label="Vorherige Woche">‹</button><button type="button" class="rbtn" data-a="tweek" data-dir="1" aria-label="Nächste Woche">›</button><button type="button" class="rbtn" data-a="tset" aria-label="Einstellungen">⚙︎</button></div></div>`;
@@ -2133,7 +2135,7 @@ Object.assign(ACT,{
 
 /* ---------- Habits sortieren: am Griff ziehen ---------- */
 const GRIP='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>';
-const SORTIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v15M4.5 7.5 8 4l3.5 3.5M16 20V5M12.5 16.5 16 20l3.5-3.5"/></svg>';
+const SORTIC='<svg viewBox="0 0 24 24" style="width:18px;height:18px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v15M4.5 7.5 8 4l3.5 3.5M16 20V5M12.5 16.5 16 20l3.5-3.5"/></svg>';
 function vHabitSort(list){return `<span class="hint" style="margin-top:-10px">Am Griff ziehen. Die Reihenfolge gilt überall – auf Heute, in Habits und in den Widgets.</span>
   <div class="hsortl" id="hsortl">${list.map(x=>`<div class="hsrow glass" data-id="${x.id}"><span class="emo">${esc(x.emoji||'•')}</span><span class="hname">${esc(x.name)}</span><span class="hgrip" aria-label="${esc(x.name)} verschieben">${GRIP}</span></div>`).join('')}</div>`}
 let HS=null;
