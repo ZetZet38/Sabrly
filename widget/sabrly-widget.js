@@ -1,4 +1,4 @@
-// SABRLY_WIDGET v9
+// SABRLY_WIDGET v10
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
 // Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
@@ -12,8 +12,8 @@
 //   monat         Monatskalender mit Erfüllung pro Tag
 //   serie         längste Serie (serie: Lesen für einen bestimmten Habit)
 //   stimmung      Stimmung des Tages
-// In der Scriptable-App: „⌚ Garmin-Test“ lädt deine letzten Trainings über die Garmin Personal API
-// (Schlüssel aus Garmin Connect → Einstellungen → Personal API Key, gespeichert nur im Schlüsselbund).
+// Garmin: In der Scriptable-App „⌚ Garmin“ wählen und den Schlüssel aus Garmin Connect (Einstellungen → Personal API Key) eingeben.
+// Danach übernimmt das Widget neue Läufe und Trainings automatisch nach Sabrly. Der Schlüssel liegt nur im Schlüsselbund.
 
 const CFG = {
   apiKey: 'AIzaSyDigyr-IMs9guXwfa-o-fs5CLmZ9INUGdc',
@@ -965,7 +965,7 @@ async function getWidget(fam, param) {
     if (!data) return messageWidget(fam, 'Keine Verbindung', 'Das Widget lädt deine Daten, sobald du online bist.');
   }
   S = normalizeState(data.state); LOGS = data.logs || {};
-  await ensureTimes(); if (!stale) { await syncPrayerNotifs(); await syncWeekNotif(); }
+  await ensureTimes(); if (!stale) { await syncPrayerNotifs(); await syncWeekNotif(); await garminAuto(); }
   return build(fam, data, stale, param);
 }
 /* ---------- Aktionen in der Scriptable-App (nach einem Tipp aufs Widget) ---------- */
@@ -1201,9 +1201,10 @@ function unzipFit(b) {
 
 // FIT-Datei lesen: alle Nachrichten als { n: Nachrichtennummer, f: { Feldnummer: Wert } }
 const FIT_EPOCH = 631065600;
-function fitParse(b, keep) {
-  const SZ = [1, 1, 1, 2, 2, 4, 4, 1, 4, 8, 1, 2, 4, 1, 8, 8, 8], msgs = [], counts = {}, recFields = {};
-  let p = 0, firstRec = null, recs = 0;
+// rec: true sammelt die Datensätze kompakt als [Zeit, Distanz (cm), Puls]
+function fitParse(b, keep, rec) {
+  const SZ = [1, 1, 1, 2, 2, 4, 4, 1, 4, 8, 1, 2, 4, 1, 8, 8, 8], msgs = [], counts = {}, recFields = {}, R = [];
+  let p = 0, firstRec = null, recs = 0, lastTs = null;
   const num = (q, t, le) => {
     const s = SZ[t]; if (s === 1) { const v = b[q]; if (t === 1) return v === 0x7F ? null : (v << 24 >> 24); if (t === 10) return v === 0 ? null : v; return v === 0xFF ? null : v; }
     if (t === 8 || t === 9) { let all = true; for (let i = 0; i < s; i++) if (b[q + i] !== 0xFF) all = false; if (all) return null; const dv = new DataView(new ArrayBuffer(s)); for (let i = 0; i < s; i++) dv.setUint8(i, b[q + i]); return t === 8 ? dv.getFloat32(0, le) : dv.getFloat64(0, le); }
@@ -1242,12 +1243,15 @@ function fitParse(b, keep) {
         q += size;
       }
       q += d.dev;
-      if (isRec) { recs++; for (const k of Object.keys(f)) recFields[k] = 1; if (!firstRec) firstRec = f; }
+      // komprimierter Zeitstempel im Kopf: 5 Bit Versatz zur letzten vollen Zeit
+      if (f && (h & 0x80) && lastTs != null && f[253] == null) { const o = h & 0x1F; let ts = (lastTs & ~0x1F) + o; if (o < (lastTs & 0x1F)) ts += 0x20; f[253] = ts; }
+      if (f && f[253] != null) lastTs = f[253];
+      if (isRec) { recs++; for (const k of Object.keys(f)) recFields[k] = 1; if (!firstRec) firstRec = f; if (rec) R.push([f[253], f[5], f[3]]); }
       if (want) msgs.push({ n: d.n, f });
     }
     p = end + 2;
   }
-  return { msgs, counts, recs, recFields: Object.keys(recFields).map(Number), firstRec };
+  return { msgs, counts, recs, recFields: Object.keys(recFields).map(Number), firstRec, rec: R };
 }
 
 const GMS = { 0: 'file_id', 12: 'sport', 18: 'session', 19: 'lap', 20: 'record', 21: 'event', 22: 'source', 23: 'device_info', 26: 'workout', 27: 'workout_step', 34: 'activity', 49: 'file_creator', 72: 'training_file', 78: 'hrv', 101: 'length', 104: 'device_aux_battery', 113: 'gps_metadata?', 140: 'physiological?', 141: 'mesg141', 206: 'field_description', 207: 'developer_data_id', 216: 'time_in_zone', 225: 'set', 227: 'stress_level', 285: 'jump', 312: 'split', 313: 'split_summary', 325: 'mesg325' };
@@ -1350,15 +1354,234 @@ async function garminTest() {
   a.addAction('OK'); a.addAction('Bericht ansehen');
   if (await a.presentAlert() === 1) await QuickLook.present(rep, true);
 }
+
+/* ---------- Garmin → Sabrly: Läufe als Lauf-Einträge, Kraft und Sonstiges als ga-Einträge ---------- */
+const GTN = { running: 'Laufen', treadmill_running: 'Laufband', trail_running: 'Trailrun', track_running: 'Bahnlauf', indoor_running: 'Laufband', virtual_run: 'Virtueller Lauf', strength_training: 'Krafttraining',
+  cycling: 'Radfahren', indoor_cycling: 'Indoor-Radfahren', road_biking: 'Rennrad', mountain_biking: 'Mountainbike', gravel_cycling: 'Gravel', virtual_ride: 'Virtuelles Radfahren', hiit: 'HIIT', indoor_cardio: 'Cardio',
+  elliptical: 'Crosstrainer', stair_climbing: 'Treppensteigen', indoor_rowing: 'Rudergerät', rowing: 'Rudern', lap_swimming: 'Schwimmen', open_water_swimming: 'Freiwasser', yoga: 'Yoga', pilates: 'Pilates',
+  hiking: 'Wandern', boxing: 'Boxen', soccer: 'Fußball', basketball: 'Basketball', tennis: 'Tennis', padel: 'Padel', bouldering: 'Bouldern', rock_climbing: 'Klettern', jump_rope: 'Seilspringen', mobility: 'Mobility' };
+const GSKIP = /^(walking|casual_walking|speed_walking|floor_climbing|transition|multi_sport|uncategorized)$/;
+const GDAYS = 14;
+const gTyp = a => String((a.activityType && a.activityType.typeKey) || '');
+function gClass(a) {
+  const t = gTyp(a), km = (+a.distance || 0) / 1000, dur = +a.duration || 0;
+  if (/run/.test(t) && km >= 0.3) return 'run';
+  if (/strength/.test(t)) return dur >= 300 ? 'str' : null;
+  if (!t || GSKIP.test(t)) return null;
+  return dur >= 20 * 60 ? 'oth' : null;
+}
+function gStart(a) { const m = /^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)/.exec(String(a.startTimeLocal || '')); return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null; }
+function gDay(a) { const d = gStart(a); return d ? iso(new Date(d.getTime() - (S.settings.dayStart || 0) * 3600e3)) : null; }
+const r1 = v => v == null || isNaN(v) ? null : Math.round(+v * 10) / 10, ri = v => v == null || isNaN(v) ? 0 : Math.round(+v);
+function gBase(a) {
+  const st = gStart(a), z = [1, 2, 3, 4, 5].map(i => ri(a['hrTimeInZone_' + i])), o = { id: String(a.activityId), n: String(a.activityName || GTN[gTyp(a)] || 'Training').slice(0, 60), typ: gTyp(a) };
+  if (st) { o.st = pad(st.getHours()) + ':' + pad(st.getMinutes()); o.ts = st.getTime(); }
+  const add = (k, v) => { if (v != null && v !== 0 && v !== '' && !(typeof v === 'number' && isNaN(v))) o[k] = v; };
+  add('kcal', ri(a.calories)); add('te', r1(a.aerobicTrainingEffect)); add('ate', r1(a.anaerobicTrainingEffect)); add('load', ri(a.activityTrainingLoad)); add('lbl', a.trainingEffectLabel ? String(a.trainingEffectLabel) : '');
+  if (z.some(Boolean)) o.z = z;
+  return o;
+}
+// km-Splits aus den Datensätzen: bewegte Zeit (Lücken > 10 s = Pause) und Ø-Puls je Kilometer
+function kmSplits(rec) {
+  const out = []; let mt = 0, pt = null, pd = 0, segT = 0, hs = 0, hn = 0, next = 1000;
+  for (const [t, dc, h] of rec) {
+    if (t == null) continue;
+    const dt = pt != null ? t - pt : 0, step = dt > 0 && dt <= 10 ? dt : 0;
+    if (h) { hs += h; hn++; }
+    if (dc == null) { mt += step; pt = t; continue; }
+    const d = dc / 100;
+    while (d >= next) { const fr = d > pd ? (next - pd) / (d - pd) : 1, at = mt + step * fr; out.push({ t: Math.round(at - segT), h: hn ? Math.round(hs / hn) : 0 }); segT = at; hs = 0; hn = 0; next += 1000; }
+    mt += step; pt = t; pd = Math.max(pd, d);
+  }
+  const rest = pd - (next - 1000); if (rest >= 50 && out.length < 200) out.push({ t: Math.round(mt - segT), h: hn ? Math.round(hs / hn) : 0, m: Math.round(rest) });
+  return out.slice(0, 200);
+}
+// Lauf/Geh-Abschnitte, die die Uhr selbst erkennt (split 17 Laufen, 18 Gehen)
+function gSegs(F) {
+  const L = F.msgs.filter(m => m.n === 312 && (m.f[0] === 17 || m.f[0] === 18)).map(m => m.f).sort((a, b) => (a[9] || 0) - (b[9] || 0))
+    .map(f => ({ k: f[0] === 17 ? 'r' : 'w', t: ri((f[2] != null ? f[2] : f[1]) / 1000), m: ri((f[3] || 0) / 100), h: ri(f[15]) })).filter(x => x.t > 0);
+  return L.some(x => x.k === 'w' && x.t >= 20) && L.some(x => x.k === 'r') ? L.slice(0, 60) : null;
+}
+function gLaps(F) {
+  return F.msgs.filter(m => m.n === 19).map(m => m.f).map(f => ({ t: ri((f[8] != null ? f[8] : f[7]) / 1000), m: ri((f[9] || 0) / 100), h: ri(f[15]), x: ri(f[16]), i: f[23] == null ? 0 : f[23], tr: f[24] == null ? 0 : f[24] })).filter(x => x.t > 0).slice(0, 80);
+}
+const med = a => { const s = a.slice().sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+const gMin = s => { const m = Math.round(s / 30) / 2; return (m < 1 ? Math.round(s) + ' s' : String(m).replace('.', ',') + ' min'); };
+// Intervalle erkennen: Runden mit Pause (strukturiertes Workout) oder die Lauf/Geh-Abschnitte der Uhr
+function gIntervals(laps, seg) {
+  let reps = null, rests = [], how = '';
+  const work = laps.filter(l => l.i === 0 || l.i === 5), rest = laps.filter(l => l.i === 1 || l.i === 4);
+  if (rest.length && work.length >= 2) { reps = work; rests = rest.map(l => l.t); how = 'Pause'; }
+  else if (seg) {
+    const runs = seg.filter(x => x.k === 'r'), md = med(runs.map(x => x.t)), main = runs.filter(x => Math.abs(x.t - md) <= md * 0.25);
+    if (main.length >= 2) { const a = seg.indexOf(main[0]), b = seg.indexOf(main[main.length - 1]); reps = main; rests = seg.slice(a, b).filter(x => x.k === 'w').map(x => x.t); how = 'gehen'; }
+  }
+  if (!reps || reps.length < 2) return null;
+  const ds = reps.map(x => x.m), dm = med(ds), byDist = how === 'Pause' && dm >= 100 && ds.every(x => Math.abs(x - dm) <= dm * 0.06);
+  const iv = { p: 'own', n: Math.min(30, reps.length), u: byDist ? 'm' : 'min', len: byDist ? Math.round(dm / 50) * 50 : Math.max(1, Math.round(med(reps.map(x => x.t)) / 60)),
+    pz: rests.length ? gMin(med(rests)) + ' ' + how : '', r: [] };
+  iv.r = reps.slice(0, 30).map(x => ({ v: byDist ? msx(x.t) : (x.m > 0 ? msx(x.t / (x.m / 1000)) : ''), h: x.h || 0 }));
+  return iv;
+}
+const msx = s => { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + pad(s % 60); };
+function gPlanned(d) { const T = S.training, w = T && T.weeks && T.weeks[weekStart(d)], a = w && w.d && w.d[wd(d)]; return Array.isArray(a) ? a : []; }
+function gRun(a, F, d) {
+  const g = gBase(a), add = (k, v) => { if (v) g[k] = v; };
+  add('cad', ri(a.averageRunningCadenceInStepsPerMinute)); add('asc', ri(a.elevationGain)); add('stl', ri(a.avgStrideLength)); add('vo2', ri(a.vO2MaxValue));
+  let iv = null;
+  if (F) {
+    const km = kmSplits(F.rec); if (km.length) g.km = km;
+    const seg = gSegs(F); if (seg) g.seg = seg;
+    const laps = gLaps(F); if (laps.length > 1) g.lap = laps;
+    const tz = F.msgs.find(m => m.n === 216 && m.f[0] === 18);
+    if (tz) { if (Array.isArray(tz.f[6])) g.zb = tz.f[6].slice(0, 6); if (tz.f[11]) g.mhr = tz.f[11]; if (tz.f[12]) g.rhr = tz.f[12]; }
+    iv = gIntervals(laps, seg);
+  }
+  const P = gPlanned(d), pI = P.includes('@I'), pL = P.includes('@L');
+  const t = pI && !pL ? 'iv' : pL && !pI ? 'easy' : iv ? 'iv' : 'easy';
+  const r = { id: 'g-' + g.id, t, dur: ri(a.duration), km: Math.round((+a.distance || 0) / 10) / 100, hr: ri(a.averageHR), max: ri(a.maxHR), g };
+  if (iv) g.ivx = iv;
+  if (t === 'iv') r.iv = iv || { p: 'own', n: 1, len: Math.max(1, Math.round(r.dur / 60)), u: 'min', pz: '', r: [{ v: r.km ? msx(r.dur / r.km) : '', h: r.hr }] };
+  return r;
+}
+function gOther(a, k) {
+  const o = gBase(a); o.k = k; o.dur = ri(a.duration); o.hr = ri(a.averageHR); o.max = ri(a.maxHR);
+  const km = Math.round((+a.distance || 0) / 10) / 100; if (km >= 0.1) o.km = km;
+  return o;
+}
+// lokaler Merkzettel: wann zuletzt geprüft, Fehlerzustand. Ob eine Einheit schon da ist, entscheidet allein Sabrly
+// (so kommt ein Import zurück, falls die App ihn beim gleichzeitigen Speichern überschrieben hat)
+const gLP = () => { const fm = FileManager.local(); return fm.joinPath(fm.documentsDirectory(), 'sabrly-garmin.json'); };
+function gLoad() { try { const fm = FileManager.local(), p = gLP(); const j = fm.fileExists(p) ? JSON.parse(fm.readString(p)) : null; if (j && typeof j === 'object') { delete j.ids; return j; } } catch (e) {} return {}; }
+function gStore(o) { try { FileManager.local().writeString(gLP(), JSON.stringify(o)); } catch (e) {} }
+function gKnownIn(day, id) {
+  if (!day) return false;
+  if ((day.run || []).some(r => r && (r.id === 'g-' + id || (r.g && String(r.g.id) === id)))) return true;
+  if ((day.ga || []).some(x => x && String(x.id) === id)) return true;
+  return Array.isArray(day.gdel) && day.gdel.map(String).includes(id);
+}
+function trHabitW(kind) {
+  const T = S.training; if (!T) return null; const hs = S.habits.filter(h => !h.archived);
+  if (kind === 'run') { if (T.rhabit === '-') return null; const r = hs.find(h => h.id === T.rhabit) || (!T.rhabit ? hs.find(h => /lauf|laufen|joggen|running/i.test(h.name)) : null); if (r) return r; }
+  if (T.habit === '-') return null;
+  return hs.find(h => h.id === T.habit) || (!T.habit ? hs.find(h => /training|gym|sport|workout|fitness|kraft/i.test(h.name)) : null) || null;
+}
+// eine Einheit in den Monat schreiben (frisch gelesen, mit Vorbedingung)
+async function gWrite(d, kind, item) {
+  const mk = mkey(d);
+  return retry(async () => {
+    const md = await getDoc(mk), obj = md ? asObj(md) : { days: {} }; if (!obj.days) obj.days = {};
+    const day = obj.days[d] || {}, id = String(kind === 'run' ? item.g.id : item.id);
+    if (gKnownIn(day, id)) return 'known';
+    const ops = [];
+    if (kind === 'run') {
+      const runs = Array.isArray(day.run) ? day.run.slice() : [];
+      // selbst eingetragener Lauf am selben Tag: Garmin-Werte übernehmen, Typ und Intervalle behalten
+      const man = runs.map((r, i) => ({ r, i })).filter(x => x.r && !x.r.g);
+      let hit = null;
+      if (man.length) hit = man.slice().sort((x, y) => Math.abs((+x.r.km || 0) - item.km) - Math.abs((+y.r.km || 0) - item.km))[0];
+      if (hit) {
+        const o = hit.r, m = Object.assign({}, o, { dur: item.dur, km: item.km, hr: item.hr || o.hr || 0, max: item.max || o.max || 0, g: item.g });
+        if (!(o.t === 'iv' && o.iv && (o.iv.r || []).some(x => x.v || x.h))) { m.t = item.t; if (item.iv) m.iv = item.iv; else delete m.iv; }
+        runs[hit.i] = m;
+      } else runs.push(item);
+      ops.push([['days', d, 'run'], tval(runs)]);
+    } else {
+      const ga = Array.isArray(day.ga) ? day.ga.slice() : []; ga.push(item); ga.sort((x, y) => (x.ts || 0) - (y.ts || 0));
+      ops.push([['days', d, 'ga'], tval(ga)]);
+    }
+    // Habit wie in der App abhaken – nur für heute und gestern, nicht beim Nachholen älterer Tage
+    const hk = kind === 'run' ? 'run' : kind === 'str' ? 'tr' : null, h = hk ? trHabitW(hk) : null;
+    let ticked = null;
+    LOGS[mk] = obj;
+    if (h && d <= today() && d >= addDays(today(), -1) && h.created <= d && !isDone(h, d)) { const nv = stepVal(h, d); ops.push([['days', d, 'h', h.id], tval(nv)]); ticked = h.name; }
+    await patchFields(mk, ops, md ? md.updateTime : null);
+    if (kind === 'run') obj.days[d] = Object.assign({}, day, { run: fv(ops[0][1]) }); else obj.days[d] = Object.assign({}, day, { ga: fv(ops[0][1]) });
+    if (ticked) { obj.days[d].h = Object.assign({}, day.h || {}); obj.days[d].h[h.id] = fv(ops[ops.length - 1][1]); }
+    LOGS[mk] = obj;
+    return ticked ? 'ok:' + ticked : 'ok';
+  });
+}
+function gLine(d, kind, x) {
+  const dd = pdate(d), w = DN[wd(d)] + ' ' + dd.getDate() + '.' + (dd.getMonth() + 1) + '.';
+  if (kind === 'run') return w + ' · ' + (x.t === 'iv' ? 'Intervalle' : 'Lauf') + ' ' + String(x.km).replace('.', ',') + ' km · ' + gDur(x.dur);
+  return w + ' · ' + (x.k === 'str' ? 'Krafttraining' : (GTN[x.typ] || x.n)) + ' · ' + gDur(x.dur) + (x.hr ? ' · Ø ' + x.hr : '');
+}
+// Status für die App (eigenes Dokument „garmin“, das die App nur liest)
+async function gStatus(L, patch) {
+  const now = Date.now(), changed = (patch.err || '') !== (L.err || '');
+  if (!changed && !patch.n && L.wrote && now - L.wrote < 3 * 3600e3) return;
+  const o = { at: new Date(now).toISOString(), err: patch.err || '', n: (L.total || 0), last: (L.recent || []).slice(0, 6) };
+  try { await patchFields('garmin', [[['at'], tval(o.at)], [['err'], tval(o.err)], [['n'], tval(o.n)], [['last'], tval(o.last)]]); L.wrote = now; } catch (e) {}
+}
+// force: in der App (alles Neue, ohne Wartezeit) · sonst im Widget: höchstens alle 20 min, 2 Einheiten
+async function garminSync(force) {
+  if (!kget(GK.key) || !kget(K.uid)) return null;
+  const L = gLoad(), now = Date.now(), wait = L.err === 'key' ? 6 * 3600e3 : 20 * 60e3;
+  if (!force && L.last && now - L.last < wait) return null;
+  L.last = now; gStore(L);
+  const res = { added: [], ticked: [], skipped: 0, err: '' }, t0 = Date.now();
+  try {
+    const list = await gJSON('/activitylist-service/activities/search/activities?start=0&limit=' + (force ? 40 : 10));
+    if (list.status === 429) throw new Error('Garmin bremst gerade (zu viele Anfragen). Später nochmal.');
+    if (list.status !== 200 || !Array.isArray(list.json)) throw new Error('Garmin-Liste: Status ' + list.status);
+    const min = addDays(today(), -GDAYS), todo = [];
+    for (const a of list.json) {
+      const k = gClass(a), d = gDay(a), id = String(a.activityId || '');
+      if (!k || !d || !id || d < min || d > today()) continue;
+      if (gKnownIn(dayGet(d), id)) continue;
+      todo.push({ a, k, d, id });
+    }
+    todo.reverse();
+    for (const x of todo.slice(0, force ? 30 : 2)) {
+      if (!force && Date.now() - t0 > 12000) break;
+      let item;
+      if (x.k === 'run') {
+        let F = null;
+        try { const r = await gReq('/download-service/files/activity/' + x.id, 'application/zip, application/x-zip-compressed, application/octet-stream', true);
+          if (r.status === 200 && r.body) F = fitParse(unzipFit(r.body.getBytes()).bytes, n => n === 19 || n === 216 || n === 312, true); } catch (e) {}
+        item = gRun(x.a, F, x.d);
+      } else item = gOther(x.a, x.k);
+      const w = await gWrite(x.d, x.k, item);
+      if (w === 'known') { res.skipped++; continue; }
+      res.added.push(gLine(x.d, x.k, item));
+      if (/^ok:/.test(w)) res.ticked.push(w.slice(3));
+    }
+    L.total = (L.total || 0) + res.added.length; L.recent = res.added.concat(L.recent || []).slice(0, 6);
+    await gStatus(L, { n: res.added.length, err: '' }); L.err = '';
+  } catch (e) {
+    const m = String(e.message || e), ne = /^GKEY/.test(m) ? 'key' : 'net'; res.err = ne === 'key' ? 'key' : m;
+    if (ne === 'key' || L.err === 'key') await gStatus(L, { err: ne });
+    L.err = ne;
+  }
+  gStore(L);
+  return res;
+}
+async function garminAuto() { try { await garminSync(false); } catch (e) {} }
+async function garminNow() {
+  const r = await garminSync(true);
+  if (!r) return;
+  if (r.err === 'key') {
+    const a = new Alert(); a.title = 'Schlüssel abgelehnt'; a.message = 'Garmin nimmt den Schlüssel nicht mehr an. Vermutlich ist er abgelaufen. Erstelle in Garmin Connect einen neuen und gib ihn hier ein.';
+    a.addAction('Neuen Schlüssel eingeben'); a.addCancelAction('Abbrechen');
+    if (await a.presentAlert() === 0 && await garminAskKey()) return garminNow();
+    return;
+  }
+  if (r.err) { await info('Garmin', 'Abruf hat nicht geklappt.\n(' + r.err + ')'); return; }
+  const msg = r.added.length ? r.added.join('\n') + (r.ticked.length ? '\n\nAbgehakt: ' + r.ticked.filter((v, i, s) => s.indexOf(v) === i).join(', ') : '') + '\n\nIn Sabrly unter Training zu sehen.'
+    : 'Alle Trainings der letzten ' + GDAYS + ' Tage sind schon in Sabrly.';
+  await info(r.added.length ? '⌚ ' + r.added.length + (r.added.length === 1 ? ' Einheit' : ' Einheiten') + ' übernommen' : '⌚ Nichts Neues', msg);
+}
 async function garminMenu() {
-  if (!kget(GK.key)) { if (await garminAskKey()) return garminTest(); return; }
-  const a = new Alert(); a.title = '⌚ Garmin';
-  a.message = 'Der Test lädt deine letzten Trainings von Garmin und erstellt einen Bericht für Claude. Dein Schlüssel bleibt auf diesem iPhone.';
-  a.addAction('Test starten'); a.addAction('Schlüssel ersetzen'); a.addDestructiveAction('Schlüssel löschen'); a.addCancelAction('Abbrechen');
+  if (!kget(GK.key)) { if (await garminAskKey()) return garminNow(); return; }
+  const L = gLoad(), a = new Alert(); a.title = '⌚ Garmin';
+  a.message = 'Neue Läufe und Trainings kommen automatisch in Sabrly, sobald das Widget aktualisiert. ' + (L.last ? 'Zuletzt geprüft: ' + pad(new Date(L.last).getHours()) + ':' + pad(new Date(L.last).getMinutes()) + ' Uhr.' : '') + '\nDein Schlüssel bleibt auf diesem iPhone.';
+  a.addAction('Jetzt abrufen'); a.addAction('Bericht für Claude (Test)'); a.addAction('Schlüssel ersetzen'); a.addDestructiveAction('Schlüssel löschen'); a.addCancelAction('Abbrechen');
   const i = await a.presentAlert();
-  if (i === 0) return garminTest();
-  if (i === 1) { if (await garminAskKey()) return garminTest(); return; }
-  if (i === 2) { garminForget(); await info('Gelöscht', 'Der Garmin-Schlüssel ist von diesem iPhone entfernt.'); }
+  if (i === 0) return garminNow();
+  if (i === 1) return garminTest();
+  if (i === 2) { if (await garminAskKey()) return garminNow(); return; }
+  if (i === 3) { garminForget(); await info('Gelöscht', 'Der Garmin-Schlüssel ist von diesem iPhone entfernt. Bereits übernommene Trainings bleiben in Sabrly.'); }
 }
 
 async function main() {
@@ -1398,7 +1621,7 @@ async function main() {
     ['Übersicht (klein)', 'small', ''], ['Aufgaben (mittel)', 'medium', 'aufgaben'], ['Vers (mittel)', 'medium', 'vers'], ['Vers (groß)', 'large', 'vers'], ['Monat (mittel)', 'medium', 'monat'],
     ['Monat (groß)', 'large', 'monat'], ['Serie (klein)', 'small', 'serie'], ['Stimmung (klein)', 'small', 'stimmung'], ['Sperrbildschirm', 'accessoryRectangular', '']];
   a.addAction('✓  Heute abhaken');
-  a.addAction('⌚  Garmin-Test');
+  a.addAction('⌚  Garmin');
   for (const [l] of opts) a.addAction('Vorschau: ' + l);
   a.addDestructiveAction('Abmelden');
   a.addCancelAction('Fertig');

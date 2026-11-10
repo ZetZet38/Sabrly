@@ -623,6 +623,32 @@ body:has(.trest) .wrap{padding-bottom:70px}
 .hgrip{width:48px;height:48px;display:grid;place-items:center;color:var(--muted);touch-action:none;cursor:grab;flex:none}
 .hgrip svg{width:22px;height:22px}
 
+/* Garmin */
+.gcard .gk{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.gcard .gk>div{display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px;border-radius:14px;background:rgba(255,255,255,.05)}
+.gcard .gk b{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.gcard .gk span{font-size:12px;color:var(--muted);line-height:1.25}
+.gz{display:flex;height:10px;border-radius:6px;overflow:hidden;gap:2px;background:rgba(255,255,255,.06)}
+.gz i{display:block;min-width:3px}
+.gzl{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--muted)}
+.gzl span{display:inline-flex;align-items:baseline;gap:4px}.gzl small{opacity:.7;font-size:11px}
+.gkm{display:flex;flex-direction:column;gap:5px}
+.gkm>div{display:grid;grid-template-columns:42px minmax(0,1fr) 52px 38px;align-items:center;gap:10px;font-size:14px}
+.gkm>div.hd{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.gkm i{display:block;height:8px;border-radius:5px;background:var(--c,#6FA4FF);opacity:.85}
+.gkm b{text-align:right;font-weight:650}.gkm small{color:var(--muted);text-align:right;font-size:13px}
+.gseg{display:flex;flex-direction:column;gap:4px}
+.gseg>div{display:grid;grid-template-columns:minmax(0,1fr) 48px 62px 48px 34px;gap:8px;font-size:13.5px;padding:6px 10px;border-radius:10px;background:rgba(111,164,255,.10)}
+.gseg>div.w{background:rgba(255,255,255,.04);color:var(--muted)}
+.gseg>div span:not(:first-child){text-align:right}
+.glap summary{cursor:pointer;color:var(--muted);font-size:13.5px;padding:4px 0}
+.glap>div{display:grid;grid-template-columns:26px 64px 48px minmax(0,1fr) 34px;gap:8px;font-size:13.5px;padding:3px 0}
+.glap>div span:not(:first-child){text-align:right}
+.gmeta{display:block;margin-top:6px;opacity:.9}
+.thero.gah .gz{margin-top:10px}.thero.gah .gzl{margin-top:6px}
+.gtag{font-size:12px;opacity:.8}
+.glast{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted)}
+
 .wrk{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px}
 .wrk>div{display:flex;flex-direction:column;gap:2px;padding:10px 10px 9px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line);min-width:0}
 .wrk b{font-size:24px;line-height:1.1}.wrk b small{font-size:13px;color:var(--muted);margin-left:1px}
@@ -789,10 +815,11 @@ function syncHTML(){const m={cloud:['ok','Synchronisiert · auf all deinen Gerä
   err:['err','Speichern fehlgeschlagen. Lokal gesichert.'],local:['','Ohne Konto · nur auf diesem Gerät gespeichert']}[SYNC]||['',''];
   return `<span class="sync ${m[0]}" id="syncline"><i></i>${m[1]}</span>`}
 function applyDoc(k,raw){const data=clone(raw);if(!data)return false;
+  if(k==='garmin'){if(JSON.stringify(data)===JSON.stringify(GST))return false;GST=data;return true}
   if(k==='state'){const n=normalize(data);if(JSON.stringify(n)===JSON.stringify(S))return false;S=n;return true}
   if(k.startsWith('m-')){const n=data.days?data:{days:{}};if(JSON.stringify(n)===JSON.stringify(LOGS[k]))return false;LOGS[k]=n;return true}
   return false}
-function stopCloud(){if(unsub){try{unsub()}catch(e){}}unsub=null;cloudReady=false;clearTimeout(flushT)}
+function stopCloud(){if(unsub){try{unsub()}catch(e){}}unsub=null;cloudReady=false;clearTimeout(flushT);GST=null}
 function startCloud(){
   stopCloud();SYNC='loading';let first=true;const uid=USER.uid;
   const timer=setTimeout(()=>{if(SYNC==='loading')setSync(navigator.onLine===false?'offline':'slow')},10000);
@@ -807,6 +834,7 @@ function startCloud(){
         const cloudKeys=new Set();
         for(const doc of snap.docs){const k=doc.id,data=clone(doc.data());cloudKeys.add(k);
           if(k==='state'){if(!localPending('state')||!ADOPTED){S=normalize(data);saved.state=rev.state}}
+          else if(k==='garmin')GST=data;
           else if(k.startsWith('m-')){const local=LOGS[k],merged={days:{...((data&&data.days)||{})}};
             if(localPending(k)&&local?.days)for(const[d,e]of Object.entries(local.days))merged.days[d]={...(merged.days[d]||{}),...clone(e)};
             LOGS[k]=merged}}
@@ -1577,7 +1605,8 @@ const LIB={
 /* ---------- Training: Datenmodell ----------
    S.training: {days:[{id,name,sub,col,blocks}], ex:{eigene Übungen}, weeks:{Montag:{d:{0..6:[ids]},s:{0..6:'F'|'S'|'N'}}}, habit, rhabit, hr}
    Baustein: {k:'ex',id,e,p:[{k,r}],lo,hi,rest,note} oder {k:'emom',id,v(Sek.),n(Runden),it:[{e,r,k}],note}
-   Pro Tag in LOGS: tr:[{id,day,n,st,en,feel,x:[{b,e,s:[{k,r}]} | {b,em:{v,n,it,ok}}]}], run:[{id,t,dur,km,hr,max,iv}]
+   Pro Tag in LOGS: tr:[{id,day,n,st,en,feel,x:[{b,e,s:[{k,r}]} | {b,em:{v,n,it,ok}}]}], run:[{id,t,dur,km,hr,max,iv,g}]
+   Garmin (vom Widget): run[].g = Werte der Uhr (km-Splits, Zonen …), ga:[{id,k:'str'|'oth',n,st,ts,dur,hr,max,kcal,te,z}], gdel:[gelöschte Garmin-IDs]
    Firestore kennt keine Arrays in Arrays – darum überall Objekte in Listen. */
 const TCOL={g:'#46E0AE',b:'#6FA4FF',o:'#FF9F4A',p:'#B48CFF',r:'#FF7A85',y:'#E3D26F'};
 // Orange und Gelb wirken als getönte Fläche auf dunklem Grund bräunlich – etwas mehr Tönung gleicht das aus
@@ -1636,6 +1665,38 @@ const planDay=(ws,i)=>{const w=wkOf(ws),a=w&&w.d[i];return Array.isArray(a)?a.fi
 const hasPlan=ws=>{const w=wkOf(ws);return !!w&&Object.values(w.d).some(a=>a&&a.length)};
 const sessOf=d=>{const a=dayGet(d)?.tr;return Array.isArray(a)?a:[]};
 const runsOf=d=>{const a=dayGet(d)?.run;return Array.isArray(a)?a:[]};
+/* ---------- Garmin: Werte von der Uhr (das Sabrly-Widget in Scriptable übernimmt sie) ---------- */
+var GST=null; // Status-Dokument „garmin“: {at,err,n,last}
+const gaOf=d=>{const a=dayGet(d)?.ga;return Array.isArray(a)?a.filter(x=>x&&typeof x==='object'&&x.id):[]};
+// Garmin-Krafttraining den Sabrly-Sessions zuordnen: nächste Startzeit (≤ 3 h), bei je einer immer
+function gaPair(d){const ses=sessOf(d).slice().sort((a,b)=>(a.st||0)-(b.st||0)),G=gaOf(d).filter(x=>x.k==='str'),m=new Map(),used=new Set(),one=ses.length===1&&G.length===1;
+  for(const s of ses){let best=null,bd=Infinity;for(const g of G){if(used.has(g.id))continue;const dd=g.ts&&s.st?Math.abs(g.ts-s.st):0;if(dd<bd){bd=dd;best=g}}
+    if(best&&(bd<=3*3600e3||one)){m.set(s.id,best);used.add(best.id)}}
+  return {bySess:m,free:gaOf(d).filter(x=>!used.has(x.id))}}
+const GTEL={RECOVERY:'Erholung',BASE:'Grundlage',AEROBIC_BASE:'Grundlage',TEMPO:'Tempo',LACTATE_THRESHOLD:'Laktatschwelle',THRESHOLD:'Schwelle',VO2MAX:'VO2max',ANAEROBIC_CAPACITY:'anaerobe Kapazität',SPEED:'Schnelligkeit',SPRINT:'Sprint',NO_BENEFIT:'kein Effekt'};
+const gLbl=l=>l?(GTEL[l]||String(l).toLowerCase().replace(/_/g,' ')):'';
+const ZC=['#8A9391','#6FA4FF','#46E0AE','#FF9F4A','#FF5F6D'];
+const zRange=(zb,i)=>zb&&zb[i]!=null&&zb[i+1]!=null?`${zb[i]+1}–${zb[i+1]}`:'';
+function zoneBar(z,zb){if(!Array.isArray(z))return '';const tot=z.reduce((a,b)=>a+(+b||0),0);if(!tot)return '';
+  return `<div class="gz" role="img" aria-label="Zeit in Pulszonen">${z.map((v,i)=>v?`<i style="flex:${v};background:${ZC[i]}"></i>`:'').join('')}</div><div class="gzl">${z.map((v,i)=>`<span><b style="color:${ZC[i]}">Z${i+1}</b> ${Math.round((+v||0)/60)} min${zRange(zb,i)?`<small>${zRange(zb,i)}</small>`:''}</span>`).join('')}</div>`}
+const gaMeta=x=>[x.dur?hmsx(x.dur):'',x.km?fk(x.km)+' km':'',x.hr?'Ø '+x.hr+(x.max?' / max '+x.max:''):'',x.kcal?x.kcal+' kcal':''].filter(Boolean).join(' · ');
+const gaName=x=>x.k==='str'?'Krafttraining':(x.n||'Training');
+function gaHero(d,x,lbl){const str=x.k==='str';
+  return `<div class="thero gah" style="--c:${str?TCOL.g:TCOL.p}"><span class="label">${esc(lbl)} · ⌚ Garmin${x.st?' · '+esc(x.st):''}</span><h3>${esc(gaName(x))}</h3><span class="meta">${esc(gaMeta(x))}${x.te!=null?' · TE '+fk(x.te):''}</span>${zoneBar(x.z)}
+    <div class="btns">${str&&d<=today()?`<button type="button" class="btn" data-a="wfree" data-d="${d}">Sätze nachtragen</button>`:''}<button type="button" class="btn" data-a="gahide" data-d="${d}" data-id="${esc(x.id)}">Ausblenden</button></div></div>`}
+// Lauf-Seite: alles, was die Uhr gemessen hat
+function gRunCard(r,ps){const g=r.g;if(!g)return '';const pace=ps?hmsx(ps):(r.km>0&&r.dur?hmsx(r.dur/r.km):'');
+  const k=(v,l)=>v||v===0?`<div><b class="num">${v}</b><span>${l}</span></div>`:'';
+  let h=`<div class="card glass stack gcard" style="gap:12px"><div class="row between" style="gap:8px"><span class="label">⌚ Von Garmin${g.st?' · '+esc(g.st)+' Uhr':''}</span><span class="hint" style="text-align:right">${esc(g.n||'')}</span></div>
+    <div class="gk">${k(pace,'min/km')}${k(g.cad||'','Schritte/min')}${k(g.asc?g.asc+' m':'','Höhenmeter')}${k(g.kcal||'','kcal')}${k(g.te!=null?fk(g.te):'','Trainingseffekt')}${k(g.load||'','Belastung')}</div>
+    ${g.lbl?`<span class="hint">Wirkung laut Garmin: ${esc(gLbl(g.lbl))}${g.ate?' · anaerob '+fk(g.ate):''}</span>`:''}`;
+  if(g.z)h+=`<span class="label">Pulszonen</span>${zoneBar(g.z,g.zb)}`;
+  if(g.km&&g.km.length){const P=g.km.map(x=>x.m?x.t*1000/x.m:x.t),full=P.filter((p,i)=>!g.km[i].m),mx=Math.max(...full,1),mn=Math.min(...full,mx);
+    h+=`<span class="label">Kilometer</span><div class="gkm"><div class="hd"><span>km</span><span></span><span>Pace</span><span>Puls</span></div>${g.km.map((x,i)=>{const p=P[i],w=x.m?20:mx===mn?100:40+(mx-p)/(mx-mn)*60;
+      return `<div><span class="num">${x.m?fk(Math.round(x.m/10)/100):i+1}</span><i style="width:${w.toFixed(0)}%"></i><b class="num">${msx(p)}</b><small class="num">${x.h||'–'}</small></div>`}).join('')}</div>`}
+  if(g.seg&&g.seg.length)h+=`<span class="label">Laufen und Gehen</span><div class="gseg">${g.seg.map(x=>`<div class="${x.k==='r'?'r':'w'}"><span>${x.k==='r'?'Laufen':'Gehen'}</span><span class="num">${msx(x.t)}</span><span class="num">${x.m} m</span><span class="num">${x.m&&x.t?msx(x.t/(x.m/1000)):''}</span><span class="num">${x.h||''}</span></div>`).join('')}</div><span class="hint">Die Uhr erkennt selbst, wann du gehst. ${g.ivx?`Erkannt: ${ivName(g.ivx)}${g.ivx.pz?', dazwischen '+esc(g.ivx.pz):''}.`:''}</span>`;
+  if(g.lap&&g.lap.length>1)h+=`<details class="glap"><summary>Runden der Uhr (${g.lap.length})</summary>${g.lap.map((x,i)=>`<div><span>${i+1}.</span><span class="num">${fk(Math.round(x.m/10)/100)} km</span><span class="num">${msx(x.t)}</span><span class="num">${x.m?msx(x.t/(x.m/1000))+' /km':''}</span><span class="num">${x.h||''}</span></div>`).join('')}</details>`;
+  return h+'</div>'}
 function allSess(kind){const out=[];for(const k of Object.keys(LOGS).sort().reverse()){const days=LOGS[k]?.days||{};
   for(const d of Object.keys(days).sort().reverse()){const a=days[d]&&days[d][kind];if(Array.isArray(a))for(let i=a.length-1;i>=0;i--)if(a[i])out.push({d,s:a[i]})}}return out}
 const itemName=id=>RUNK[id]?RUNK[id].n:(TDAY(id)?.name||'Training');
@@ -1697,7 +1758,7 @@ function vTraining(){const T=TR();if(!T)return vTSetup();wRestore();
   const t=today(),sel=UI.tsel||t,ws=weekStart(sel),de=pdate(addDays(ws,6)),dsd=pdate(ws);
   let h=`<div class="ttop"><div style="min-width:0"><h1>Training</h1><span class="sub">KW ${kw(ws)} · ${dsd.getDate()}. ${MS[dsd.getMonth()]} – ${de.getDate()}. ${MS[de.getMonth()]}</span></div><div class="wknav"><button type="button" class="rbtn" data-a="tweek" data-dir="-1" aria-label="Vorherige Woche">‹</button><button type="button" class="rbtn" data-a="tweek" data-dir="1" aria-label="Nächste Woche">›</button><button type="button" class="rbtn" data-a="tset" aria-label="Einstellungen">⚙︎</button></div></div>`;
   if(UI.w&&!UI.w.edit)h+=`<button type="button" class="banner good trun" data-a="wresume"><b>Training läuft: ${esc(UI.w.n)}</b><span class="bs">Seit ${msx((NOW()-UI.w.st)/1000)} min · Tippen zum Fortsetzen</span></button>`;
-  let days='';for(let i=0;i<7;i++){const d=addDays(ws,i),L=planDay(ws,i),extra=sessOf(d).filter(s=>!L.includes(s.day)).length+runsOf(d).filter(r=>!L.includes(r.t==='iv'?'@I':'@L')).length;
+  let days='';for(let i=0;i<7;i++){const d=addDays(ws,i),L=planDay(ws,i),extra=sessOf(d).filter(s=>!L.includes(s.day)).length+runsOf(d).filter(r=>!L.includes(r.t==='iv'?'@I':'@L')).length+gaPair(d).free.length;
     days+=`<button type="button" class="twd${d===t?' t':''}${d===sel?' sel':''}" data-a="tsel" data-d="${d}" aria-label="${fmtLong(d)}"><small>${DN[i]}</small><b class="num">${pdate(d).getDate()}</b>${L.length?L.map(id=>tagHTML(id,doneItem(d,id))).join(''):extra?'<span class="ttag ok" style="--c:var(--accent)">✓</span>':'<span class="ttag rest">–</span>'}</button>`}
   const C=weekCounts(ws);
   h+=`<section class="sec" style="gap:10px"><div class="twk">${days}</div>${C.kp||C.lp||C.kd||C.ld?`<div class="row" style="justify-content:center;gap:8px"><span class="pill num">Kraft ${C.kd}/${C.kp}</span><span class="pill num">Laufen ${C.ld}/${C.lp}</span></div>`:''}</section>`;
@@ -1716,21 +1777,22 @@ function vTraining(){const T=TR();if(!T)return vTSetup();wRestore();
   const L=allSess('tr').slice(0,6);
   if(L.length)h+=`<section class="sec"><div class="sec-h"><h2>Letzte Trainings</h2></div>${L.map(({d,s})=>sessRow(d,s)).join('')}<span class="hint">Tippen zum Bearbeiten · nach links wischen zum Löschen</span></section>`;
   return h}
-function sessRow(d,s){const D=TDAY(s.day),sets=(s.x||[]).reduce((n,x)=>n+(x.em?x.em.ok.filter(Boolean).length:(x.s||[]).length),0),mins=s.en&&s.st?Math.round((s.en-s.st)/60000):0;
-  return swipeRow(`<div class="todo solid"><span class="tdot" style="--c:${TCOL[D?.col||'g']}"></span><button type="button" class="tt" data-a="wedit" data-d="${d}" data-id="${esc(s.id)}"><b>${esc(s.n||D?.name||'Training')}</b><span>${fmtShort(d)} · ${(s.x||[]).length} Übungen · ${sets} Sätze${mins>0&&mins<400?' · '+mins+' min':''}</span></button></div>`,
+function sessRow(d,s){const D=TDAY(s.day),sets=(s.x||[]).reduce((n,x)=>n+(x.em?x.em.ok.filter(Boolean).length:(x.s||[]).length),0),mins=s.en&&s.st?Math.round((s.en-s.st)/60000):0,gx=gaPair(d).bySess.get(s.id);
+  return swipeRow(`<div class="todo solid"><span class="tdot" style="--c:${TCOL[D?.col||'g']}"></span><button type="button" class="tt" data-a="wedit" data-d="${d}" data-id="${esc(s.id)}"><b>${esc(s.n||D?.name||'Training')}</b><span>${fmtShort(d)} · ${(s.x||[]).length} Übungen · ${sets} Sätze${mins>0&&mins<400?' · '+mins+' min':''}${gx&&gx.hr?' · ⌚ Ø '+gx.hr:''}</span></button></div>`,
     sa('sa-del','wdel',`data-d="${d}" data-id="${esc(s.id)}"`,IC.del,'Löschen')+sa('sa-edit','wedit',`data-d="${d}" data-id="${esc(s.id)}"`,IC.edit,'Ändern'))}
 function dayCards(sel){const t=today(),ws=weekStart(sel),L=planDay(ws,wd(sel)),lbl=sel===t?'Heute':dayTitle(sel);let h='';
-  const ses=sessOf(sel),runs=runsOf(sel),usedS=new Set(),usedR=new Set();
+  const ses=sessOf(sel),runs=runsOf(sel),usedS=new Set(),usedR=new Set(),GP=gaPair(sel),gm=s=>{const x=s&&GP.bySess.get(s.id);return x?`<span class="meta gmeta">⌚ ${esc(gaMeta(x))}${x.te!=null?' · TE '+fk(x.te):''}</span>`:''};
   for(const id of L){if(RUNK[id]){const iv=id==='@I',r=runs.find(x=>(x.t==='iv')===iv&&!usedR.has(x.id));if(r)usedR.add(r.id);const T=TR();
-      h+=`<div class="thero run" style="--c:${itemCol(id)}"><span class="label">${esc(lbl)}</span><h3>${esc(RUNK[id].n)}</h3><span class="meta">${r?'✓ '+esc(runLine(r)):iv?'Intervalle, z. B. 4 × 4 min oder 3 × 8 min':'Puls unter '+T.hr}</span>
+      h+=`<div class="thero run" style="--c:${itemCol(id)}"><span class="label">${esc(lbl)}</span><h3>${esc(RUNK[id].n)}</h3><span class="meta">${r?'✓ '+esc(runLine(r))+(r.g?' · ⌚':''):iv?'Intervalle, z. B. 4 × 4 min oder 3 × 8 min':'Puls unter '+T.hr}</span>
         ${r?`<button type="button" class="btn" data-a="runedit" data-d="${sel}" data-id="${esc(r.id)}">Ansehen / ändern</button>`:sel<=t?`<button type="button" class="btn pri" data-a="runnew" data-d="${sel}" data-k="${iv?'iv':'easy'}">Lauf eintragen</button>`:'<span class="pill">geplant</span>'}</div>`;continue}
     const D=TDAY(id),s=ses.find(x=>x.day===id&&!usedS.has(x.id));if(s)usedS.add(s.id);const run=UI.w&&!UI.w.edit&&UI.w.d===sel&&UI.w.day===id;
     h+=`<div class="thero tap" style="--c:${TCOL[D.col]}" data-a="dayed" data-id="${esc(id)}" role="button" tabindex="0" aria-label="${esc(D.name)} bearbeiten"><div class="row between"><span class="label">${esc(lbl)}</span><span class="tedit">✎ Bearbeiten</span></div><h3>${esc(D.name)}${D.sub?` <small>· ${esc(D.sub)}</small>`:''}</h3><span class="meta">${D.blocks.length} Übungen · ca. ${dayMin(D)} min</span>
-      <div class="exl">${D.blocks.map(b=>`<span>${esc(b.k==='emom'?'EMOM '+b.it.map(x=>EXD(x.e).n).join(' / '):EXD(b.e).n)}</span>`).join('')}</div>
+      <div class="exl">${D.blocks.map(b=>`<span>${esc(b.k==='emom'?'EMOM '+b.it.map(x=>EXD(x.e).n).join(' / '):EXD(b.e).n)}</span>`).join('')}</div>${gm(s)}
       ${run?`<button type="button" class="btn pri" data-a="wresume">Fortsetzen</button>`:s?`<button type="button" class="btn" data-a="wedit" data-d="${sel}" data-id="${esc(s.id)}">✓ Erledigt · ansehen / ändern</button>`:sel<=t?`<button type="button" class="btn pri" data-a="wstart" data-day="${id}" data-d="${sel}">${sel===t?'Training starten':'Nachtragen'}</button>`:'<span class="pill">geplant</span>'}</div>`}
-  for(const s of ses)if(!usedS.has(s.id))h+=`<div class="thero${TDAY(s.day)?' tap':''}" style="--c:${TCOL[TDAY(s.day)?.col||'g']}"${TDAY(s.day)?` data-a="dayed" data-id="${esc(s.day)}" role="button" tabindex="0"`:''}><span class="label">${esc(lbl)} · zusätzlich</span><h3>${esc(s.n)}</h3><button type="button" class="btn" data-a="wedit" data-d="${sel}" data-id="${esc(s.id)}">✓ Erledigt · ansehen / ändern</button></div>`;
-  for(const r of runs)if(!usedR.has(r.id))h+=`<div class="thero run" style="--c:${TCOL[r.t==='iv'?'o':'b']}"><span class="label">${esc(lbl)} · zusätzlich</span><h3>${r.t==='iv'?'Intervalle':'Lauf'}</h3><span class="meta">✓ ${esc(runLine(r))}</span><button type="button" class="btn" data-a="runedit" data-d="${sel}" data-id="${esc(r.id)}">Ansehen / ändern</button></div>`;
-  if(!L.length&&!ses.length&&!runs.length)h+=`<div class="thero rest"><span class="label">${esc(lbl)}</span><h3>${hasPlan(ws)?'Ruhetag':'Nichts geplant'}</h3><span class="meta">${hasPlan(ws)?'Erholung gehört zum Training.':'Plane die Woche oder starte einfach.'}</span>${sel<=t?`<div class="btns"><button type="button" class="btn" data-a="wfree" data-d="${sel}">Training starten</button><button type="button" class="btn" data-a="runnew" data-d="${sel}" data-k="easy">Lauf eintragen</button></div>`:''}</div>`;
+  for(const s of ses)if(!usedS.has(s.id))h+=`<div class="thero${TDAY(s.day)?' tap':''}" style="--c:${TCOL[TDAY(s.day)?.col||'g']}"${TDAY(s.day)?` data-a="dayed" data-id="${esc(s.day)}" role="button" tabindex="0"`:''}><span class="label">${esc(lbl)} · zusätzlich</span><h3>${esc(s.n)}</h3>${gm(s)}<button type="button" class="btn" data-a="wedit" data-d="${sel}" data-id="${esc(s.id)}">✓ Erledigt · ansehen / ändern</button></div>`;
+  for(const r of runs)if(!usedR.has(r.id))h+=`<div class="thero run" style="--c:${TCOL[r.t==='iv'?'o':'b']}"><span class="label">${esc(lbl)} · zusätzlich</span><h3>${r.t==='iv'?'Intervalle':'Lauf'}</h3><span class="meta">✓ ${esc(runLine(r))}${r.g?' · ⌚':''}</span><button type="button" class="btn" data-a="runedit" data-d="${sel}" data-id="${esc(r.id)}">Ansehen / ändern</button></div>`;
+  for(const x of GP.free)h+=gaHero(sel,x,lbl);
+  if(!L.length&&!ses.length&&!runs.length&&!GP.free.length)h+=`<div class="thero rest"><span class="label">${esc(lbl)}</span><h3>${hasPlan(ws)?'Ruhetag':'Nichts geplant'}</h3><span class="meta">${hasPlan(ws)?'Erholung gehört zum Training.':'Plane die Woche oder starte einfach.'}</span>${sel<=t?`<div class="btns"><button type="button" class="btn" data-a="wfree" data-d="${sel}">Training starten</button><button type="button" class="btn" data-a="runnew" data-d="${sel}" data-k="easy">Lauf eintragen</button></div>`:''}</div>`;
   return h}
 // Abschnitt auf der Heute-Seite
 function heuteTraining(sel){if(!TR())return '';wRestore();const t=today(),fut=sel>t,L=planDay(weekStart(sel),wd(sel)),ses=sessOf(sel),runs=runsOf(sel),rows=[],usedS=new Set(),usedR=new Set();
@@ -1742,6 +1804,7 @@ function heuteTraining(sel){if(!TR())return '';wRestore();const t=today(),fut=se
     rows.push(row(s?' ok':'',TCOL[D.col],ICTR,D.name+(D.sub?' · '+D.sub:''),s?'Erledigt':`${D.blocks.length} Übungen · ca. ${dayMin(D)} min`,
       live?`<button type="button" class="go" data-a="wresume">Weiter</button>`:s?`<button type="button" class="go" data-a="wedit" data-d="${sel}" data-id="${esc(s.id)}" aria-label="Training ansehen">✓</button>`:fut?'<span class="pill">geplant</span>':`<button type="button" class="go" data-a="wstart" data-day="${id}" data-d="${sel}">${sel===t?'Starten':'Nachtragen'}</button>`))}
   for(const s of ses)if(!usedS.has(s.id))rows.push(row(' ok',TCOL[TDAY(s.day)?.col||'g'],ICTR,s.n,'Erledigt',`<button type="button" class="go" data-a="wedit" data-d="${sel}" data-id="${esc(s.id)}" aria-label="Training ansehen">✓</button>`));
+  for(const x of gaPair(sel).free)rows.push(row(' ok',x.k==='str'?TCOL.g:TCOL.p,'⌚',gaName(x),gaMeta(x),'<span class="pill">Garmin</span>'));
   for(const r of runs)if(!usedR.has(r.id))rows.push(row(' ok',TCOL[r.t==='iv'?'o':'b'],'🏃',r.t==='iv'?'Intervalle':'Lauf',runLine(r),`<button type="button" class="go" data-a="runedit" data-d="${sel}" data-id="${esc(r.id)}" aria-label="Lauf ansehen">✓</button>`));
   if(run&&!rows.some(r=>r.includes('data-a="wresume"')))rows.unshift(row('',TCOL.g,ICTR,UI.w.n,'läuft gerade','<button type="button" class="go" data-a="wresume">Weiter</button>'));
   if(!rows.length)return '';
@@ -1955,18 +2018,25 @@ function pTSet(){const T=TR(),hs=S.habits.filter(h=>!h.archived),ah=trHabit('tr'
     <span class="hint">Ist dein iPhone auf lautlos, kann iOS den Ton unterdrücken. Dann leuchtet der Bildschirm am Pausenende kurz grün auf.</span>
     <div class="row between"><div style="min-width:0"><span>Pulsgrenze lockere Läufe</span><div class="hint">Darunter zählt ein Lauf für „Pace bei Puls unter …“.</div></div><div class="stepper"><button type="button" class="cbtn" data-a="thr" data-dir="-1" aria-label="Weniger">−</button><b>${T.hr}</b><button type="button" class="cbtn" data-a="thr" data-dir="1" aria-label="Mehr">+</button></div></div>
   </div>
+  ${gSetCard()}
   <button type="button" class="btn" data-a="tdays">Trainingstage bearbeiten</button>`}
+function gAgo(iso){const t=Date.parse(iso||'');if(!t)return '';const m=Math.round((NOW()-t)/60000);return m<2?'gerade eben':m<60?`vor ${m} min`:m<60*24?`vor ${Math.round(m/60)} h`:`vor ${Math.round(m/1440)} Tagen`}
+function gSetCard(){const G=GST,how='In Scriptable das Sabrly-Skript öffnen → ⌚ Garmin';
+  if(!G)return `<div class="card glass stack" style="gap:8px"><span class="label">⌚ Garmin</span><span>Läufe und Trainings automatisch von deiner Uhr</span><span class="hint">${how} und den Schlüssel aus Garmin Connect eingeben (im Browser: Einstellungen → Personal API Key). Danach übernimmt das Widget neue Einheiten selbst.</span></div>`;
+  if(G.err==='key')return `<div class="card glass stack" style="gap:8px"><span class="label">⌚ Garmin</span><span style="color:var(--crit)">Schlüssel abgelaufen oder ungültig</span><span class="hint">In Garmin Connect einen neuen erstellen, dann: ${how} → Schlüssel ersetzen.</span></div>`;
+  return `<div class="card glass stack" style="gap:8px"><span class="label">⌚ Garmin</span><span>Verbunden${G.at?' · geprüft '+esc(gAgo(G.at)):''}</span>${Array.isArray(G.last)&&G.last.length?`<div class="glast">${G.last.slice(0,4).map(x=>`<span>${esc(x)}</span>`).join('')}</div>`:''}<span class="hint">Neue Läufe und Trainings kommen automatisch, sobald das Sabrly-Widget aktualisiert. Sofort: ${how} → Jetzt abrufen.</span></div>`}
 
 /* ---------- Laufen ---------- */
 const IVP={'4x4':{n:4,len:4,u:'min',pz:'3 min traben'},'3x8':{n:3,len:8,u:'min',pz:'2 min traben'},'6x400':{n:6,len:400,u:'m',pz:'200 m traben'},'8x200':{n:8,len:200,u:'m',pz:'200 m gehen'}};
 const ivName=P=>`${P.n} × ${P.len} ${P.u}`;
 function ivPace(P,v){const s=clockSec(v);if(!s)return 0;return P.u==='m'?s/(P.len/1000):s} // Sek. pro km
 function runLine(r){const p=r.km>0&&r.dur?hmsx(r.dur/r.km):'';return r.t==='iv'&&r.iv?`${ivName(r.iv)}${r.km?' · '+fk(r.km)+' km':''}${r.hr?' · Ø '+r.hr:''}`:`${fk(r.km)} km${p?' · '+p+' /km':''}${r.hr?' · Ø '+r.hr:''}`}
-function runDraft(d,k,r){if(r)return {d,id:r.id,t:r.t,dur:hmsx(r.dur),km:fk(r.km),hr:r.hr||'',max:r.max||'',iv:r.iv?clone(r.iv):{...IVP['3x8'],p:'3x8',r:[{v:'',h:''},{v:'',h:''},{v:'',h:''}]}};
+function runDraft(d,k,r){if(r)return {d,id:r.id,t:r.t,dur:hmsx(r.dur),km:fk(r.km),hr:r.hr||'',max:r.max||'',g:r.g?clone(r.g):null,iv:r.iv?clone(r.iv):r.g&&r.g.ivx?clone(r.g.ivx):{...IVP['3x8'],p:'3x8',r:[{v:'',h:''},{v:'',h:''},{v:'',h:''}]}};
   return {d,id:null,t:k==='iv'?'iv':'easy',dur:'',km:'',hr:'',max:'',iv:{...IVP['3x8'],p:'3x8',r:Array.from({length:3},()=>({v:'',h:''}))}}}
 function pRun(){const f=UI.page,R=f.r,iv=R.t==='iv',T=TR(),sec=clockSec(R.dur),km=pnum(R.km),pace=sec&&km?sec/km:0,hr=+R.hr||0;
   let h=`<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Abbrechen</button><h2>${R.id?'Lauf ändern':'Lauf eintragen'}</h2><button type="button" class="r txtbtn pri" data-a="runsave">Sichern</button></div>
   <div class="seg">${[['easy','Locker / Lang'],['iv','Intervalle']].map(([k,t])=>`<button type="button" class="${R.t===k?'on':''}" data-a="rtype" data-v="${k}">${t}</button>`).join('')}</div>
+  ${gRunCard(R,pace)}
   <div class="card glass stack" style="gap:12px"><div class="fgroup"><label class="label" for="rn-d">Datum</label><input class="tinput" type="date" id="rn-d" data-rf="d" value="${esc(R.d)}" max="${today()}"></div>
     <div class="tfgrid"><div class="fgroup"><label class="label" for="rn-dur">Dauer${iv?' gesamt':''}</label><input class="tinput num" id="rn-dur" data-rf="dur" value="${esc(R.dur)}" placeholder="h:mm:ss" inputmode="numeric" autocomplete="off"></div>
     <div class="fgroup"><label class="label" for="rn-km">Distanz${iv?' gesamt':''} (km)</label><input class="tinput num" id="rn-km" data-rf="km" value="${esc(R.km)}" placeholder="0,0" inputmode="decimal" autocomplete="off"></div>
@@ -1985,20 +2055,23 @@ function pRun(){const f=UI.page,R=f.r,iv=R.t==='iv',T=TR(),sec=clockSec(R.dur),k
       <label class="tmini"><input data-iv="${i}" data-f="v" value="${esc(v.v)}" placeholder="m:ss" inputmode="numeric" aria-label="${dist?'Zeit':'Pace'} Intervall ${i+1}"><span>${dist?'min':'/km'}</span></label>
       <label class="tmini"><input data-iv="${i}" data-f="h" value="${esc(v.h)}" placeholder="–" inputmode="numeric" aria-label="Ø-Puls Intervall ${i+1}"><span>bpm</span></label></div>`}).join('')}
     <span class="hint">Aus den Runden (Laps) deiner Uhr: bei Zeit-Intervallen die Pace, bei Strecken-Intervallen die Zeit – die Pace rechnet Sabrly aus. Ø-Puls = Durchschnittspuls in diesem Intervall. Ein Tempolauf ist „Eigene“ mit 1 × 20 min.</span></div>`}
-  h+=`<span class="hint">${iv?'':'Lockere und lange Läufe landen zusammen in „Pace bei Puls unter '+T.hr+'“. '}Werte aus Garmin Connect oder der Trainings-App der Apple Watch übernehmen.</span>`;
+  h+=`<span class="hint">${iv?'':'Lockere und lange Läufe landen zusammen in „Pace bei Puls unter '+T.hr+'“. '}${R.g?'Die Werte kamen von deiner Garmin-Uhr. Du kannst sie hier trotzdem ändern.':GST?'Läufe von deiner Garmin-Uhr kommen automatisch. Hier trägst du Läufe ohne Uhr ein.':'Werte aus Garmin Connect oder der Trainings-App der Apple Watch übernehmen.'}</span>`;
   if(R.id)h+=`<button type="button" class="btn" data-a="copyrun" data-d="${esc(f.od)}" data-id="${esc(R.id)}">📋 Für Claude kopieren</button><button type="button" class="btn danger" data-a="rundel" data-d="${esc(f.od)}" data-id="${esc(R.id)}">Lauf löschen</button>`;
   return h}
 function runSave(){const f=UI.page,R=f.r;const dur=clockSec(fmtClock(R.dur)),km=pnum(R.km);
   if(!dur&&!km){toast('Trag mindestens Dauer oder Distanz ein.');return}
   if(!R.d||R.d>today()){toast('Bitte ein Datum bis heute wählen.');return}
-  const run={id:R.id||'r-'+newId(),t:R.t,dur:dur||0,km:km||0,hr:clampI(R.hr,0,250,0),max:clampI(R.max,0,250,0)};
+  const run={id:R.id||'r-'+newId(),t:R.t,dur:dur||0,km:km||0,hr:clampI(R.hr,0,250,0),max:clampI(R.max,0,250,0)};if(R.g)run.g=R.g;
   if(R.t==='iv'){const P=R.iv;run.iv={p:P.p,n:clampI(P.n,1,30,1),len:clampI(P.len,1,50000,1),u:P.u==='m'?'m':'min',pz:String(P.pz||'').slice(0,40),r:P.r.slice(0,30).map(x=>({v:fmtClock(x.v),h:clampI(x.h,0,250,0)}))}}
   if(f.od&&f.od!==R.d){const o=dayGet(f.od);if(o&&Array.isArray(o.run)){o.run=o.run.filter(x=>x.id!==run.id);if(!o.run.length)delete o.run;touch(mkey(f.od))}}
   const e=dayEnsure(R.d);if(!Array.isArray(e.run))e.run=[];const k=e.run.findIndex(x=>x.id===run.id);if(k>=0)e.run[k]=run;else e.run.push(run);
   const hb=R.id?null:tickHabit(R.d,'run');touch(mkey(R.d));back();toast(R.id?'Lauf geändert':hb?`Lauf gespeichert · „${hb.name}“ abgehakt`:'Lauf gespeichert')}
-function runDel(d,id){const e=dayGet(d);if(!e||!Array.isArray(e.run))return;const i=e.run.findIndex(x=>x.id===id);if(i<0)return;const [r]=e.run.splice(i,1);if(!e.run.length)delete e.run;touch(mkey(d));
+function gTomb(e,id,on){const L=(Array.isArray(e.gdel)?e.gdel:[]).map(String).filter(x=>x!==String(id));if(on)L.push(String(id));if(L.length)e.gdel=L.slice(-60);else delete e.gdel}
+function runDel(d,id){const e=dayGet(d);if(!e||!Array.isArray(e.run))return;const i=e.run.findIndex(x=>x.id===id);if(i<0)return;const [r]=e.run.splice(i,1);if(!e.run.length)delete e.run;if(r.g)gTomb(e,r.g.id,true);touch(mkey(d));
   if(UI.page&&UI.page.t==='run')back();else render();
-  toast('Lauf gelöscht',()=>{const e2=dayEnsure(d);if(!Array.isArray(e2.run))e2.run=[];e2.run.splice(Math.min(i,e2.run.length),0,r);touch(mkey(d));render()})}
+  toast('Lauf gelöscht',()=>{const e2=dayEnsure(d);if(!Array.isArray(e2.run))e2.run=[];e2.run.splice(Math.min(i,e2.run.length),0,r);if(r.g)gTomb(e2,r.g.id,false);touch(mkey(d));render()})}
+function gaHide(d,id){const e=dayGet(d);if(!e||!Array.isArray(e.ga))return;const i=e.ga.findIndex(x=>x&&String(x.id)===String(id));if(i<0)return;const [x]=e.ga.splice(i,1);if(!e.ga.length)delete e.ga;gTomb(e,id,true);touch(mkey(d));render();
+  toast(gaName(x)+' ausgeblendet',()=>{const e2=dayEnsure(d);if(!Array.isArray(e2.ga))e2.ga=[];e2.ga.splice(Math.min(i,e2.ga.length),0,x);gTomb(e2,id,false);touch(mkey(d));render()})}
 function pRuns(){const T=TR(),t=today(),tw=weekStart(t),all=allSess('run');
   let h=`<div class="ptopbar"><button type="button" class="hbtn glass" data-a="back" aria-label="Zurück">${IC.back}</button><h2>Laufen</h2><button type="button" class="r txtbtn pri" data-a="runnew" data-d="${t}" data-k="easy">+ Lauf</button></div>`;
   if(!all.length)return h+`<div class="card glass empty"><b>Noch keine Läufe</b><span class="muted">Trag deinen ersten Lauf ein. Danach siehst du hier, wie sich deine Pace bei gleichem Puls entwickelt.</span></div>`;
@@ -2020,7 +2093,7 @@ function pRuns(){const T=TR(),t=today(),tw=weekStart(t),all=allSess('run');
     const avg=r=>{const L=r.iv.r.filter(x=>x.v),p=L.map(x=>ivPace(r.iv,x.v)).filter(Boolean),hh=r.iv.r.map(x=>+x.h).filter(Boolean);return {p:p.length?p.reduce((a,b)=>a+b,0)/p.length:0,h:hh.length?Math.round(hh.reduce((a,b)=>a+b,0)/hh.length):0,last:hh.length?hh[hh.length-1]:0}};
     h+=`<div class="card glass stack" style="gap:8px"><span class="label">Intervalle ${esc(k0)}</span>${same.map(x=>{const a=avg(x.s);return `<div class="row between tlh"><span>${fmtShort(x.d)}</span><span class="num">${a.p?msx(a.p)+' /km':'–'} · Ø ${a.h||'–'}${a.last?' · letztes '+a.last:''}</span></div>`}).join('')}
       ${same.length>1?(()=>{const a=avg(same[0].s),b=avg(same[same.length-1].s);return a.h&&b.h&&a.p&&b.p?`<span class="hint">Ø-Puls ${b.h} → ${a.h} bei ${msx(b.p)} → ${msx(a.p)} /km. ${a.h<b.h&&a.p<=b.p+3?'Gleiche Arbeit, weniger Puls – du wirst fitter.':''}</span>`:''})():''}</div>`}
-  h+=`<section class="sec"><div class="sec-h"><h2>Letzte Läufe</h2></div>${all.slice(0,12).map(({d,s:r})=>swipeRow(`<div class="todo solid"><span class="tdot" style="--c:${TCOL[r.t==='iv'?'o':'b']}"></span><button type="button" class="tt" data-a="runedit" data-d="${d}" data-id="${esc(r.id)}"><b>${r.t==='iv'?'Intervalle':'Lauf'}${r.t!=='iv'&&r.hr&&r.hr<T.hr?' · locker':''}</b><span>${fmtShort(d)} · ${esc(runLine(r))}${r.dur?' · '+hmsx(r.dur):''}</span></button></div>`,
+  h+=`<section class="sec"><div class="sec-h"><h2>Letzte Läufe</h2></div>${all.slice(0,12).map(({d,s:r})=>swipeRow(`<div class="todo solid"><span class="tdot" style="--c:${TCOL[r.t==='iv'?'o':'b']}"></span><button type="button" class="tt" data-a="runedit" data-d="${d}" data-id="${esc(r.id)}"><b>${r.t==='iv'?'Intervalle':'Lauf'}${r.t!=='iv'&&r.hr&&r.hr<T.hr?' · locker':''}${r.g?' <span class="gtag">⌚</span>':''}</b><span>${fmtShort(d)} · ${esc(runLine(r))}${r.dur?' · '+hmsx(r.dur):''}</span></button></div>`,
     sa('sa-del','rundelq',`data-d="${d}" data-id="${esc(r.id)}"`,IC.del,'Löschen')+sa('sa-edit','runedit',`data-d="${d}" data-id="${esc(r.id)}"`,IC.edit,'Ändern'))).join('')}<span class="hint">Tippen zum Ändern · nach links wischen zum Löschen</span></section>`;
   return h}
 
@@ -2214,10 +2287,22 @@ function sessText(d,s){const mins=s.en&&s.st?Math.round((s.en-s.st)/60000):0,L=[
   for(const x of s.x||[]){const b=blockOf(s.day,x.b);
     if(x.em){const em=x.em;L.push(`  EMOM alle ${msx(em.v)} min, ${em.n} Runden (${em.it.map(t=>`${t.r} ${EXD(t.e).n}${t.k?' +'+fk(t.k)+' kg':''}`).join(' / ')}): ${em.ok.filter(Boolean).length}/${em.n} Runden geschafft`);continue}
     L.push(`  ${EXD(x.e).n}: ${setLine(x.e,x.s)}${b&&b.e===x.e?` (Ziel ${b.lo}${b.hi>b.lo?'–'+b.hi:''}${EXD(x.e).t==='time'?' s':''})`:''}`)}
+  const gx=gaPair(d).bySess.get(s.id);if(gx)L.push('  '+gaLine(gx));
   return L.join('\n')}
+// Garmin-Werte als Text: Dauer, Puls, Kalorien, Trainingseffekt, Zonen
+function gaLine(x){const P=[x.dur?hmsx(x.dur):'',x.km?fk(x.km)+' km':'',x.hr?'Ø-Puls '+x.hr:'',x.max?'max '+x.max:'',x.kcal?x.kcal+' kcal':'',x.te!=null?'Trainingseffekt '+fk(x.te)+(x.ate?' / anaerob '+fk(x.ate):'')+(x.lbl?' ('+gLbl(x.lbl)+')':''):'',x.load?'Belastung '+x.load:''].filter(Boolean);
+  return `Garmin${x.st?' ab '+x.st:''}: ${P.join(' · ')}${Array.isArray(x.z)&&x.z.some(Boolean)?' · Zonen '+x.z.map((v,i)=>`Z${i+1} ${msx(v)}`).join(' '):''}`}
+function gaText(d,x){return `${dmy(d)} – ${gaName(x)}${x.k==='str'?' (nur Garmin, keine Sätze in Sabrly)':''}\n  ${gaLine(x)}`}
 function runText(d,r){const pace=r.km>0&&r.dur?hmsx(r.dur/r.km)+' /km':'';
   const L=[`${dmy(d)} – ${r.t==='iv'?'Intervalle'+(r.iv?' '+ivName(r.iv):''):'Lauf locker/lang'} · ${fk(r.km)} km · ${hmsx(r.dur)}${pace?' · Ø '+pace:''}${r.hr?' · Ø-Puls '+r.hr:''}${r.max?' · max '+r.max:''}`];
   if(r.t==='iv'&&r.iv){L.push(`  Pause dazwischen: ${r.iv.pz||'–'}`);r.iv.r.forEach((x,i)=>{if(!x.v&&!x.h)return;const ps=ivPace(r.iv,x.v);L.push(`  ${i+1}) ${r.iv.len} ${r.iv.u}: ${r.iv.u==='m'?x.v+' min ('+(ps?msx(ps)+' /km':'–')+')':(x.v||'–')+' /km'}${x.h?' · Ø-Puls '+x.h:''}`)})}
+  const g=r.g;if(g){const P=[g.st?'Start '+g.st:'',g.cad?'Kadenz '+g.cad+'/min':'',g.stl?'Schrittlänge '+g.stl+' cm':'',g.asc?g.asc+' Hm':'',g.kcal?g.kcal+' kcal':'',
+      g.te!=null?'Trainingseffekt '+fk(g.te)+(g.ate?' / anaerob '+fk(g.ate):'')+(g.lbl?' ('+gLbl(g.lbl)+')':''):'',g.load?'Belastung '+g.load:'',g.vo2?'VO2max '+g.vo2:''].filter(Boolean);
+    L.push('  Garmin: '+P.join(' · '));
+    if(Array.isArray(g.z)&&g.z.some(Boolean))L.push('  Pulszonen: '+g.z.map((v,i)=>`Z${i+1}${zRange(g.zb,i)?' ('+zRange(g.zb,i)+')':''} ${msx(v)}`).join(' · ')+(g.mhr?' · HFmax '+g.mhr:'')+(g.rhr?' · Ruhepuls '+g.rhr:''));
+    if(g.km&&g.km.length)L.push('  km-Splits (Pace, Ø-Puls): '+g.km.map((x,i)=>`${x.m?fk(Math.round(x.m/10)/100)+' km':'km '+(i+1)} ${msx(x.m?x.t*1000/x.m:x.t)}${x.h?' ('+x.h+')':''}`).join(' · '));
+    if(g.seg&&g.seg.length)L.push('  Laufen/Gehen (von der Uhr erkannt): '+g.seg.map(x=>`${x.k==='r'?'Laufen':'Gehen'} ${msx(x.t)}/${x.m} m${x.h?' ('+x.h+')':''}`).join(' · '));
+    if(g.lap&&g.lap.length>1&&g.lap.some(l=>l.i===1||l.i===4||l.tr===0))L.push('  Runden: '+g.lap.map((x,i)=>`${i+1}) ${x.m} m in ${msx(x.t)}${x.h?' ('+x.h+')':''}`).join(' · '))}
   return L.join('\n')}
 function weekText(ws){const R=weekReview(ws),end=addDays(ws,6),T=TR(),L=[`Sabrly – Woche KW ${kw(ws)} (${pdate(ws).getDate()}.${pdate(ws).getMonth()+1}.–${pdate(end).getDate()}.${pdate(end).getMonth()+1}.${pdate(end).getFullYear()})`,''];
   if(R.per.length){L.push(`Habits: ${R.hp??'–'} % erfüllt${R.hpPrev!=null?' (Vorwoche '+R.hpPrev+' %)':''}`);R.per.forEach(o=>L.push(`- ${o.x.name}: ${fk(o.v)}/${o.T}${o.x.freq==='weekly'?' (Wochenziel)':''}`))}
@@ -2226,7 +2311,7 @@ function weekText(ws){const R=weekReview(ws),end=addDays(ws,6),T=TR(),L=[`Sabrly
   if(R.todos)L.push(`Aufgaben erledigt: ${R.todos}`);
   if(T){const plan=[];for(let i=0;i<7;i++){const P=planDay(ws,i);if(P.length)plan.push(`${DN[i]} ${P.map(itemName).join(' + ')}`)}
     L.push('',`Training${plan.length?' (Plan: '+plan.join(' · ')+')':''}`);let any=false;
-    for(let i=0;i<7;i++){const d=addDays(ws,i);for(const s of sessOf(d)){L.push(sessText(d,s));any=true}for(const r of runsOf(d)){L.push(runText(d,r));any=true}}
+    for(let i=0;i<7;i++){const d=addDays(ws,i);for(const s of sessOf(d)){L.push(sessText(d,s));any=true}for(const r of runsOf(d)){L.push(runText(d,r));any=true}for(const x of gaPair(d).free){L.push(gaText(d,x));any=true}}
     if(!any)L.push('Keine Einheiten eingetragen.');else L.push(`Kraft ${R.C.kd}${R.C.kp?'/'+R.C.kp:''} · Läufe ${R.C.ld}${R.C.lp?'/'+R.C.lp:''} · ${fk(R.km)||0} km`)}
   return L.join('\n')}
 function copyText(txt){let ok=false;try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast('Kopiert – jetzt im Claude-Chat einfügen'),()=>copyFallback(txt));ok=true}}catch(e){}
@@ -2241,7 +2326,8 @@ Object.assign(ACT,{
   tsnd:()=>{const T=TR();T.snd=T.snd===false;touch('state',300);if(T.snd){acUnlock();beep(true)}render()},
   twake:()=>{const T=TR();T.wake=T.wake===false;touch('state',300);render()},
   tsndtest:()=>{acUnlock();setTimeout(()=>beep(true),60);tflash()},
-  weeknotify:()=>{S.settings.weekNotify=S.settings.weekNotify===false;touch('state',300);render()}});
+  weeknotify:()=>{S.settings.weekNotify=S.settings.weekNotify===false;touch('state',300);render()},
+  gahide:el=>gaHide(el.dataset.d,el.dataset.id)});
 
 /* ---------- Wochenleiste: sauberes Wechseln von Woche und Tag ---------- */
 const EASE='cubic-bezier(.2,.8,.2,1)';

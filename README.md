@@ -56,10 +56,18 @@ Sonntags (und montags für die vergangene Woche) zeigt Heute einen Rückblick: H
 Stimmung, was gut lief und was ausbaufähig ist – mit „Nächste Woche planen“. Das Widget plant dazu sonntags um 18 Uhr eine Mitteilung
 „Woche planen“ mit Kurzfassung (abschaltbar unter Mehr → Ansicht; entfällt, wenn die nächste Woche schon geplant ist).
 
-## Garmin (in Arbeit)
+## Garmin
 
-Im Scriptable-Skript gibt es „⌚ Garmin-Test“. Es nutzt die Garmin Personal API mit einem eigenen Schlüssel
-(Garmin Connect im Browser → Einstellungen → Personal API Key, direkt: connect.garmin.com/app/settings/personalApiToken).
-Der Schlüssel liegt nur im Schlüsselbund des iPhones, nie im Code oder in Firestore. Der Test lädt die letzten 20 Trainings,
-die Detail-Endpunkte und die Original-Aufzeichnung (ZIP → FIT, Runden und Sätze werden im Skript ausgelesen) und kopiert einen
-Bericht ohne Standort- und Personendaten in die Zwischenablage. Darauf baut der automatische Import der Trainingseinheiten auf.
+Läufe und Trainings kommen automatisch von der Garmin-Uhr. Einrichten: in Scriptable das Sabrly-Skript öffnen → „⌚ Garmin“ →
+Schlüssel eingeben (Garmin Connect im Browser → Einstellungen → Personal API Key, direkt: connect.garmin.com/app/settings/personalApiToken).
+Der Schlüssel liegt nur im Schlüsselbund des iPhones, nie im Code oder in Firestore.
+
+- Das Widget prüft höchstens alle 20 Minuten auf neue Einheiten (2 pro Aktualisierung), „Jetzt abrufen“ im Skript holt alles der letzten 14 Tage.
+- Läufe werden Lauf-Einträge mit den Werten der Uhr (`run[].g`): km-Splits (aus der Aufzeichnung berechnet), Lauf/Geh-Abschnitte,
+  Runden, Pulszonen, Kadenz, Höhenmeter, Trainingseffekt. Intervalle erkennt Sabrly aus Runden mit Pause oder aus den Lauf/Geh-Abschnitten;
+  der Wochenplan entscheidet, ob ein Lauf als locker oder Intervall zählt. Ein selbst eingetragener Lauf am selben Tag bekommt die Werte dazu.
+- Krafttraining und sonstige Einheiten (z. B. Indoor-Radfahren, ab 20 min; Gehen nicht) landen in `ga` und werden der Sabrly-Session
+  mit der nächsten Startzeit zugeordnet. Gelöschte oder ausgeblendete Einheiten merkt sich der Tag in `gdel`.
+- Für heute und gestern hakt der Import den Lauf- bzw. Trainings-Habit ab, ältere Tage bleiben unverändert.
+- Status für die App: Dokument `garmin` (zuletzt geprüft, Fehler, letzte Einheiten), sichtbar unter Training → ⚙︎.
+- „Bericht für Claude (Test)“ im Skript zeigt, was die Garmin-Schnittstelle liefert (ohne Standort und Personendaten).
