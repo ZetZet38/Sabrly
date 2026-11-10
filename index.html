@@ -447,9 +447,9 @@ code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;backgro
 .tsheet .tpl-big{background:rgba(255,255,255,.05);border:1px solid var(--line)}
 .ttags{display:flex;flex-wrap:wrap;gap:6px}
 .ttag{--c:var(--accent);display:inline-block;max-width:100%;font-size:10.5px;font-weight:700;padding:2px 6px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  background:color-mix(in srgb,var(--c) 17%,transparent);color:var(--c)}
-.ttag.ok{background:var(--c);color:#06140F}
-.ttag.rest{background:rgba(255,255,255,.06);color:var(--faint)}
+  background:transparent;color:var(--c);box-shadow:inset 0 0 0 1.5px var(--c)}
+.ttag.ok{background:var(--c);color:#06140F;box-shadow:none}
+.ttag.rest{background:rgba(255,255,255,.06);color:var(--faint);box-shadow:none}
 .tpl-big .ttag{font-size:12px;padding:4px 8px}
 .twk{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .twd{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 2px 9px;border-radius:14px;min-width:0;color:var(--fg)}
@@ -615,6 +615,14 @@ body:has(.trest) .wrap{padding-bottom:70px}
 /* Datum/Uhrzeit: iOS gibt den Feldern sonst eine feste Breite und zentriert den Wert */
 .tinput[type=date],.tinput[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;text-align:left}
 .tinput::-webkit-date-and-time-value{text-align:left}
+.thero.tap{cursor:pointer;transition:transform .15s}.thero.tap:active{transform:scale(.985)}
+.tedit{font-size:12px;font-weight:650;color:var(--muted)}
+.hsortl{display:flex;flex-direction:column;gap:8px}
+.hsrow{position:relative;display:flex;align-items:center;gap:12px;padding:6px 6px 6px 16px;border-radius:var(--r-md);transition:transform .22s var(--spring)}
+.hsrow .emo{font-size:22px}.hsrow .hname{flex:1;min-width:0;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hsrow.drag{transition:none;z-index:5;background:rgba(44,48,52,.97);box-shadow:0 14px 34px rgba(0,0,0,.55)}
+.hgrip{width:48px;height:48px;display:grid;place-items:center;color:var(--muted);touch-action:none;cursor:grab;flex:none}
+.hgrip svg{width:22px;height:22px}
 
 /* Tab bar */
 .tabbar{position:fixed;z-index:20;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));
@@ -991,9 +999,10 @@ function habitRow(x,d,locked){
 /* --- Habits --- */
 function vHabits(){const t=today();
   const list=S.habits.filter(x=>!x.archived),arch=S.habits.filter(x=>x.archived),st=!S.settings.statTab&&UI.hseg==='s';
-  let h=`<div class="sec-h" style="margin-top:6px"><h1>${st?'Statistik':'Habits'}</h1>${st?'':`<button type="button" class="iconbtn glass" data-a="hnew" aria-label="Neuer Habit">+</button>`}</div>`;
+  let h=`<div class="sec-h" style="margin-top:6px"><h1>${st?'Statistik':'Habits'}</h1>${st?'':UI.hsort&&list.length>1?`<button type="button" class="txtbtn pri" data-a="hsort">Fertig</button>`:`<div class="row" style="gap:8px">${list.length>1?`<button type="button" class="iconbtn glass" data-a="hsort" aria-label="Reihenfolge ändern">${SORTIC}</button>`:''}<button type="button" class="iconbtn glass" data-a="hnew" aria-label="Neuer Habit">+</button></div>`}</div>`;
   if(!S.settings.statTab)h+=`<div class="seg" style="margin-top:-14px"><button type="button" class="${st?'':'on'}" data-a="hseg" data-v="h">Habits</button><button type="button" class="${st?'on':''}" data-a="hseg" data-v="s">Statistik</button></div>`;
   if(st)return h+vStats(true);
+  if(UI.hsort&&list.length>1)return h+vHabitSort(list);
   if(!list.length)h+=`<div class="card glass empty"><b>Noch keine Habits</b><span class="muted">Leg mit dem Plus deinen ersten an.</span></div>`;
   else h+=`<span class="hint" style="margin-top:-10px">Tippen für Details · nach links wischen zum Ändern, Archivieren oder Löschen</span>`;
   for(const x of list){const wk=x.freq==='weekly',sch=scheduled(x,t),v=wk?weekCount(x,weekStart(t),t):hv(x,t),T=wk?x.target:tgt(x),dn=v>=T,s=streak(x);
@@ -1495,42 +1504,42 @@ setInterval(()=>{if(UI.page||UI.tab!=='heute'||document.hidden)return;
    t: kg = Gewicht × Wdh. · bw = Körpergewicht + Zusatzgewicht · time = Gewicht × Sekunden
    sd: je Seite · du: zwei Hanteln (Gewicht je Hand) · i: Steigerung in kg · m: Muskelgruppen (Anteil)
    tp: Ausführung · er: typischer Fehler · al: Alternativen (gleiches Muster) */
-const MUS=['Brust','Rücken','Schultern','Arme','Beine','Core'];
+const MUS=['Brust','Rücken','Schultern','Bizeps','Trizeps','Beine','Core'];
 const LIB={
- bank:{n:'Bankdrücken',t:'kg',m:{Brust:1,Arme:.5,Schultern:.3},i:2.5,tp:['Schulterblätter zusammen und nach unten, leichte Brücke','Stange zur unteren Brust führen, Ellbogen etwa 45° vom Körper','Füße fest am Boden, aus den Beinen mitdrücken'],er:'Ellbogen weit ausstellen – belastet die Schulter.',al:['khbank','brustpresse','dipsm']},
- khbank:{n:'Kurzhantel-Bankdrücken',t:'kg',du:1,m:{Brust:1,Arme:.5,Schultern:.3},i:2,tp:['Hanteln über der Brust, Handgelenke gerade','Tief absenken, bis die Brust gedehnt ist','Oben nicht aneinanderschlagen'],er:'Hanteln zu weit Richtung Kopf – dann arbeitet die Schulter statt der Brust.',al:['bank','brustpresse','schraeg']},
- schraeg:{n:'Schrägbankdrücken (Kurzhantel)',t:'kg',du:1,m:{Brust:1,Schultern:.5,Arme:.3},i:2,tp:['Bank auf etwa 30°, nicht steiler','Zur oberen Brust absenken','Schulterblätter bleiben hinten'],er:'Bank zu steil – dann wird es Schulterdrücken.',al:['khbank','bank','kabelflys']},
- brustpresse:{n:'Brustpresse',t:'kg',m:{Brust:1,Arme:.5},i:5,tp:['Sitz so einstellen, dass die Griffe auf Brusthöhe sind','Schulterblätter zusammen und unten','Langsam zurück (2–3 s), kräftig drücken'],er:'Schultern nach vorn rollen lassen – dann arbeitet die Schulter statt der Brust.',al:['khbank','bank','kabelflys']},
- dips:{n:'Dips',t:'bw',m:{Brust:1,Arme:1,Schultern:.5},i:2.5,tp:['Schultern weg von den Ohren, Brust raus','Leicht nach vorn lehnen, Ellbogen etwa 45° vom Körper','Unten kurz kontrolliert, oben nicht ganz durchdrücken'],er:'Zu tief ins Dehnen fallen – kostet die Schulter, bringt nichts extra.',al:['dipsm','bankeng','khbank']},
- dipsm:{n:'Maschinen-Dips',t:'kg',m:{Arme:1,Brust:.7},i:5,tp:['Aufrecht sitzen, Schultern unten','Ellbogen nah am Körper','Kontrolliert zurück'],er:'Schultern ziehen nach oben.',al:['dips','trizeps','bankeng']},
- bankeng:{n:'Bankdrücken eng',t:'kg',m:{Arme:1,Brust:.7},i:2.5,tp:['Griff schulterbreit, nicht enger','Ellbogen nah am Körper','Stange zur unteren Brust'],er:'Zu enger Griff – die Handgelenke leiden.',al:['dips','dipsm','trizeps']},
+ bank:{n:'Bankdrücken',t:'kg',m:{Brust:1,Trizeps:.5,Schultern:.3},i:2.5,tp:['Schulterblätter zusammen und nach unten, leichte Brücke','Stange zur unteren Brust führen, Ellbogen etwa 45° vom Körper','Füße fest am Boden, aus den Beinen mitdrücken'],er:'Ellbogen weit ausstellen – belastet die Schulter.',al:['khbank','brustpresse','dipsm']},
+ khbank:{n:'Kurzhantel-Bankdrücken',t:'kg',du:1,m:{Brust:1,Trizeps:.5,Schultern:.3},i:2,tp:['Hanteln über der Brust, Handgelenke gerade','Tief absenken, bis die Brust gedehnt ist','Oben nicht aneinanderschlagen'],er:'Hanteln zu weit Richtung Kopf – dann arbeitet die Schulter statt der Brust.',al:['bank','brustpresse','schraeg']},
+ schraeg:{n:'Schrägbankdrücken (Kurzhantel)',t:'kg',du:1,m:{Brust:1,Schultern:.5,Trizeps:.3},i:2,tp:['Bank auf etwa 30°, nicht steiler','Zur oberen Brust absenken','Schulterblätter bleiben hinten'],er:'Bank zu steil – dann wird es Schulterdrücken.',al:['khbank','bank','kabelflys']},
+ brustpresse:{n:'Brustpresse',t:'kg',m:{Brust:1,Trizeps:.5},i:5,tp:['Sitz so einstellen, dass die Griffe auf Brusthöhe sind','Schulterblätter zusammen und unten','Langsam zurück (2–3 s), kräftig drücken'],er:'Schultern nach vorn rollen lassen – dann arbeitet die Schulter statt der Brust.',al:['khbank','bank','kabelflys']},
+ dips:{n:'Dips',t:'bw',m:{Brust:1,Trizeps:1,Schultern:.5},i:2.5,tp:['Schultern weg von den Ohren, Brust raus','Leicht nach vorn lehnen, Ellbogen etwa 45° vom Körper','Unten kurz kontrolliert, oben nicht ganz durchdrücken'],er:'Zu tief ins Dehnen fallen – kostet die Schulter, bringt nichts extra.',al:['dipsm','bankeng','khbank']},
+ dipsm:{n:'Maschinen-Dips',t:'kg',m:{Trizeps:1,Brust:.7},i:5,tp:['Aufrecht sitzen, Schultern unten','Ellbogen nah am Körper','Kontrolliert zurück'],er:'Schultern ziehen nach oben.',al:['dips','trizeps','bankeng']},
+ bankeng:{n:'Bankdrücken eng',t:'kg',m:{Trizeps:1,Brust:.7},i:2.5,tp:['Griff schulterbreit, nicht enger','Ellbogen nah am Körper','Stange zur unteren Brust'],er:'Zu enger Griff – die Handgelenke leiden.',al:['dips','dipsm','trizeps']},
  kabelflys:{n:'Kabel-Flys',t:'kg',m:{Brust:1},i:2.5,tp:['Ellbogen leicht gebeugt und fixiert','Im Bogen, Hände vor der Brust zusammen','Dehnung kontrolliert'],er:'Arme beugen und strecken – dann wird es Drücken.',al:['khbank','brustpresse','liegestuetz']},
- liegestuetz:{n:'Liegestütze',t:'bw',m:{Brust:1,Arme:.5,Core:.3},i:2.5,tp:['Körper eine Linie, Bauch fest','Hände etwas weiter als schulterbreit','Brust bis knapp über den Boden'],er:'Hüfte hängt durch.',al:['bank','khbank','dips']},
+ liegestuetz:{n:'Liegestütze',t:'bw',m:{Brust:1,Trizeps:.5,Core:.3},i:2.5,tp:['Körper eine Linie, Bauch fest','Hände etwas weiter als schulterbreit','Brust bis knapp über den Boden'],er:'Hüfte hängt durch.',al:['bank','khbank','dips']},
  landmine:{n:'Landmine Press',t:'kg',m:{Schultern:1,Brust:.5,Core:.3},i:2.5,tp:['Hüfte und Bauch fest, nicht ins Hohlkreuz','Stange schräg nach vorn-oben drücken, Schulterblatt mitgehen lassen','Rippen unten halten'],er:'Mit dem Oberkörper ausweichen statt aus der Schulter zu drücken.',al:['schulterkh','schraeg','ohp']},
- schulterkh:{n:'Schulterdrücken (Kurzhantel)',t:'kg',du:1,m:{Schultern:1,Arme:.5},i:2,tp:['Sitzend, Rücken an der Lehne','Hanteln auf Ohrhöhe starten','Oben nicht ganz durchdrücken'],er:'Ins Hohlkreuz fallen.',al:['ohp','landmine','seitheben']},
- ohp:{n:'Überkopfdrücken (Langhantel)',t:'kg',m:{Schultern:1,Arme:.5,Core:.3},i:2.5,tp:['Po und Bauch fest, Rippen unten','Kopf kurz nach hinten, Stange gerade nach oben','Oben den Kopf durch die Arme'],er:'Mit dem Oberkörper weit nach hinten lehnen.',al:['schulterkh','landmine','seitheben']},
+ schulterkh:{n:'Schulterdrücken (Kurzhantel)',t:'kg',du:1,m:{Schultern:1,Trizeps:.5},i:2,tp:['Sitzend, Rücken an der Lehne','Hanteln auf Ohrhöhe starten','Oben nicht ganz durchdrücken'],er:'Ins Hohlkreuz fallen.',al:['ohp','landmine','seitheben']},
+ ohp:{n:'Überkopfdrücken (Langhantel)',t:'kg',m:{Schultern:1,Trizeps:.5,Core:.3},i:2.5,tp:['Po und Bauch fest, Rippen unten','Kopf kurz nach hinten, Stange gerade nach oben','Oben den Kopf durch die Arme'],er:'Mit dem Oberkörper weit nach hinten lehnen.',al:['schulterkh','landmine','seitheben']},
  seitheben:{n:'Seitheben (Kurzhantel)',t:'kg',du:1,m:{Schultern:1},i:1,tp:['Leicht nach vorn lehnen','Ellbogen führen, bis Schulterhöhe','Langsam ablassen'],er:'Mit Schwung aus dem Oberkörper.',al:['seitkabel','schulterkh','facepull']},
  seitkabel:{n:'Seitheben am Kabel',t:'kg',sd:1,m:{Schultern:1},i:2.5,tp:['Kabel hinter dem Körper führen','Bis Schulterhöhe, kurz halten','Ganz kontrolliert zurück'],er:'Die Schulter zieht zum Ohr.',al:['seitheben','schulterkh','facepull']},
  facepull:{n:'Face Pulls',t:'kg',m:{Schultern:1,Rücken:.5},i:2.5,tp:['Seil auf Augenhöhe','Zur Stirn ziehen, Hände nach außen drehen','Oben 1 s halten'],er:'Zu schwer und mit dem Oberkörper zurücklehnen.',al:['revfly','seitkabel','kabelrudern']},
  revfly:{n:'Reverse Flys (Maschine)',t:'kg',m:{Schultern:1,Rücken:.5},i:2.5,tp:['Brust an das Polster','Arme fast gestreckt nach hinten-außen','Schulterblätter nicht hochziehen'],er:'Mit Schwung arbeiten.',al:['facepull','seitkabel','khrudern']},
- katana:{n:'Katana Extensions',t:'kg',m:{Arme:1},i:2.5,tp:['Ellbogen hoch und ruhig halten','Volle Dehnung hinter dem Kopf','Oben kurz halten'],er:'Ellbogen wandern nach vorn – dann zieht der Rücken mit.',al:['trizeps','french','dipsm']},
- katanag:{n:'Katana Extensions, groß',t:'kg',m:{Arme:1},i:2.5,tp:['Großer Bewegungsweg, ganz in die Dehnung','Ellbogen hoch halten','Oben kurz halten'],er:'Ellbogen wandern nach vorn.',al:['katana','trizeps','french']},
- trizeps:{n:'Trizepsdrücken am Kabel',t:'kg',m:{Arme:1},i:2.5,tp:['Ellbogen am Körper fixiert','Unten ganz strecken, kurz halten','Langsam zurück bis 90°'],er:'Ellbogen wandern nach vorn.',al:['katana','french','dipsm']},
- french:{n:'SZ-French-Press',t:'kg',m:{Arme:1},i:2.5,tp:['Liegend, Stange über der Stirn','Nur die Unterarme bewegen','Ellbogen eng'],er:'Die Ellbogen gehen auseinander.',al:['katana','trizeps','bankeng']},
- klimmzug:{n:'Klimmzüge',t:'bw',m:{Rücken:1,Arme:.5},i:2.5,tp:['Aus dem toten Hang, Schulterblätter zuerst nach unten','Brust Richtung Stange, Ellbogen zur Hüfte','Kontrolliert ablassen, ganz strecken'],er:'Halbe Wiederholungen – unten nicht ganz strecken.',al:['latzug','chinup','kabelpull']},
- chinup:{n:'Chin-ups',t:'bw',m:{Rücken:1,Arme:.8},i:2.5,tp:['Untergriff schulterbreit','Brust zur Stange, Ellbogen nach unten','Unten ganz strecken'],er:'Kinn reckt sich nach vorn, der Körper schwingt.',al:['klimmzug','latzug','kabelpull']},
- latzug:{n:'Latziehen',t:'kg',m:{Rücken:1,Arme:.5},i:5,tp:['Oberschenkel fest unter dem Polster','Zur oberen Brust ziehen, Ellbogen nach unten','Kontrolliert nach oben'],er:'Weit nach hinten lehnen und reißen.',al:['klimmzug','chinup','kabelpull']},
- tbar:{n:'T-Bar Row',t:'kg',m:{Rücken:1,Arme:.3},i:2.5,tp:['Brust raus, Rücken neutral','Ellbogen eng am Körper zur Hüfte ziehen','Oben Schulterblätter zusammen'],er:'Mit Schwung aus dem unteren Rücken reißen.',al:['brustrudern','kabelrudern','khrudern']},
- khrudern:{n:'Kurzhantelrudern einarmig',t:'kg',sd:1,m:{Rücken:1,Arme:.3},i:2,tp:['Knie und Hand auf der Bank, Rücken gerade','Hantel zur Hüfte ziehen','Unten ganz strecken lassen'],er:'Der Oberkörper dreht auf.',al:['tbar','kabelrudern','brustrudern']},
- kabelrudern:{n:'Kabelrudern sitzend',t:'kg',m:{Rücken:1,Arme:.3},i:5,tp:['Aufrecht sitzen, Brust raus','Griff zum Bauch, Schulterblätter zusammen','Nach vorn ohne Rundrücken'],er:'Mit dem Oberkörper schaukeln.',al:['tbar','brustrudern','khrudern']},
- brustrudern:{n:'Brustgestütztes Rudern',t:'kg',m:{Rücken:1,Arme:.3},i:5,tp:['Brust ans Polster','Ellbogen nah am Körper','Oben 1 s halten'],er:'Die Brust löst sich vom Polster.',al:['tbar','kabelrudern','khrudern']},
+ katana:{n:'Katana Extensions',t:'kg',m:{Trizeps:1},i:2.5,tp:['Ellbogen hoch und ruhig halten','Volle Dehnung hinter dem Kopf','Oben kurz halten'],er:'Ellbogen wandern nach vorn – dann zieht der Rücken mit.',al:['trizeps','french','dipsm']},
+ katanag:{n:'Katana Extensions, groß',t:'kg',m:{Trizeps:1},i:2.5,tp:['Großer Bewegungsweg, ganz in die Dehnung','Ellbogen hoch halten','Oben kurz halten'],er:'Ellbogen wandern nach vorn.',al:['katana','trizeps','french']},
+ trizeps:{n:'Trizepsdrücken am Kabel',t:'kg',m:{Trizeps:1},i:2.5,tp:['Ellbogen am Körper fixiert','Unten ganz strecken, kurz halten','Langsam zurück bis 90°'],er:'Ellbogen wandern nach vorn.',al:['katana','french','dipsm']},
+ french:{n:'SZ-French-Press',t:'kg',m:{Trizeps:1},i:2.5,tp:['Liegend, Stange über der Stirn','Nur die Unterarme bewegen','Ellbogen eng'],er:'Die Ellbogen gehen auseinander.',al:['katana','trizeps','bankeng']},
+ klimmzug:{n:'Klimmzüge',t:'bw',m:{Rücken:1,Bizeps:.5},i:2.5,tp:['Aus dem toten Hang, Schulterblätter zuerst nach unten','Brust Richtung Stange, Ellbogen zur Hüfte','Kontrolliert ablassen, ganz strecken'],er:'Halbe Wiederholungen – unten nicht ganz strecken.',al:['latzug','chinup','kabelpull']},
+ chinup:{n:'Chin-ups',t:'bw',m:{Rücken:1,Bizeps:.8},i:2.5,tp:['Untergriff schulterbreit','Brust zur Stange, Ellbogen nach unten','Unten ganz strecken'],er:'Kinn reckt sich nach vorn, der Körper schwingt.',al:['klimmzug','latzug','kabelpull']},
+ latzug:{n:'Latziehen',t:'kg',m:{Rücken:1,Bizeps:.5},i:5,tp:['Oberschenkel fest unter dem Polster','Zur oberen Brust ziehen, Ellbogen nach unten','Kontrolliert nach oben'],er:'Weit nach hinten lehnen und reißen.',al:['klimmzug','chinup','kabelpull']},
+ tbar:{n:'T-Bar Row',t:'kg',m:{Rücken:1,Bizeps:.3},i:2.5,tp:['Brust raus, Rücken neutral','Ellbogen eng am Körper zur Hüfte ziehen','Oben Schulterblätter zusammen'],er:'Mit Schwung aus dem unteren Rücken reißen.',al:['brustrudern','kabelrudern','khrudern']},
+ khrudern:{n:'Kurzhantelrudern einarmig',t:'kg',sd:1,m:{Rücken:1,Bizeps:.3},i:2,tp:['Knie und Hand auf der Bank, Rücken gerade','Hantel zur Hüfte ziehen','Unten ganz strecken lassen'],er:'Der Oberkörper dreht auf.',al:['tbar','kabelrudern','brustrudern']},
+ kabelrudern:{n:'Kabelrudern sitzend',t:'kg',m:{Rücken:1,Bizeps:.3},i:5,tp:['Aufrecht sitzen, Brust raus','Griff zum Bauch, Schulterblätter zusammen','Nach vorn ohne Rundrücken'],er:'Mit dem Oberkörper schaukeln.',al:['tbar','brustrudern','khrudern']},
+ brustrudern:{n:'Brustgestütztes Rudern',t:'kg',m:{Rücken:1,Bizeps:.3},i:5,tp:['Brust ans Polster','Ellbogen nah am Körper','Oben 1 s halten'],er:'Die Brust löst sich vom Polster.',al:['tbar','kabelrudern','khrudern']},
  kelso:{n:'Kelso Shrugs',t:'kg',m:{Rücken:1},i:5,tp:['Brustgestützt, Arme lang','Schulterblätter nach hinten-oben ziehen','Oben 1–2 s halten'],er:'Mit den Armen rudern statt die Schulterblätter zu bewegen.',al:['brustrudern','facepull','revfly']},
  kabelpull:{n:'Kabel-Pullover',t:'kg',m:{Rücken:1},i:2.5,tp:['Arme fast gestreckt, leicht vorgebeugt','Stange im Bogen zu den Oberschenkeln','Den Lat spüren, nicht die Arme'],er:'Arme beugen – dann wird es Trizepsdrücken.',al:['latzug','klimmzug','chinup']},
- curls:{n:'Bizeps-Curls (Maschine)',t:'kg',m:{Arme:1},i:5,tp:['Ellbogen bleiben auf dem Polster','Oben kurz anspannen','Langsam ablassen'],er:'Mit dem Oberkörper Schwung holen.',al:['kcurls','szcurls','khcurls']},
- kcurls:{n:'Kabel-Curls',t:'kg',m:{Arme:1},i:2.5,tp:['Ellbogen fix an der Seite','Volle Streckung unten','Kein Schwung'],er:'Die Ellbogen wandern nach vorn.',al:['curls','szcurls','hammer']},
- khcurls:{n:'Kurzhantel-Curls',t:'kg',du:1,m:{Arme:1},i:1,tp:['Ellbogen bleiben an der Seite','Beim Hochgehen die Handgelenke nach außen drehen','Langsam ablassen'],er:'Mit dem Rücken schwingen.',al:['szcurls','kcurls','hammer']},
- hammer:{n:'Hammer-Curls',t:'kg',du:1,m:{Arme:1},i:1,tp:['Neutraler Griff, Daumen oben','Ellbogen fix','Kontrolliert ablassen'],er:'Die Schultern ziehen mit.',al:['khcurls','kcurls','szcurls']},
- szcurls:{n:'SZ-Curls',t:'kg',m:{Arme:1},i:2.5,tp:['Schulterbreiter Griff','Ellbogen fix an der Seite','Oben anspannen, langsam runter'],er:'Die Hüfte schiebt nach vorn.',al:['curls','khcurls','kcurls']},
+ curls:{n:'Bizeps-Curls (Maschine)',t:'kg',m:{Bizeps:1},i:5,tp:['Ellbogen bleiben auf dem Polster','Oben kurz anspannen','Langsam ablassen'],er:'Mit dem Oberkörper Schwung holen.',al:['kcurls','szcurls','khcurls']},
+ kcurls:{n:'Kabel-Curls',t:'kg',m:{Bizeps:1},i:2.5,tp:['Ellbogen fix an der Seite','Volle Streckung unten','Kein Schwung'],er:'Die Ellbogen wandern nach vorn.',al:['curls','szcurls','hammer']},
+ khcurls:{n:'Kurzhantel-Curls',t:'kg',du:1,m:{Bizeps:1},i:1,tp:['Ellbogen bleiben an der Seite','Beim Hochgehen die Handgelenke nach außen drehen','Langsam ablassen'],er:'Mit dem Rücken schwingen.',al:['szcurls','kcurls','hammer']},
+ hammer:{n:'Hammer-Curls',t:'kg',du:1,m:{Bizeps:1},i:1,tp:['Neutraler Griff, Daumen oben','Ellbogen fix','Kontrolliert ablassen'],er:'Die Schultern ziehen mit.',al:['khcurls','kcurls','szcurls']},
+ szcurls:{n:'SZ-Curls',t:'kg',m:{Bizeps:1},i:2.5,tp:['Schulterbreiter Griff','Ellbogen fix an der Seite','Oben anspannen, langsam runter'],er:'Die Hüfte schiebt nach vorn.',al:['curls','khcurls','kcurls']},
  squat:{n:'Kniebeuge',t:'kg',m:{Beine:1,Core:.3},i:2.5,tp:['Stange auf dem oberen Rücken, Bauch fest','Knie in Richtung Fußspitzen','So tief, wie der Rücken gerade bleibt'],er:'Die Knie fallen nach innen.',al:['goblet','beinpresse','bulgarian']},
  goblet:{n:'Goblet Squat',t:'kg',m:{Beine:1,Core:.3},i:2,tp:['Kettlebell oder Hantel vor der Brust','Ellbogen zwischen die Knie','Aufrecht bleiben'],er:'Die Fersen heben ab.',al:['squat','beinpresse','bulgarian']},
  beinpresse:{n:'Beinpresse',t:'kg',m:{Beine:1},i:10,tp:['Füße schulterbreit, mittig auf der Platte','Tief, solange der Po am Polster bleibt','Knie oben nicht durchdrücken'],er:'Der Po rollt unten vom Polster.',al:['squat','goblet','bulgarian']},
@@ -1544,8 +1553,8 @@ const LIB={
  hipthrust:{n:'Hip Thrust',t:'kg',m:{Beine:1},i:5,tp:['Oberer Rücken auf der Bank, Kinn zur Brust','Aus den Fersen drücken, oben den Po anspannen','Rippen unten, kein Hohlkreuz'],er:'Hohlkreuz statt Hüftstreckung.',al:['rdl','swings','beinbeuger']},
  waden:{n:'Wadenheben',t:'kg',m:{Beine:.5},i:5,tp:['Ganz tief in die Dehnung','Oben 1 s halten','Ohne Wippen'],er:'Nur die halbe Bewegung.',al:[]},
  swings:{n:'Kettlebell Swings',t:'kg',m:{Beine:1,Core:.5,Rücken:.5},i:4,tp:['Aus der Hüfte schnappen, nicht aus den Armen heben','Rücken neutral, oben den Po fest anspannen','Glocke fällt zurück, Hüfte erst spät beugen'],er:'Kniebeuge statt Hüftbeuge – die Kraft muss aus der Hüftstreckung kommen.',al:['kreuzheben','hipthrust','rdl']},
- carry:{n:'Suitcase Carry',t:'time',sd:1,m:{Core:1,Arme:.3},i:4,tp:['Aufrecht gehen, nicht zur Glocke kippen','Schulter auf der Seite der Glocke runterziehen','Ruhige, kurze Schritte'],er:'Zur schweren Seite hängen – genau das soll der Core verhindern.',al:['farmers','pallof','plank']},
- farmers:{n:"Farmer's Walk",t:'time',du:1,m:{Core:1,Arme:.5,Rücken:.3},i:4,tp:['Aufrecht, Schultern unten','Kurze, schnelle Schritte','Griff fest'],er:'Die Schultern hängen nach vorn.',al:['carry','plank']},
+ carry:{n:'Suitcase Carry',t:'time',sd:1,m:{Core:1},i:4,tp:['Aufrecht gehen, nicht zur Glocke kippen','Schulter auf der Seite der Glocke runterziehen','Ruhige, kurze Schritte'],er:'Zur schweren Seite hängen – genau das soll der Core verhindern.',al:['farmers','pallof','plank']},
+ farmers:{n:"Farmer's Walk",t:'time',du:1,m:{Core:1,Rücken:.3},i:4,tp:['Aufrecht, Schultern unten','Kurze, schnelle Schritte','Griff fest'],er:'Die Schultern hängen nach vorn.',al:['carry','plank']},
  lrot:{n:'Landmine Rotation',t:'kg',sd:1,m:{Core:1},i:5,tp:['Aus Hüfte und Füßen drehen, Arme lang','Die Stange bewusst abbremsen','Der Blick folgt der Stange'],er:'Nur aus den Armen drehen.',al:['holzhacker','pallof','carry']},
  pallof:{n:'Pallof Press',t:'kg',sd:1,m:{Core:1},i:2.5,tp:['Seitlich zum Kabel, Griff vor der Brust','Arme gerade nach vorn drücken, nicht mitdrehen','2 s halten'],er:'Die Hüfte dreht mit.',al:['lrot','holzhacker','carry']},
  holzhacker:{n:'Kabel-Holzhacker',t:'kg',sd:1,m:{Core:1},i:2.5,tp:['Aus Hüfte und Füßen drehen','Arme lang','Kontrolliert zurück'],er:'Nur aus den Armen ziehen.',al:['lrot','pallof']},
@@ -1577,7 +1586,7 @@ function normBlock(b){b=b&&typeof b==='object'?b:{};
   const p=(Array.isArray(b.p)?b.p:[]).filter(x=>x&&typeof x==='object').slice(0,12).map(x=>({k:x.k==null||x.k===''?null:pnum(x.k),r:clampI(x.r,0,999,8)}));
   const lo=clampI(b.lo,1,999,8);
   return {k:'ex',id:String(b.id||'b-'+newId()),e:String(b.e||'bank'),p:p.length?p:[{k:null,r:lo},{k:null,r:lo},{k:null,r:lo}],lo,hi:Math.max(lo,clampI(b.hi,1,999,12)),rest:clampI(b.rest,0,1800,90),note:String(b.note||'').slice(0,140)}}
-function normCustom(v,id){const m={};if(v.m&&typeof v.m==='object')for(const k of MUS)if(+v.m[k]>0)m[k]=Math.min(1,+v.m[k]);
+function normCustom(v,id){const m={};if(v.m&&typeof v.m==='object'){for(const k of MUS)if(+v.m[k]>0)m[k]=Math.min(1,+v.m[k]);if(+v.m.Arme>0&&!m.Bizeps&&!m.Trizeps){m.Bizeps=m.Trizeps=Math.min(1,+v.m.Arme)}}
   return {n:String(v.n||'Übung').slice(0,40),t:['kg','bw','time'].includes(v.t)?v.t:'kg',sd:v.sd?1:0,du:v.du?1:0,m,i:pnum(v.i)||2.5,tp:(Array.isArray(v.tp)?v.tp:[]).map(String).filter(Boolean).slice(0,6),er:String(v.er||'').slice(0,200),vid:String(v.vid||'').slice(0,300),al:(Array.isArray(v.al)?v.al:[]).map(String).slice(0,6),own:1,id}}
 function normTraining(t){if(!t||typeof t!=='object')return null;
   const days=(Array.isArray(t.days)?t.days:[]).filter(d=>d&&typeof d==='object').slice(0,14).map(d=>({id:String(d.id||'d-'+newId()),name:String(d.name||'Training').slice(0,24),sub:String(d.sub||'').slice(0,30),col:TCOL[d.col]?d.col:'g',blocks:(Array.isArray(d.blocks)?d.blocks:[]).slice(0,24).map(normBlock)}));
@@ -1650,7 +1659,7 @@ function muscleWeek(ws){const done={},plan={};MUS.forEach(m=>{done[m]=0;plan[m]=
     for(const s of sessOf(d))for(const x of s.x||[]){if(x.em){x.em.ok.forEach((ok,k)=>{if(ok&&x.em.it.length)add(done,x.em.it[k%x.em.it.length].e,1)})}else add(done,x.e,(x.s||[]).length)}
     for(const id of planDay(ws,i)){const D=TDAY(id);if(!D)continue;for(const b of D.blocks){if(b.k==='emom')b.it.forEach((t,k)=>add(plan,t.e,Math.ceil((b.n-k)/b.it.length)));else add(plan,b.e,b.p.length)}}}
   return {done,plan}}
-const MRANGE={Brust:[10,20],Rücken:[10,20],Schultern:[8,16],Arme:[8,16],Beine:[10,20],Core:[6,12]};
+const MRANGE={Brust:[10,20],Rücken:[10,20],Schultern:[8,16],Bizeps:[6,14],Trizeps:[6,14],Beine:[10,20],Core:[6,12]};
 
 /* ---------- Zeitrad: iOS-Zeitauswahl als Minuten | Sekunden ---------- */
 function twheel(sec,attrs,cls){sec=Math.max(0,Math.round(sec||0));const m=Math.min(23,Math.floor(sec/60)),s=sec%60;
@@ -1702,10 +1711,10 @@ function dayCards(sel){const t=today(),ws=weekStart(sel),L=planDay(ws,wd(sel)),l
       h+=`<div class="thero run" style="--c:${itemCol(id)}"><span class="label">${esc(lbl)}</span><h3>${esc(RUNK[id].n)}</h3><span class="meta">${r?'✓ '+esc(runLine(r)):iv?'Intervalle, z. B. 4 × 4 min oder 3 × 8 min':'Puls unter '+T.hr}</span>
         ${r?`<button type="button" class="btn" data-a="runedit" data-d="${sel}" data-id="${esc(r.id)}">Ansehen / ändern</button>`:sel<=t?`<button type="button" class="btn pri" data-a="runnew" data-d="${sel}" data-k="${iv?'iv':'easy'}">Lauf eintragen</button>`:'<span class="pill">geplant</span>'}</div>`;continue}
     const D=TDAY(id),s=ses.find(x=>x.day===id&&!usedS.has(x.id));if(s)usedS.add(s.id);const run=UI.w&&!UI.w.edit&&UI.w.d===sel&&UI.w.day===id;
-    h+=`<div class="thero" style="--c:${TCOL[D.col]}"><span class="label">${esc(lbl)}</span><h3>${esc(D.name)}${D.sub?` <small>· ${esc(D.sub)}</small>`:''}</h3><span class="meta">${D.blocks.length} Übungen · ca. ${dayMin(D)} min</span>
+    h+=`<div class="thero tap" style="--c:${TCOL[D.col]}" data-a="dayed" data-id="${esc(id)}" role="button" tabindex="0" aria-label="${esc(D.name)} bearbeiten"><div class="row between"><span class="label">${esc(lbl)}</span><span class="tedit">✎ Bearbeiten</span></div><h3>${esc(D.name)}${D.sub?` <small>· ${esc(D.sub)}</small>`:''}</h3><span class="meta">${D.blocks.length} Übungen · ca. ${dayMin(D)} min</span>
       <div class="exl">${D.blocks.map(b=>`<span>${esc(b.k==='emom'?'EMOM '+b.it.map(x=>EXD(x.e).n).join(' / '):EXD(b.e).n)}</span>`).join('')}</div>
       ${run?`<button type="button" class="btn pri" data-a="wresume">Fortsetzen</button>`:s?`<button type="button" class="btn" data-a="wedit" data-d="${sel}" data-id="${esc(s.id)}">✓ Erledigt · ansehen / ändern</button>`:sel<=t?`<button type="button" class="btn pri" data-a="wstart" data-day="${id}" data-d="${sel}">${sel===t?'Training starten':'Nachtragen'}</button>`:'<span class="pill">geplant</span>'}</div>`}
-  for(const s of ses)if(!usedS.has(s.id))h+=`<div class="thero" style="--c:${TCOL[TDAY(s.day)?.col||'g']}"><span class="label">${esc(lbl)} · zusätzlich</span><h3>${esc(s.n)}</h3><button type="button" class="btn" data-a="wedit" data-d="${sel}" data-id="${esc(s.id)}">✓ Erledigt · ansehen / ändern</button></div>`;
+  for(const s of ses)if(!usedS.has(s.id))h+=`<div class="thero${TDAY(s.day)?' tap':''}" style="--c:${TCOL[TDAY(s.day)?.col||'g']}"${TDAY(s.day)?` data-a="dayed" data-id="${esc(s.day)}" role="button" tabindex="0"`:''}><span class="label">${esc(lbl)} · zusätzlich</span><h3>${esc(s.n)}</h3><button type="button" class="btn" data-a="wedit" data-d="${sel}" data-id="${esc(s.id)}">✓ Erledigt · ansehen / ändern</button></div>`;
   for(const r of runs)if(!usedR.has(r.id))h+=`<div class="thero run" style="--c:${TCOL[r.t==='iv'?'o':'b']}"><span class="label">${esc(lbl)} · zusätzlich</span><h3>${r.t==='iv'?'Intervalle':'Lauf'}</h3><span class="meta">✓ ${esc(runLine(r))}</span><button type="button" class="btn" data-a="runedit" data-d="${sel}" data-id="${esc(r.id)}">Ansehen / ändern</button></div>`;
   if(!L.length&&!ses.length&&!runs.length)h+=`<div class="thero rest"><span class="label">${esc(lbl)}</span><h3>${hasPlan(ws)?'Ruhetag':'Nichts geplant'}</h3><span class="meta">${hasPlan(ws)?'Erholung gehört zum Training.':'Plane die Woche oder starte einfach.'}</span>${sel<=t?`<div class="btns"><button type="button" class="btn" data-a="wfree" data-d="${sel}">Training starten</button><button type="button" class="btn" data-a="runnew" data-d="${sel}" data-k="easy">Lauf eintragen</button></div>`:''}</div>`;
   return h}
@@ -2121,6 +2130,26 @@ Object.assign(ACT,{
   stattab:()=>{S.settings.statTab=!S.settings.statTab;if(!S.settings.statTab&&UI.tab==='statistik')UI.tab='habits';touch('state',200);render()}});
 // nur kleine Abhak-Elemente und Schalter – auf Zeilen/Karten würde der Schalter das Scrollen blockieren
 ['wset','wsave','wfinish','wemdot','restp','restm','restskip','cexsave','blksave','runsave','thr','stattab'].forEach(a=>HAPTIC.add(a));
+
+/* ---------- Habits sortieren: am Griff ziehen ---------- */
+const GRIP='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>';
+const SORTIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v15M4.5 7.5 8 4l3.5 3.5M16 20V5M12.5 16.5 16 20l3.5-3.5"/></svg>';
+function vHabitSort(list){return `<span class="hint" style="margin-top:-10px">Am Griff ziehen. Die Reihenfolge gilt überall – auf Heute, in Habits und in den Widgets.</span>
+  <div class="hsortl" id="hsortl">${list.map(x=>`<div class="hsrow glass" data-id="${x.id}"><span class="emo">${esc(x.emoji||'•')}</span><span class="hname">${esc(x.name)}</span><span class="hgrip" aria-label="${esc(x.name)} verschieben">${GRIP}</span></div>`).join('')}</div>`}
+let HS=null;
+document.addEventListener('pointerdown',e=>{const g=e.target.closest&&e.target.closest('.hgrip');if(!g)return;const row=g.closest('.hsrow'),rows=[...row.parentElement.children];if(rows.length<2)return;
+  e.preventDefault();const r0=rows[0].getBoundingClientRect(),r1=rows[1].getBoundingClientRect();
+  HS={row,rows,from:rows.indexOf(row),to:rows.indexOf(row),y0:e.clientY,step:r1.top-r0.top};row.classList.add('drag');try{g.setPointerCapture(e.pointerId)}catch(err){}
+  try{if(navigator.vibrate)navigator.vibrate(10)}catch(err){}});
+document.addEventListener('pointermove',e=>{if(!HS)return;e.preventDefault();const dy=e.clientY-HS.y0,n=HS.rows.length;
+  HS.row.style.transform=`translateY(${dy}px) scale(1.02)`;const to=Math.max(0,Math.min(n-1,HS.from+Math.round(dy/HS.step)));
+  if(to!==HS.to){HS.to=to;try{if(navigator.vibrate)navigator.vibrate(6)}catch(err){}}
+  HS.rows.forEach((r,i)=>{if(r===HS.row)return;const sh=HS.from<i&&i<=to?-HS.step:to<=i&&i<HS.from?HS.step:0;r.style.transform=sh?`translateY(${sh}px)`:''})},{passive:false});
+function hsEnd(){if(!HS)return;const {from,to}=HS;HS=null;
+  if(from!==to){const act=S.habits.filter(x=>!x.archived),arc=S.habits.filter(x=>x.archived),[m]=act.splice(from,1);act.splice(to,0,m);S.habits=[...act,...arc];touch('state')}
+  render()}
+document.addEventListener('pointerup',hsEnd);document.addEventListener('pointercancel',hsEnd);
+ACT.hsort=()=>{UI.hsort=!UI.hsort;render()};
 
 /* ---------- Wochenleiste: sauberes Wechseln von Woche und Tag ---------- */
 const EASE='cubic-bezier(.2,.8,.2,1)';
