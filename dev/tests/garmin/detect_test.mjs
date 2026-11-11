@@ -1,0 +1,20 @@
+// Erkennung mit Zeynels echten Abschnitten prüfen
+import { loadGarmin } from './garmin_block.mjs';
+const G = loadGarmin(['gAnalyze','gRoles']);
+const S = (k, t, m, h) => ({ k, t, m, h });
+const nov9 = [S('r', 223, 544, 148), S('w', 65, 98, 152), S('r', 492, 1391, 171), S('w', 133, 217, 144), S('r', 495, 1289, 172), S('w', 126, 197, 140), S('r', 492, 1308, 170)];
+const nov7 = [S('r', 499, 1261, 149), S('w', 15, 25, 142), S('r', 185, 402, 151), S('w', 35, 53, 163), S('r', 1405, 3051, 155), S('w', 3, 4, 148), S('r', 918, 1864, 153), S('w', 12, 17, 157), S('r', 528, 1164, 153)];
+const longEasy = [S('r', 1500, 3300, 150), S('w', 60, 90, 130), S('r', 1680, 3600, 152)];
+const fourByFour = [S('r', 600, 1500, 140), S('w', 90, 130, 150), S('r', 240, 900, 172), S('w', 180, 260, 140), S('r', 240, 910, 175), S('w', 180, 255, 141), S('r', 245, 905, 176), S('w', 175, 250, 142), S('r', 240, 900, 177), S('w', 60, 90, 150), S('r', 480, 1100, 150)];
+const sixBy400 = [S('r', 500, 1200, 140), S('w', 100, 150, 140), ...[95, 92, 98, 90, 94, 97].flatMap((t, i) => [S('r', t, 400, 170 + i), S('w', 120, 170, 140)]).slice(0, -1)];
+let f = 0; const ok = (n, c, i) => { console.log((c ? 'PASS ' : 'FAIL ') + n + (i ? ' :: ' + i : '')); if (!c) f++; };
+let A = G.gAnalyze([], nov9.map(x => ({ ...x }))); ok('9.11. → 3 × 8 min, 2 min gehen', A.iv && A.iv.n === 3 && A.iv.len === 8 && A.iv.u === 'min' && A.iv.pz === '2 min gehen', JSON.stringify(A));
+ok('9.11. warm-up = first run + walk', A.roles && A.roles.a === 2 && A.roles.b === 6);
+const seg = G.gRoles(nov9.map(x => ({ ...x })), A.roles); ok('9.11. roles', seg.map(x => x.p || '-').join('') === 'ee-----', seg.map(x => x.p || '-').join(''));
+A = G.gAnalyze([], nov7); ok('7.11. zone-2/3 run → no intervals', !A.iv, JSON.stringify(A.iv));
+A = G.gAnalyze([], longEasy); ok('long run with one 1-min walk → no intervals', !A.iv, JSON.stringify(A.iv));
+A = G.gAnalyze([], fourByFour); ok('4 × 4 min with warm-up/cool-down', A.iv && A.iv.n === 4 && A.iv.len === 4 && A.iv.u === 'min' && A.iv.pz === '3 min gehen' && A.roles.a === 2 && A.roles.b === 8, JSON.stringify(A));
+A = G.gAnalyze([], sixBy400); ok('6 × 400 m → distance intervals', A.iv && A.iv.n === 6 && A.iv.u === 'm' && A.iv.len === 400 && A.iv.r[0].v === '1:35', JSON.stringify(A.iv));
+const laps = [{ t: 600, m: 1500, h: 130, i: 2 }, { t: 120, m: 400, h: 170, i: 0 }, { t: 90, m: 150, h: 140, i: 1 }, { t: 120, m: 400, h: 174, i: 0 }, { t: 300, m: 800, h: 135, i: 3 }];
+A = G.gAnalyze(laps, null); ok('workout laps → 2 × 400 m, 1,5 min Pause', A.iv && A.iv.u === 'm' && A.iv.len === 400 && A.iv.pz === '1,5 min Pause', JSON.stringify(A.iv));
+console.log(f ? 'FAILS ' + f : 'ALL OK'); process.exitCode = f ? 1 : 0;
