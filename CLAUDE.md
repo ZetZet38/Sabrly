@@ -43,13 +43,13 @@ Sabrly ist Zeynels persönlicher Habit-Tracker mit Training, Läufen, Gebeten, A
 ## Bauen und testen
 
 ```bash
-cd dev && npm install          # einmal pro Umgebung (@garmin/fitsdk, fflate, playwright)
+cd dev && npm install          # einmal pro Umgebung (@garmin/fitsdk, fflate)
 python3 dev/build.py           # baut index.html
 bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 ```
 
-- Falls Playwright den Browser nicht findet: `cd dev && npx playwright install chromium`
-  (in manchen Umgebungen ist Chromium schon vorinstalliert – dann nichts neu installieren).
+- Playwright + Chromium sind in Claude-Code-Cloud-Umgebungen vorinstalliert (über `NODE_PATH`) – **nicht** neu installieren.
+  Nur wenn `node -e "require('playwright')"` fehlschlägt: `cd dev && npm i -D playwright && npx playwright install chromium`.
 - `test.sh` umfasst (Stand Übergabe): Widget 439 Tests, Garmin-Logik (Erkennung, Tempo, FIT/ZIP 98), Web-App 488 Tests.
 - **Web-Tests:** `dev/tests/web/build_harness.py` baut Testseiten aus `index.html` + `fbmock.js` (Firestore-Nachbau, lehnt wie
   das echte Firestore **Arrays in Arrays** und `undefined` ab). `web_train_tests.js` = Training/Garmin, `web_tests.js` = Basis-App.
@@ -62,7 +62,9 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 ## Veröffentlichen
 
 1. `bash dev/test.sh` grün.
-2. `git add -A && git commit -m "…"`, dann `git pull --rebase` und `git push` auf `main`.
+2. `git add -A && git commit -m "…"`, dann `git pull --rebase` und `git push` auf **`main`** – GitHub Pages veröffentlicht nur `main`.
+   Arbeitet die Sitzung auf einem eigenen Branch (Standard in Claude Code im Web): am Ende in `main` zusammenführen und `main` pushen.
+   Geht das nicht (Push auf `main` verweigert), einen Pull Request erstellen und Zeynel sagen, dass er ihn auf GitHub mit „Merge“ übernimmt.
 3. GitHub Pages braucht ~1 min. Prüfen: Datei mit Cache-Buster laden, z. B. `…/widget/sabrly-widget.js?t=<zeit>` (erste Zeile = Version).
    **Hängt Pages länger als ~5 min** (kam vor): leeren Commit pushen – `git commit --allow-empty -m "GitHub Pages neu veröffentlichen"`.
 4. Zeynel Bescheid geben: App neu öffnen; bei Garmin-Änderungen in Scriptable „⌚ Garmin → Jetzt abrufen“.

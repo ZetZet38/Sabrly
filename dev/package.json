@@ -1,14 +1,13 @@
 {
   "name": "sabrly-dev",
   "private": true,
-  "description": "Bauen und Testen von Sabrly. Siehe CLAUDE.md im Repo-Hauptordner.",
+  "description": "Bauen und Testen von Sabrly. Siehe CLAUDE.md im Repo-Hauptordner. Playwright + Chromium sind in Claude-Code-Cloud-Umgebungen vorinstalliert.",
   "scripts": {
     "build": "python3 build.py",
     "test": "bash test.sh"
   },
   "devDependencies": {
     "@garmin/fitsdk": "21.221.0",
-    "fflate": "0.8.3",
-    "playwright": "1.63.0"
+    "fflate": "0.8.3"
   }
 }
