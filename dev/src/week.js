@@ -40,10 +40,11 @@ function weekCardHeute(t){const w=wd(t),ws=w===6?weekStart(t):w===0?addDays(week
 /* ---------- Für Claude kopieren: kompakter Text statt Screenshots ---------- */
 const dmy=d=>{const x=pdate(d);return `${DN[wd(d)]} ${x.getDate()}.${x.getMonth()+1}.`};
 function setLine(e,sets){const D=EXD(e);return (sets||[]).map(s=>`${D.t==='bw'?(+s.k?'+'+fk(s.k)+' kg':'KG'):fk(+s.k||0)+' kg'} × ${s.r}${D.t==='time'?' s':''}${s.q!=null?` (RIR ${s.q>=4?'4+':s.q})`:''}`).join(' · ')+(D.sd?' (je Seite)':'')+(D.du?' (Gewicht je Hand)':'')}
-function sessText(d,s){const mins=s.en&&s.st?Math.round((s.en-s.st)/60000):0,L=[`${dmy(d)} – ${s.n}${mins>0&&mins<400?' · '+mins+' min':''}${s.feel!=null?' · Gefühl: '+['leicht','okay','hart'][s.feel]:''}`];
-  for(const x of s.x||[]){const b=blockOf(s.day,x.b);
-    if(x.em){const em=x.em;L.push(`  EMOM alle ${msx(em.v)} min, ${em.n} Runden (${em.it.map(t=>`${t.r} ${EXD(t.e).n}${t.k?' +'+fk(t.k)+' kg':''}`).join(' / ')}): ${em.ok.filter(Boolean).length}/${em.n} Runden geschafft`);continue}
-    L.push(`  ${EXD(x.e).n}: ${setLine(x.e,x.s)}${b&&b.e===x.e?` (Ziel ${b.lo}${b.hi>b.lo?'–'+b.hi:''}${EXD(x.e).t==='time'?' s':''})`:''}`)}
+function sessText(d,s){const W=wFromSess(d,s),TM=wTimes(W),mins=s.en&&s.st?Math.round((s.en-s.st)/60000):0,L=[`${dmy(d)} – ${s.n}${mins>0&&mins<400?' · '+mins+' min':''}${s.feel!=null?' · Gefühl: '+['leicht','okay','hart'][s.feel]:''}`];
+  (s.x||[]).forEach((x,xi)=>{const b=blockOf(s.day,x.b),o=TM&&TM.by.get(xi);
+    if(x.em){const em=x.em;L.push(`  EMOM alle ${msx(em.v)} min, ${em.n} Runden (${em.it.map(t=>`${t.r} ${EXD(t.e).n}${t.k?' +'+fk(t.k)+' kg':''}`).join(' / ')}): ${em.ok.filter(Boolean).length}/${em.n} Runden geschafft`);return}
+    L.push(`  ${EXD(x.e).n}: ${setLine(x.e,x.s)}${b&&b.e===x.e?` (Ziel ${b.lo}${b.hi>b.lo?'–'+b.hi:''}${EXD(x.e).t==='time'?' s':''})`:''}${o&&o.n>1?` · Zeit ${msx(o.dur)}${o.rest!=null?`, Pause Ø ${msx(o.rest)}${o.plan?' (geplant '+msx(o.plan)+')':''}`:''}`:''}`)});
+  if(TM)L.push(`  Zeiten: bis erster Satz ${msx(TM.lead)} · erster bis letzter Satz ${msx(TM.total-TM.lead)}${TM.rest!=null?' · Pause Ø '+msx(TM.rest):''}${TM.wech!=null?' · Wechsel Ø '+msx(TM.wech):''}${TM.long?' · '+TM.long+' Lücke(n) über 15 min nicht mitgezählt':''}`);
   const gx=gaPair(d).bySess.get(s.id);if(gx)L.push('  '+gaLine(gx));
   return L.join('\n')}
 // Garmin-Werte als Text: Dauer, Puls, Kalorien, Trainingseffekt, Zonen
