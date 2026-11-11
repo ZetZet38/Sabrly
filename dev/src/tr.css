@@ -64,6 +64,10 @@
 .tplat{font-size:12.5px;color:var(--amber);background:rgba(242,169,59,.09);border:1px solid rgba(242,169,59,.25);border-radius:12px;padding:8px 10px}
 .tsets{display:flex;flex-direction:column;gap:6px}
 .tsrow{display:grid;grid-template-columns:20px 1fr 1fr 44px;align-items:center;gap:8px}
+.trir{display:flex;align-items:center;gap:6px;margin:-1px 0 3px 28px}
+.trir span{font-size:11.5px;color:var(--muted);margin-right:2px;white-space:nowrap}
+.trir button{flex:1;min-height:36px;border-radius:10px;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--muted);font-family:var(--num);font-size:16px}
+.trir button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .tsrow .no{font-size:17px;color:var(--faint);text-align:center}
 .tsrow label{display:flex;align-items:baseline;gap:4px;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:11px;padding:0 10px;min-height:44px;min-width:0}
 .tsrow input{width:100%;min-width:0;background:transparent;border:0;outline:none;font-family:var(--num);font-size:22px;color:var(--fg);padding:8px 0}

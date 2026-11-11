@@ -45,6 +45,8 @@ Beim ersten Öffnen eine Vorlage wählen (Push · Pull · Tag C, Push · Pull ·
 danach ist alles änderbar: Trainingstage, Übungen aus der Bibliothek oder eigene, Sätze, Wiederholungsbereich, Pause (Zeitrad), EMOM-Blöcke.
 Die Woche wird pro Woche geplant (mit Schicht pro Tag). Im Training: Sätze abhaken, Pausen-Timer (±10 s), ⓘ für Ausführung und Video,
 ⇄ für Alternativen. Vorschläge nach doppelter Progression, Plateau-Hinweis ab 5 Einheiten ohne Fortschritt.
+Nach dem Abhaken eines Satzes erscheint die Reserve-Reihe (RIR) `0 · 1 · 2 · 3 · 4+` – optional, der letzte Wert ist vorbelegt, nochmal
+antippen löscht ihn. RIR 0 hält das Gewicht, viel Luft (überall 3+) steigert stärker; „Wie schwer war's?“ wird aus der RIR vorgeschlagen.
 Läufe (locker/lang oder Intervalle nach Zeit oder Strecke) mit Auswertung „Pace bei Puls unter …“, Kilometer pro KW und Intervall-Verlauf.
 Nach dem Speichern wird der Habit „Training“ (bzw. „Laufen“) automatisch abgehakt.
 Am Ende der Pause gibt es einen kurzen Ton und der Bildschirm leuchtet grün auf; während des Trainings bleibt der Bildschirm an (beides unter Training → ⚙︎).

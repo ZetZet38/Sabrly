@@ -50,7 +50,7 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 
 - Playwright + Chromium sind in Claude-Code-Cloud-Umgebungen vorinstalliert (über `NODE_PATH`) – **nicht** neu installieren.
   Nur wenn `node -e "require('playwright')"` fehlschlägt: `cd dev && npm i -D playwright && npx playwright install chromium`.
-- `test.sh` umfasst (Stand Übergabe): Widget 439 Tests, Garmin-Logik (Erkennung, Tempo, FIT/ZIP 98), Web-App 488 Tests.
+- `test.sh` umfasst (Stand Übergabe): Widget 439 Tests, Garmin-Logik (Erkennung, Tempo, FIT/ZIP 98), Web-App 522 Tests.
 - **Web-Tests:** `dev/tests/web/build_harness.py` baut Testseiten aus `index.html` + `fbmock.js` (Firestore-Nachbau, lehnt wie
   das echte Firestore **Arrays in Arrays** und `undefined` ab). `web_train_tests.js` = Training/Garmin, `web_tests.js` = Basis-App.
 - **Widget-Tests:** `dev/tests/widget/run.js` ist ein strenger Scriptable-Nachbau (unbekannte Eigenschaften werfen Fehler).
@@ -85,7 +85,10 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 - `days:[{id,name,sub,col,blocks}]`, `ex` (eigene Übungen), `weeks:{Montag:{d:{0..6:[ids]}, s:{0..6:'F'|'S'|'N'}}}` (Plan + Schicht),
   `habit`/`rhabit` (Habit für Training/Lauf, automatisch abhaken), `hr` (Pulsgrenze locker), `snd`, `wake`.
 - Baustein: `{k:'ex',id,e,p:[{k,r}],lo,hi,rest,note}` oder EMOM `{k:'emom',id,v,n,it:[{e,r,k}],note}`.
-- Session pro Tag: `tr:[{id,day,n,st,en,feel,x:[{b,e,s:[{k,r}]} | {b,em:{v,n,it,ok}}]}]`.
+- Session pro Tag: `tr:[{id,day,n,st,en,feel,x:[{b,e,s:[{k,r,q?}]} | {b,em:{v,n,it,ok}}]}]`. `q` = RIR 0–4 (4 = „4+“), fehlt, wenn nicht gewählt.
+- RIR: Reihe `.trir` unter jedem abgehakten Satz (`wrir`); beim Abhaken vorbelegt mit dem vorigen Satz derselben Übung, sonst dem letzten Training.
+  `suggest()`: RIR 0 → halten; alle ≥ 3 → +2 Wdh./+10 s, alle 4+ am oberen Ende → doppelter Gewichtsschritt. `feelFromRir()` belegt „Wie schwer war's?“
+  beim Beenden vor (Ø ≤ 1 hart, ≥ 3 leicht; `UI.w.feelAuto`, wird nicht gespeichert). „Für Claude kopieren“: `× 10 (RIR 2)`.
 - Lauf: `run:[{id,t:'easy'|'iv',dur,km,hr,max,iv,g}]`; Plan-Einträge `@L` (locker) / `@I` (Intervalle).
 - Doppelte Progression; „Hart“ hält das Gewicht; Plateau = 5 Einheiten ohne Fortschritt; Wochensätze je Muskel
   (`MUS`: Brust, Rücken, Schultern, Bizeps, Trizeps, Beine, Core).
@@ -127,17 +130,15 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 
 Mit Zeynel besprochen am 11.11.2026, Reihenfolge = Vorschlag (oben zuerst):
 
-1. **RIR je Satz** – nach dem Abhaken eine Reihe zum Antippen `0 · 1 · 2 · 3 · 4+` (optional, letzter Wert vorbelegt). Progression nutzt RIR
-   (Luft nach oben → mehr steigern, RIR 0 → halten). „Wie schwer war's?“ am Ende aus RIR vorschlagen. In „Für Claude kopieren“ aufnehmen.
-2. **Notiz pro Übung** im Training – kleines „+ Notiz“, Schnellauswahl („Pause verlängert“, „links/rechts ungleich“, „Technik unsauber“) + Freitext.
+1. **Notiz pro Übung** im Training – kleines „+ Notiz“, Schnellauswahl („Pause verlängert“, „links/rechts ungleich“, „Technik unsauber“) + Freitext.
    In Zusammenfassung und Text für Claude.
-3. **Zeiten automatisch** – Zeitstempel je abgehaktem Satz → echte Pausen, Zeit pro Übung, Wechselzeiten. Anzeige in der Zusammenfassung, im Text für Claude.
+2. **Zeiten automatisch** – Zeitstempel je abgehaktem Satz → echte Pausen, Zeit pro Übung, Wechselzeiten. Anzeige in der Zusammenfassung, im Text für Claude.
    (Später möglich: Garmin-Puls je Übung aus der Kraft-Aufzeichnung über diese Zeitstempel.)
-4. **Zusammenfassung wieder ansehen** – die Ansicht nach Trainingsende (Minuten, Sätze, Tonnen, Vorschläge) soll für gespeicherte Trainings
+3. **Zusammenfassung wieder ansehen** – die Ansicht nach Trainingsende (Minuten, Sätze, Tonnen, Vorschläge) soll für gespeicherte Trainings
    wieder aufrufbar sein: Antippen → Zusammenfassung, „Bearbeiten“ als Knopf darin.
-5. **Aufwärmen** – Zeit bis zum ersten Arbeitssatz automatisch messen; am Start antippen, was gemacht wurde (Rad, Laufband, Mobility, Aufwärmsätze);
+4. **Aufwärmen** – Zeit bis zum ersten Arbeitssatz automatisch messen; am Start antippen, was gemacht wurde (Rad, Laufband, Mobility, Aufwärmsätze);
    einzelne Sätze als Aufwärmsatz markierbar (zählen nicht für die Progression).
-6. **Supersätze** – zwei Übungen im Trainingstag verbinden (z. B. Swings + Suitcase Carry), im Training abwechselnd, Pause erst nach dem Paar.
+5. **Supersätze** – zwei Übungen im Trainingstag verbinden (z. B. Swings + Suitcase Carry), im Training abwechselnd, Pause erst nach dem Paar.
 
 Später / Ideen: alternative Übungen (erst wenn Zeynel regelmäßig im Gym trackt), Trainings-Widget, Körpergewicht/Bauchumfang,
 Intervall-Farbe Pink statt Orange (falls es ihn stört). Aufräumen auf GitHub: Branch „probe“ löschen (macht Zeynel).
