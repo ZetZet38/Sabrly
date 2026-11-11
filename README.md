@@ -78,3 +78,7 @@ Der Schlüssel liegt nur im Schlüsselbund des iPhones, nie im Code oder in Fire
 - Für heute und gestern hakt der Import den Lauf- bzw. Trainings-Habit ab, ältere Tage bleiben unverändert.
 - Status für die App: Dokument `garmin` (zuletzt geprüft, Fehler, letzte Einheiten), sichtbar unter Training → ⚙︎.
 - „Bericht für Claude (Test)“ im Skript zeigt, was die Garmin-Schnittstelle liefert (ohne Standort und Personendaten).
+
+## Entwicklung
+
+Quellen, Bau-Skript und Tests liegen in `dev/`. Wie man baut, testet und veröffentlicht, steht in `CLAUDE.md`.
