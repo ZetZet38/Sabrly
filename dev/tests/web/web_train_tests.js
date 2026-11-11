@@ -106,7 +106,7 @@ await step('info + swap',async()=>{
 await step('finish + save',async()=>{
   for(let k=0;k<60;k++){const b=qa('[data-a="wset"]').find(b=>!b.closest('.tsrow').classList.contains('done'));if(!b)break;b.click();await wait(2)}
   click('.ptopbar [data-a="wfinish"]');ok('done page',UI.page.t==='wdone'&&qa('.kpi').length===3);
-  ok('suggestions',qa('.tnxt div').length===6);ok('habit hint',q('#view').textContent.includes('„Training“ wird beim Speichern abgehakt'));
+  ok('suggestions',qa('.tsg div').length===6);ok('habit hint',q('#view').textContent.includes('„Training“ wird beim Speichern abgehakt'));
   click('[data-a="wfeel"][data-v="1"]');ok('feel okay',UI.w.feel===1);
   click('.ptopbar [data-a="wsave"]');await wait(800);
   const ss=sessOf(t);ok('session saved',ss.length===1&&ss[0].day===P().id&&ss[0].x.length===6&&ss[0].feel===1);
@@ -118,14 +118,17 @@ await step('finish + save',async()=>{
 await step('history + edit',async()=>{
   click('#tab-training');ok('hero done',qa('.thero .btn').some(b=>/Erledigt/.test(b.textContent)));
   ok('strip tag done = same tint + check',!!q('.twd.t .ttag.ok')&&q('.twd.t .ttag.ok').textContent.startsWith('✓ ')&&getComputedStyle(q('.twd.t .ttag.ok')).backgroundColor===getComputedStyle(qa('.twd.t .ttag')[0]).backgroundColor);
-  ok('last trainings',qa('.swipe .tt[data-a="wedit"]').length===1);
-  click('.swipe .tt[data-a="wedit"]');ok('edit page',UI.page.t==='work'&&UI.w.edit===sessOf(t)[0].id&&qa('.tsrow.done').length===sessOf(t)[0].x.reduce((n,x)=>n+x.s.length,0));
+  ok('last trainings',qa('.swipe .tt[data-a="wview"]').length===1);
+  ok('swipe still has edit',!!q('.swipe-actions [data-a="wedit"]'));
+  click('.swipe .tt[data-a="wview"]');ok('tap opens summary',UI.page.t==='wsum'&&qa('.kpi').length===3&&!!q('.ptopbar [data-a="wedit"]')&&q('#view').textContent.includes('Übungen')&&q('#view').textContent.includes('Dips'),q('#view').textContent.slice(0,200));
+  click('.ptopbar [data-a="wedit"]');ok('edit page',UI.page.t==='work'&&UI.w.edit===sessOf(t)[0].id&&qa('.tsrow.done').length===sessOf(t)[0].x.reduce((n,x)=>n+x.s.length,0));
   ok('no rest wheel in edit',!q('.tw-in[data-tw="rest"]'));
   typeIn('[data-ws="r"][data-i="0"][data-j="0"]','9');click('.ptopbar [data-a="wsave"]');await wait(300);
-  ok('edited',sessOf(t).length===1&&sessOf(t)[0].x[0].s[0].r===9);
+  ok('edited',sessOf(t).length===1&&sessOf(t)[0].x[0].s[0].r===9);ok('save returns to summary',UI.page.t==='wsum');click('.ptopbar [data-a="back"]');
   const id=sessOf(t)[0].id;q(`.swipe-actions [data-a="wdel"]`).click();await wait(50);ok('deleted',sessOf(t).length===0);
   click('[data-a="undo"]');ok('undo',sessOf(t).length===1&&sessOf(t)[0].id===id);
-  click('.thero [data-a="wedit"]');click('.ptopbar [data-a="wcancel"]');ok('cancel edit',!UI.w&&!UI.page);
+  click('.thero [data-a="wview"]');ok('hero opens summary',UI.page.t==='wsum');click('.ptopbar [data-a="wedit"]');click('.ptopbar [data-a="wcancel"]');ok('cancel edit returns to summary',!UI.w&&UI.page.t==='wsum');
+  click('.ptopbar [data-a="back"]');ok('back to training',!UI.page);
 });
 await step('second workout uses history',async()=>{
   ACT.wstart({dataset:{day:P().id,d:t}});
@@ -164,7 +167,7 @@ await step('rir per set',async()=>{
   for(const x of UI.w.it)for(const st of x.sets)if(st.done)st.q=0;
   click('.ptopbar [data-a="wfinish"]');ok('feel suggested hard',UI.w.feel===2&&UI.w.feelAuto&&q('#view').textContent.includes('Vorschlag aus deiner Reserve'));
   ok('hard button on',q('[data-a="wfeel"][data-v="2"]').classList.contains('on'));
-  ok('next-time suggestion holds',/halten/.test(qa('.tnxt div b')[0].textContent),qa('.tnxt div b')[0].textContent);
+  ok('next-time suggestion holds',/halten/.test(qa('.tsg div b')[0].textContent),qa('.tsg div b')[0].textContent);
   click('[data-a="wfeel"][data-v="0"]');ok('manual feel overrides',UI.w.feel===0&&!UI.w.feelAuto);
   click('.ptopbar [data-a="back"]');for(const st of UI.w.it[0].sets)st.q=4;click('.ptopbar [data-a="wfinish"]');
   ok('manual feel kept on re-finish',UI.w.feel===0);
@@ -185,6 +188,44 @@ await step('rir per set',async()=>{
   ok('edit changes rir',sessOf(d0).find(x=>x.id===sv.id).x[0].s[0].q===0);
   // Aufräumen: Test-Einheit entfernen
   const e0=dayEnsure(d0);e0.tr=e0.tr.filter(z=>z.id!==sv.id);touch(mkey(d0));UI.page=null;UI.stack=[];render();
+});
+await step('times + summary',async()=>{
+  const base=Date.now();let off=0;window.__now=()=>base+off*1000;
+  ACT.wstart({dataset:{day:PU().id,d:t}});ok('live workout is not late',UI.w.lt===0&&UI.w.it[0].sets.length>=3&&UI.w.it[1].k==='ex');
+  const done=(i,j,sec)=>{off=sec;click(`[data-a="wset"][data-i="${i}"][data-j="${j}"]`)};
+  done(0,0,240);done(0,1,330);done(0,2,470);done(1,0,560);
+  ok('t = seconds since start',UI.w.it[0].sets.slice(0,3).map(s=>s.t).join()==='240,330,470'&&UI.w.it[1].sets[0].t===560,JSON.stringify(UI.w.it.slice(0,2).map(x=>x.sets.map(s=>s.t))));
+  click('[data-a="wset"][data-i="0"][data-j="2"]');ok('undo removes t',!('t' in UI.w.it[0].sets[2]));done(0,2,500);
+  const T=wTimes(UI.w);
+  ok('lead',T.lead===240);ok('rest avg',T.rest===130,T.rest);ok('change avg',T.wech===60,T.wech);ok('exercise time',T.by.get(0).dur===260&&T.by.get(0).rest===130&&T.by.get(1).n===1,JSON.stringify([...T.by]));
+  ok('plan rest known',T.by.get(0).plan>0);
+  off=620;click('.ptopbar [data-a="wfinish"]');ok('done page shows times',q('#view').textContent.includes('Bis zum ersten Satz')&&q('#view').textContent.includes('4:00')&&q('#view').textContent.includes('Pause zwischen Sätzen Ø')&&q('#view').textContent.includes('2:10'),q('#view').textContent.slice(0,500));
+  click('.ptopbar [data-a="wsave"]');await wait(600);
+  const sv=sessOf(t).slice(-1)[0];
+  ok('t saved in sets',sv.x[0].s.map(z=>z.t).join()==='240,330,500'&&sv.x[1].s[0].t===560&&!('lt' in sv),JSON.stringify(sv.x[0].s));
+  ok('no undefined in cloud',!JSON.stringify(cloud(mk)).includes('undefined'));
+  const tx=sessText(t,sv);ok('claude text has times',tx.includes('Zeiten: bis erster Satz 4:00')&&tx.includes('Pause Ø 2:10')&&tx.includes('Wechsel Ø 1:00')&&/Zeit 4:20, Pause Ø 2:10/.test(tx),tx);
+  ok('history before excludes itself',histFor(sv.x[0].e,null,{d:t,st:sv.st}).length<histFor(sv.x[0].e).length);
+  // Zusammenfassung ansehen
+  ACT.wview({dataset:{d:t,id:sv.id}});
+  ok('summary page',UI.page.t==='wsum'&&qa('.kpi').length===3&&q('#view').textContent.includes('Bis zum ersten Satz')&&q('#view').textContent.includes('Vorschlag fürs nächste Mal')&&!!q('[data-a="copysess"]')&&!q('.kpi span').textContent.includes('geschätzt'),q('#view').textContent.slice(0,300));
+  ok('summary lists exercises with sets',qa('.tnxt.tex div').some(d=>d.textContent.includes(EXD(sv.x[0].e).n)));
+  click('.ptopbar [data-a="wedit"]');ok('edit from summary',UI.page.t==='work'&&UI.w.edit===sv.id&&UI.w.it[0].sets[0].t===240);
+  click('[data-a="wset"][data-i="0"][data-j="2"]');click('[data-a="wset"][data-i="0"][data-j="2"]');ok('edit: re-checked set has no time',UI.w.it[0].sets[2].t===undefined);
+  typeIn('[data-ws="r"][data-i="0"][data-j="0"]','7');click('.ptopbar [data-a="wsave"]');await wait(400);
+  ok('save in edit returns to summary',UI.page&&UI.page.t==='wsum'&&UI.page.id===sv.id&&UI.stack.length===0,JSON.stringify(UI.page));
+  const sv2=sessOf(t).find(x=>x.id===sv.id);ok('edit keeps times',sv2.x[0].s[0].r===7&&sv2.x[0].s[0].t===240&&sv2.x[0].s[1].t===330&&!('t' in sv2.x[0].s[2]),JSON.stringify(sv2.x[0].s));
+  click('.ptopbar [data-a="back"]');ok('back from summary',!UI.page);
+  // Nachtragen: keine Zeiten, Minuten geschätzt
+  const dl=addDays(t,-2);ACT.wstart({dataset:{day:PU().id,d:dl}});ok('late flag',UI.w.lt===1);
+  click('[data-a="wset"][data-i="0"][data-j="0"]');click('[data-a="wset"][data-i="0"][data-j="1"]');ok('late sets have no t',UI.w.it[0].sets.every(s=>!('t' in s)));
+  click('.ptopbar [data-a="wfinish"]');click('.ptopbar [data-a="wsave"]');await wait(400);
+  const lv=sessOf(dl).slice(-1)[0];ok('late saved with lt',lv&&lv.lt===1&&lv.x[0].s.every(z=>!('t' in z)),JSON.stringify(lv));
+  ACT.wview({dataset:{d:dl,id:lv.id}});ok('late summary: estimated, no times card',q('.kpi span').textContent.includes('geschätzt')&&!q('#view').textContent.includes('Bis zum ersten Satz'));
+  click('.ptopbar [data-a="wedit"]');click('.ptopbar [data-a="wsave"]');await wait(300);ok('lt survives edit',sessOf(dl).find(x=>x.id===lv.id).lt===1);
+  ACT.wview({dataset:{d:'2000-01-01',id:'nope'}});ok('missing session does not crash',!!q('#view'));
+  // Aufräumen
+  window.__now=null;for(const [d,id] of [[t,sv.id],[dl,lv.id]]){const e=dayEnsure(d);e.tr=e.tr.filter(z=>z.id!==id);if(!e.tr.length)delete e.tr;touch(mkey(d))}UI.page=null;UI.stack=[];render();
 });
 await step('notiz + aufwärmen',async()=>{
   const d0=t,base=Date.now();window.__now=()=>base;
@@ -215,19 +256,25 @@ await step('notiz + aufwärmen',async()=>{
   click('[data-a="wnote"][data-i="0"]');ok('closed shows note line',q('.tnl')&&q('.tnl').textContent.includes('links/rechts ungleich · Griff nass')&&!q('.tnp'));
   await wait(500);
   ok('note + warm persisted locally',(()=>{const w=JSON.parse(localStorage.getItem(WKEY()));return w.it[0].nt==='Griff nass'&&w.wt.includes('rad')&&w.fs>0})());
+  window.__now=()=>base+9*60000+20000;click('[data-a="wset"][data-i="0"][data-j="2"]');
+  ok('times ignore warm set: lead = first working set',wTimes(UI.w)&&wTimes(UI.w).lead===500&&wTimes(UI.w).by.get(0).n===2,JSON.stringify(wTimes(UI.w)&&wTimes(UI.w).lead));
   click('.ptopbar [data-a="wfinish"]');const txt=q('#view').textContent;
   ok('summary shows warmup + notes',txt.includes('Aufwärmen')&&txt.includes('8 min')&&txt.includes('Rad')&&txt.includes('Notizen')&&txt.includes('Griff nass'),txt.slice(0,300));
-  ok('kpi sets = working sets',+qa('.kpi b')[1].textContent===1);
+  ok('kpi sets = working sets',+qa('.kpi b')[1].textContent===2);
   click('.ptopbar [data-a="wsave"]');await wait(600);
   const sv=sessOf(d0).find(x=>x.day===PU().id);
   ok('saved wu',sv&&sv.wu&&sv.wu.m===8&&sv.wu.t.join()==='sets,rad',JSON.stringify(sv&&sv.wu));
-  ok('saved working sets separate from warm',sv.x[0].s.length===1&&sv.x[0].ws.length===1&&!('w' in sv.x[0].s[0]),JSON.stringify(sv.x[0]));
+  ok('saved working sets separate from warm',sv.x[0].s.length===2&&sv.x[0].ws.length===1&&!('w' in sv.x[0].s[0]),JSON.stringify(sv.x[0]));
   ok('saved note',sv.x[0].nq.join()==='1'&&sv.x[0].n==='Griff nass');
   ok('no undefined in cloud',!JSON.stringify(cloud(mk)).includes('undefined'));
   const T=sessText(d0,sv);
   ok('claude text warmup',/Aufwärmen: 8 min · Aufwärmsätze · Rad/.test(T),T);
   ok('claude text warm sets + note',/Aufwärmsätze: .*kg × \d+/.test(T)&&/Notiz: links\/rechts ungleich · Griff nass/.test(T),T);
-  const L=lastFor(sv.x[0].b,sv.x[0].e);ok('progression history ignores warm sets',L&&L.x.s.length===1);
+  const L=lastFor(sv.x[0].b,sv.x[0].e);ok('progression history ignores warm sets',L&&L.x.s.length===2);
+  ACT.wview({dataset:{d:d0,id:sv.id}});const sm=q('#view').textContent;
+  ok('saved summary shows warmup, notes, warm sets',sm.includes('Aufwärmen')&&sm.includes('8 min')&&sm.includes('Rad')&&sm.includes('Griff nass')&&sm.includes('Bis zum ersten Satz')&&/Aufwärmen: .*kg/.test(sm),sm.slice(0,400));
+  ok('claude text keeps times without warm sets',/Zeiten: bis erster Satz 8:20/.test(T),T);
+  click('.ptopbar [data-a="back"]');
   window.__now=()=>base+30*60000;
   ACT.wstart({dataset:{day:PU().id,d:d0}});ok('note from last time shown',q('#view').textContent.includes('Notiz letztes Mal: links/rechts ungleich · Griff nass'));
   click('.ptopbar [data-a="wcancel"]');
@@ -236,7 +283,7 @@ await step('notiz + aufwärmen',async()=>{
   ok('edit: working numbering',q('[data-a="wwarm"][data-i="0"][data-j="1"]').textContent==='1');
   click('.ptopbar [data-a="wsave"]');await wait(500);
   const s2=sessOf(d0).find(x=>x.id===sv.id);
-  ok('edit keeps everything',s2.wu.m===8&&s2.x[0].ws.length===1&&s2.x[0].s.length===1&&s2.x[0].n==='Griff nass'&&s2.x[0].nq.join()==='1',JSON.stringify(s2.x[0]));
+  ok('edit keeps everything',s2.wu.m===8&&s2.x[0].ws.length===1&&s2.x[0].s.length===2&&s2.x[0].n==='Griff nass'&&s2.x[0].nq.join()==='1',JSON.stringify(s2.x[0]));
   ACT.wedit({dataset:{d:d0,id:sv.id}});click('[data-a="wwarm"][data-i="0"][data-j="0"]');ok('warm → working',!UI.w.it[0].sets[0].w);click('.ptopbar [data-a="wcancel"]');
   window.__now=null;const e0=dayEnsure(d0);e0.tr=e0.tr.filter(z=>z.id!==sv.id);touch(mkey(d0));UI.page=null;UI.stack=[];render();
   ACT.wstart({dataset:{day:PU().id,d:d0}});click('[data-a="wset"][data-i="0"][data-j="0"]');click('.ptopbar [data-a="wfinish"]');click('.ptopbar [data-a="wsave"]');await wait(500);
@@ -354,7 +401,7 @@ await step('copy for Claude',async()=>{
   click('#tab-training');click('[data-a="copyweek"]');await wait(50);
   ok('week text',got&&got.startsWith('Sabrly – Woche KW')&&got.includes('Habits:')&&got.includes('Dips:')&&got.includes('EMOM alle')&&got.includes('Intervalle')&&got.includes('Ø-Puls'),String(got).slice(0,400));
   ok('toast after copy',q('#toast').textContent.includes('Kopiert'));
-  got=null;click('.swipe .tt[data-a="wedit"]');click('[data-a="copysess"]');await wait(30);ok('session text',got&&/^\S+ \d+\.\d+\. – /.test(got)&&(got.includes('kg ×')||got.includes('EMOM alle')),String(got).slice(0,200));click('.ptopbar [data-a="wcancel"]');
+  got=null;click('.swipe .tt[data-a="wview"]');click('[data-a="copysess"]');await wait(30);ok('session text',got&&/^\S+ \d+\.\d+\. – /.test(got)&&(got.includes('kg ×')||got.includes('EMOM alle')),String(got).slice(0,200));click('.ptopbar [data-a="back"]');
   got=null;ACT.wstart({dataset:{day:P().id,d:t}});click('[data-a="wset"][data-i="1"][data-j="0"]');click('.ptopbar [data-a="wfinish"]');click('[data-a="wsavecopy"]');await wait(50);
   ok('save + copy',got&&got.includes('Landmine Press')&&!UI.w,String(got).slice(0,160));
   got=null;click('[data-a="truns"]');click('.swipe .tt[data-a="runedit"]');click('[data-a="copyrun"]');await wait(30);ok('run text',got&&/km/.test(got),String(got));click('[data-a="back"]');click('[data-a="back"]');

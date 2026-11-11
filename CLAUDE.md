@@ -50,7 +50,7 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 
 - Playwright + Chromium sind in Claude-Code-Cloud-Umgebungen vorinstalliert (über `NODE_PATH`) – **nicht** neu installieren.
   Nur wenn `node -e "require('playwright')"` fehlschlägt: `cd dev && npm i -D playwright && npx playwright install chromium`.
-- `test.sh` umfasst (Stand Übergabe): Widget 439 Tests, Garmin-Logik (Erkennung, Tempo, FIT/ZIP 98), Web-App 554 Tests.
+- `test.sh` umfasst (Stand Übergabe): Widget 439 Tests, Garmin-Logik (Erkennung, Tempo, FIT/ZIP 98), Web-App 588 Tests.
 - **Web-Tests:** `dev/tests/web/build_harness.py` baut Testseiten aus `index.html` + `fbmock.js` (Firestore-Nachbau, lehnt wie
   das echte Firestore **Arrays in Arrays** und `undefined` ab). `web_train_tests.js` = Training/Garmin, `web_tests.js` = Basis-App.
 - **Widget-Tests:** `dev/tests/widget/run.js` ist ein strenger Scriptable-Nachbau (unbekannte Eigenschaften werfen Fehler).
@@ -85,7 +85,8 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 - `days:[{id,name,sub,col,blocks}]`, `ex` (eigene Übungen), `weeks:{Montag:{d:{0..6:[ids]}, s:{0..6:'F'|'S'|'N'}}}` (Plan + Schicht),
   `habit`/`rhabit` (Habit für Training/Lauf, automatisch abhaken), `hr` (Pulsgrenze locker), `snd`, `wake`.
 - Baustein: `{k:'ex',id,e,p:[{k,r}],lo,hi,rest,note}` oder EMOM `{k:'emom',id,v,n,it:[{e,r,k}],note}`.
-- Session pro Tag: `tr:[{id,day,n,st,en,feel,x:[{b,e,s:[{k,r,q?}]} | {b,em:{v,n,it,ok}}]}]`. `q` = RIR 0–4 (4 = „4+“), fehlt, wenn nicht gewählt.
+- Session pro Tag: `tr:[{id,day,n,st,en,lt?,feel,x:[{b,e,s:[{k,r,q?,t?}]} | {b,em:{v,n,it,ok}}]}]`. `q` = RIR 0–4 (4 = „4+“), fehlt, wenn nicht gewählt.
+  `t` = Sekunden seit Start `st`, gesetzt beim Abhaken (nicht beim Nachtragen/Bearbeiten; Abhaken zurücknehmen löscht es). `lt:1` = nachgetragen (Minuten geschätzt).
 - Aufwärmen: `tr[].wu:{m?,t:['rad'|'band'|'mob'|'sets']}` – `m` = Minuten von Trainingsstart bis zum ersten abgehakten Arbeitssatz (`UI.w.fs`, nur für heute;
   Uhr `#wwu`), `t` = Auswahl. Aufwärmsätze liegen **getrennt** in `x.ws:[{k,r}]` (im Trainingsmodus `sets[].w=1`, Satznummer antippen = Schalter, „+ Aufwärmsatz“ fügt vorn ein) –
   `x.s` enthält nur Arbeitssätze, darum ignorieren Progression, PRs, Tonnen, Wochensätze, `lastFor`/`histFor` sie automatisch. Im Trainingsmodus überall `wDone(s)` (= erledigt und nicht `w`) und `wNo(x,j)` (Arbeitssatz-Index) benutzen.
@@ -94,6 +95,12 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
   `suggest()`: RIR 0 → halten; alle ≥ 3 → +2 Wdh./+10 s, alle 4+ am oberen Ende → doppelter Gewichtsschritt. `feelFromRir()` belegt „Wie schwer war's?“
   beim Beenden vor (Ø ≤ 1 hart, ≥ 3 leicht; `UI.w.feelAuto`, wird nicht gespeichert). „Für Claude kopieren“: `× 10 (RIR 2)`.
 - Lauf: `run:[{id,t:'easy'|'iv',dur,km,hr,max,iv,g}]`; Plan-Einträge `@L` (locker) / `@I` (Intervalle).
+- **Zeiten** (`wTimes(W)`, `timesCard(W)` in `main.js`; Text in `sessText`): Sätze mit `t` nach Zeit sortiert, Lücke zwischen zwei Sätzen derselben Übung = Pause,
+  zwischen verschiedenen = Wechsel, erster `t` = „bis zum ersten Satz“ (Aufwärmen/Aufbau – Grundlage für Punkt „Aufwärmen“). Lücken > 15 min (`TCAP`) zählen nicht in die Schnitte.
+  Zeit je Übung = Summe der Lücken, die an ihren Sätzen enden. Braucht ≥ 2 Sätze mit `t`; sonst keine Anzeige (alte Einheiten).
+- **Zusammenfassung** (`pWSum`, Seite `wsum`, Aktion `wview`): Antippen eines gespeicherten Trainings; „Bearbeiten“ → `wedit` (Swipe „Ändern“ geht direkt dorthin).
+  `wFromSess(d,s,edit)` baut den Arbeitszustand aus einer gespeicherten Einheit (für Bearbeiten und Zusammenfassung). Bestwerte dort nur gegen frühere Einheiten (`histFor(e,b,bef)`).
+  Nach „Sichern“ im Bearbeiten kehrt man in die Zusammenfassung zurück, wenn man von dort kam.
 - Doppelte Progression; „Hart“ hält das Gewicht; Plateau = 5 Einheiten ohne Fortschritt; Wochensätze je Muskel
   (`MUS`: Brust, Rücken, Schultern, Bizeps, Trizeps, Beine, Core).
 
@@ -132,13 +139,9 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 
 ## Offene Liste
 
-Mit Zeynel besprochen am 11.11.2026, Reihenfolge = Vorschlag (oben zuerst). Erledigt am 11.11.2026: Notiz pro Übung, Aufwärmen. Noch offen:
+Mit Zeynel besprochen am 11.11.2026, Reihenfolge = Vorschlag (oben zuerst). Gebaut und aus der Liste gestrichen (11.11.2026): „Zeiten automatisch“, „Zusammenfassung wieder ansehen“, „Notiz pro Übung“, „Aufwärmen“. Später möglich: Garmin-Puls je Übung aus der Kraft-Aufzeichnung über die Satz-Zeitstempel `t`.
 
-1. **Zeiten automatisch** – Zeitstempel je abgehaktem Satz → echte Pausen, Zeit pro Übung, Wechselzeiten. Anzeige in der Zusammenfassung, im Text für Claude.
-   (Später möglich: Garmin-Puls je Übung aus der Kraft-Aufzeichnung über diese Zeitstempel. Der Zeitstempel des ersten Arbeitssatzes existiert schon: `UI.w.fs`.)
-2. **Zusammenfassung wieder ansehen** – die Ansicht nach Trainingsende (Minuten, Sätze, Tonnen, Vorschläge, Aufwärmen, Notizen) soll für gespeicherte Trainings
-   wieder aufrufbar sein: Antippen → Zusammenfassung, „Bearbeiten“ als Knopf darin.
-3. **Supersätze** – zwei Übungen im Trainingstag verbinden (z. B. Swings + Suitcase Carry), im Training abwechselnd, Pause erst nach dem Paar.
+1. **Supersätze** – zwei Übungen im Trainingstag verbinden (z. B. Swings + Suitcase Carry), im Training abwechselnd, Pause erst nach dem Paar.
 
 Später / Ideen: alternative Übungen (erst wenn Zeynel regelmäßig im Gym trackt), Trainings-Widget, Körpergewicht/Bauchumfang,
 Intervall-Farbe Pink statt Orange (falls es ihn stört). Aufräumen auf GitHub: Branch „probe“ löschen (macht Zeynel).

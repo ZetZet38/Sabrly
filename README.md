@@ -47,6 +47,11 @@ Die Woche wird pro Woche geplant (mit Schicht pro Tag). Im Training: Sätze abha
 ⇄ für Alternativen. Vorschläge nach doppelter Progression, Plateau-Hinweis ab 5 Einheiten ohne Fortschritt.
 Nach dem Abhaken eines Satzes erscheint die Reserve-Reihe (RIR) `0 · 1 · 2 · 3 · 4+` – optional, der letzte Wert ist vorbelegt, nochmal
 antippen löscht ihn. RIR 0 hält das Gewicht, viel Luft (überall 3+) steigert stärker; „Wie schwer war's?“ wird aus der RIR vorgeschlagen.
+Sabrly merkt sich automatisch, wann du jeden Satz abhakst. Daraus entstehen nach dem Training **Zeiten**: Zeit bis zum ersten Satz
+(Aufwärmen/Aufbau), echte Pausen zwischen den Sätzen (im Vergleich zur geplanten Pause), Wechselzeit zur nächsten Übung und Zeit pro Übung –
+in der Zusammenfassung und im Text „Für Claude kopieren“. Nachgetragene Trainings haben keine Zeiten (Minuten sind dann geschätzt).
+Ein gespeichertes Training antippen öffnet die **Zusammenfassung** (Minuten, Sätze, Tonnen, Bestwerte, Zeiten, Übungen, Garmin, Vorschläge);
+oben rechts „Bearbeiten“, nach dem Speichern bist du wieder in der Zusammenfassung. Wischen → „Ändern“ öffnet wie bisher direkt die Bearbeitung.
 **Aufwärmen:** Oben im Training läuft die Aufwärmzeit bis zu deinem ersten abgehakten Arbeitssatz; tippe an, was du gemacht hast
 (Rad, Laufband, Mobility, Aufwärmsätze). Die Satznummer antippen macht den Satz zum Aufwärmsatz (blaues „A“), „+ Aufwärmsatz“ fügt einen mit halbem Gewicht ein.
 Aufwärmsätze zählen nicht für Progression, Bestwerte, Tonnen und Wochensätze.
