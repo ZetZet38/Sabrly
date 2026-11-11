@@ -1,7 +1,7 @@
 /* ---------- Training: Datenmodell ----------
    S.training: {days:[{id,name,sub,col,blocks}], ex:{eigene Übungen}, weeks:{Montag:{d:{0..6:[ids]},s:{0..6:'F'|'S'|'N'}}}, habit, rhabit, hr}
    Baustein: {k:'ex',id,e,p:[{k,r}],lo,hi,rest,note} oder {k:'emom',id,v(Sek.),n(Runden),it:[{e,r,k}],note}
-   Pro Tag in LOGS: tr:[{id,day,n,st,en,feel,x:[{b,e,s:[{k,r}]} | {b,em:{v,n,it,ok}}]}], run:[{id,t,dur,km,hr,max,iv,g}]
+   Pro Tag in LOGS: tr:[{id,day,n,st,en,feel,x:[{b,e,s:[{k,r,q?}]} | {b,em:{v,n,it,ok}}]}], run:[{id,t,dur,km,hr,max,iv,g}]
    Garmin (vom Widget): run[].g = Werte der Uhr (km-Splits, Zonen …), ga:[{id,k:'str'|'oth',n,st,ts,dur,hr,max,kcal,te,z}], gdel:[gelöschte Garmin-IDs]
    Firestore kennt keine Arrays in Arrays – darum überall Objekte in Listen. */
 const TCOL={g:'#46E0AE',b:'#6FA4FF',o:'#FF9F4A',p:'#B48CFF',r:'#FF7A85',y:'#E3D26F'};
@@ -128,10 +128,17 @@ function setsTxt(sets,e){const D=EXD(e);if(!sets||!sets.length)return '';const k
   return kt+' × '+rs.join(' · ')+(D.t==='time'?' s':'')+(D.sd?' je Seite':'')}
 const topOf=sets=>{let b=null;for(const s of sets||[]){const k=+s.k||0;if(!b||k>b.k||(k===b.k&&s.r>b.r))b={k,r:+s.r||0}}return b};
 // doppelte Progression: erst Wiederholungen bis zum oberen Ende, dann Gewicht. „Hart“ hält das Gewicht.
-function suggest(lo,hi,e,sets,feel){const D=EXD(e);if(!sets||!sets.length)return '';const top=Math.max(...sets.map(s=>+s.k||0)),inc=D.i||2.5;
-  if(sets.every(s=>s.r>=hi)){if(feel===2)return `${fk(top)} kg halten – letztes Mal war es hart`;return D.t==='bw'&&!top?`Ziel erreicht → ${fk(inc)} kg Zusatzgewicht`:`${fk(top+inc)} kg${D.t==='bw'?' Zusatz':''} · wieder ab ${lo}${D.t==='time'?' s':''}`}
+// RIR (Wiederholungen in Reserve, q 0–4; 4 = „4+“): RIR 0 → halten, überall Luft (≥ 3) → mehr steigern.
+const rirOf=sets=>(sets||[]).filter(s=>s.q!=null).map(s=>+s.q);
+function suggest(lo,hi,e,sets,feel){const D=EXD(e);if(!sets||!sets.length)return '';const top=Math.max(...sets.map(s=>+s.k||0)),inc=D.i||2.5,q=rirOf(sets),zero=q.includes(0),air=q.length>0&&Math.min(...q)>=3,big=q.length>0&&Math.min(...q)>=4;
+  if(sets.every(s=>s.r>=hi)){if(feel===2)return `${fk(top)} kg halten – letztes Mal war es hart`;if(zero)return `${fk(top)} kg halten – letztes Mal ohne Reserve (RIR 0)`;
+    const st=big?inc*2:inc;return D.t==='bw'&&!top?`Ziel erreicht → ${fk(st)} kg Zusatzgewicht`:`${fk(top+st)} kg${D.t==='bw'?' Zusatz':''}${big?' (viel Luft)':''} · wieder ab ${lo}${D.t==='time'?' s':''}`}
   if(sets.some(s=>s.r<lo))return `${fk(top)} kg halten · Ziel ${lo}–${hi}${D.t==='time'?' s':' Wdh.'}`;
+  if(zero)return `${fk(top)} kg · Wdh. halten (RIR 0)`;
+  if(air)return D.t==='time'?`${fk(top)} kg · +10 s (viel Luft)`:`${fk(top)} kg · +2 Wdh. (viel Luft)`;
   return D.t==='time'?`${fk(top)} kg · +5 s`:`${fk(top)} kg · +1 Wdh.`}
+// „Wie schwer war's?“ aus RIR: Ø ≤ 1 → hart, Ø ≥ 3 → leicht, sonst okay (null ohne RIR)
+function feelFromRir(W){const q=[];for(const x of W.it)if(x.k==='ex')for(const s of x.sets)if(s.done&&s.q!=null)q.push(+s.q);if(!q.length)return null;const a=q.reduce((u,v)=>u+v,0)/q.length;return a<=1?2:a>=3?0:1}
 // Plateau: mindestens 5 Einheiten, die letzten 5 ohne Fortschritt
 function plateau(b,e){const H=histFor(e,b).slice(0,5);if(H.length<5)return '';const sc=H.map(h=>{const t=topOf(h.s);return t.k*1000+h.s.filter(s=>(+s.k||0)===t.k).reduce((a,s)=>a+(+s.r||0),0)});
   if(Math.max(...sc.slice(0,4))>sc[4])return '';const t=topOf(H[0].s);
@@ -236,7 +243,7 @@ function wStart(dayId,d){const D=TDAY(dayId);if(!D)return;if(!D.blocks.length){t
 function wEdit(d,id){const s=sessOf(d).find(x=>x.id===id);if(!s)return;
   UI.w={d,day:s.day,n:s.n,st:s.st||NOW(),en:s.en||null,edit:s.id,feel:s.feel??null,it:(s.x||[]).map(x=>{const b=blockOf(s.day,x.b);
     if(x.em)return {k:'emom',b:x.b,v:x.em.v,n:x.em.n,its:clone(x.em.it),ok:x.em.ok.slice(),r:x.em.n,run:false,end:0,left:null,note:''};
-    return {k:'ex',b:x.b,e:x.e,orig:x.e,sets:(x.s||[]).map(q=>({k:q.k,r:q.r,done:true})),rest:b?b.rest:90,lo:b?b.lo:8,hi:b?b.hi:12,note:'',last:null}})};UI.rest=null;go({t:'work'})}
+    return {k:'ex',b:x.b,e:x.e,orig:x.e,sets:(x.s||[]).map(q=>({k:q.k,r:q.r,done:true,...(q.q!=null?{q:q.q}:{})})),rest:b?b.rest:90,lo:b?b.lo:8,hi:b?b.hi:12,note:'',last:null}})};UI.rest=null;go({t:'work'})}
 const WKEY=()=>lsKey()+':wo';
 function wPersist(){try{if(UI.w&&!UI.w.edit)localStorage.setItem(WKEY(),JSON.stringify(UI.w));else localStorage.removeItem(WKEY())}catch(e){}}
 function wRestore(){if(UI.w||UI.wTried===lsKey())return;UI.wTried=lsKey();try{const w=JSON.parse(localStorage.getItem(WKEY())||'null');if(w&&w.it&&w.d>=addDays(today(),-1)){w.it.forEach(x=>{if(x.k==='emom'&&x.run){x.left=Math.max(1,Math.ceil((x.end-NOW())/1000));x.run=false}});UI.w=w}}catch(e){}}
@@ -249,7 +256,7 @@ function exCard(x,i,cur,ed){const D=EXD(x.e),R=D.t==='time'?'s':'Wdh.';
   h+=`<div class="tsets">${x.sets.map((s,j)=>`<div class="tsrow${s.done?' done':''}"><span class="no num">${j+1}</span>
     <label>${D.t==='bw'?'<span>+</span>':''}<input inputmode="decimal" value="${fk(s.k)}" placeholder="0" data-ws="k" data-i="${i}" data-j="${j}" aria-label="Gewicht Satz ${j+1}" enterkeyhint="done"><span>kg${D.du?' ×2':''}</span></label>
     <label><input inputmode="numeric" value="${s.r??''}" placeholder="0" data-ws="r" data-i="${i}" data-j="${j}" aria-label="${R} Satz ${j+1}" enterkeyhint="done"><span>${R}${D.sd?' / Seite':''}</span></label>
-    <button type="button" class="ck" data-a="wset" data-i="${i}" data-j="${j}" aria-label="Satz ${j+1} erledigt" aria-pressed="${!!s.done}">${CHECK}</button></div>`).join('')}</div>
+    <button type="button" class="ck" data-a="wset" data-i="${i}" data-j="${j}" aria-label="Satz ${j+1} erledigt" aria-pressed="${!!s.done}">${CHECK}</button></div>${s.done?`<div class="trir" role="group" aria-label="Reserve Satz ${j+1}"><span>Reserve</span>${[0,1,2,3,4].map(v=>`<button type="button" class="${s.q===v?'on':''}" data-a="wrir" data-i="${i}" data-j="${j}" data-v="${v}" aria-pressed="${s.q===v}" aria-label="${v>=4?'4 oder mehr':v} Wiederholungen übrig">${v>=4?'4+':v}</button>`).join('')}</div>`:''}`).join('')}</div>
     <div class="texf"><span class="row" style="gap:16px"><button type="button" class="link" data-a="waddset" data-i="${i}">+ Satz</button>${x.sets.length>1?`<button type="button" class="link muted" data-a="wdelset" data-i="${i}">− Satz</button>`:''}</span>${ed?'':`<span class="trctl">Pause ${twheel(x.rest,`data-tw="rest" data-i="${i}"`)}</span>`}</div></div>`;
   return h}
 function emomCard(x,i,cur,ed){const done=x.ok.filter(Boolean).length,fin=x.r>=x.n,its=x.its,ci=its.length?its[Math.min(x.r,x.n-1)%its.length]:null;
@@ -283,12 +290,12 @@ function pWDone(){const W=UI.w;if(!W){UI.page=null;UI.stack=[];return vTraining(
    <div class="kpis"><div class="kpi glass"><b>${mins}</b><span>${W.d<today()?'Minuten (geschätzt)':'Minuten'}</span></div><div class="kpi glass"><b>${st.sets}</b><span>Sätze</span></div><div class="kpi glass"><b>${fk(Math.round(st.vol/100)/10)}</b><span>Tonnen bewegt</span></div></div>
    ${pr.map(p=>`<div class="banner good"><b>🏆 Neuer Bestwert:</b> ${esc(p)}</div>`).join('')}
    <div class="card glass stack" style="gap:10px"><span class="label">Wie schwer war's?</span><div class="seg">${['Leicht','Okay','Hart'].map((t,i)=>`<button type="button" class="${W.feel===i?'on':''}" data-a="wfeel" data-v="${i}">${t}</button>`).join('')}</div>
-   <span class="hint">„Hart“ hält beim nächsten Mal das Gewicht, statt zu steigern.</span></div>
+   <span class="hint">${W.feelAuto?'Vorschlag aus deiner Reserve (RIR) – antippen zum Ändern. ':''}„Hart“ hält beim nächsten Mal das Gewicht, statt zu steigern.</span></div>
    ${N.length?`<div class="card glass stack" style="gap:10px"><span class="label">Vorschlag fürs nächste Mal</span><div class="tnxt">${N.map(([n,v])=>`<div><span>${esc(n)}</span><b>${esc(v)}</b></div>`).join('')}</div></div>`:''}
    <span class="hint">${hb?`Dein Habit „${esc(hb.name)}“ wird beim Speichern abgehakt.`:'Tipp: Leg einen Habit „Training“ an, dann wird er nach jedem Training automatisch abgehakt.'}</span>
    <button type="button" class="btn pri" data-a="wsave">Training speichern</button><button type="button" class="btn" data-a="wsavecopy">Speichern und für Claude kopieren</button>`}
 function wSave(){const W=UI.w;if(!W)return;
-  const x=W.it.map(it=>it.k==='ex'?{b:it.b,e:it.e,s:it.sets.filter(s=>s.done).map(s=>({k:pnum(s.k)||0,r:clampI(s.r,0,9999,0)}))}
+  const x=W.it.map(it=>it.k==='ex'?{b:it.b,e:it.e,s:it.sets.filter(s=>s.done).map(s=>({k:pnum(s.k)||0,r:clampI(s.r,0,9999,0),...(s.q!=null?{q:clampI(s.q,0,4,0)}:{})}))}
     :{b:it.b,em:{v:it.v,n:it.n,it:it.its.map(t=>({e:t.e,r:t.r,k:+t.k||0})),ok:Array.from({length:it.n},(_,k)=>!!it.ok[k])}}).filter(o=>o.em?o.em.ok.some(Boolean):o.s.length);
   if(!x.length){toast('Hake mindestens einen Satz ab.');return false}
   const sess={id:W.edit||'s-'+newId(),day:W.day,n:W.n,st:W.st,en:W.edit?(W.en||W.st):W.st+wMins(W)*60000,feel:W.feel??null,x};
@@ -350,7 +357,7 @@ function pickApply(e){const f=UI.page,m=f.m;
   if(m==='swap'&&UI.w){const x=UI.w.it[f.i];if(!x)return;swapTo(x,e,f.perm);render();return}
   if(m==='wadd'&&UI.w){const X=EXD(e),tm=X.t==='time';UI.w.it.push({k:'ex',b:'w-'+newId(),e,orig:e,sets:TP(3,tm?0:null,tm?40:10).map(s=>({...s,done:false})),rest:90,lo:tm?40:8,hi:tm?60:12,note:'',last:(()=>{const L=lastFor('',e);return L?L.x.s:null})()});wPersist();render();window.scrollTo(0,document.body.scrollHeight);toast(`${X.n} für heute hinzugefügt`)}}
 function swapTo(x,e,perm){const L=lastFor(x.b,e);x.e=e;x.sw=e!==x.orig;x.last=L?L.x.s:null;x.lf=L?L.f:null;x.plat='';
-  x.sets.forEach((s,j)=>{s.done=false;const src=L?(L.x.s[j]||L.x.s[L.x.s.length-1]):null;s.k=src?src.k:null;s.r=src?src.r:x.lo});
+  x.sets.forEach((s,j)=>{s.done=false;delete s.q;const src=L?(L.x.s[j]||L.x.s[L.x.s.length-1]):null;s.k=src?src.k:null;s.r=src?src.r:x.lo});
   if(perm){const b=blockOf(UI.w.day,x.b);if(b){b.e=e;x.orig=e;x.sw=false;touch('state')}}wPersist();toast(perm?'Im Plan dauerhaft ersetzt':'Für heute getauscht')}
 // eigene Übung anlegen/bearbeiten
 function pCex(){const f=UI.page,d=f.x;
@@ -559,10 +566,11 @@ Object.assign(ACT,{
   wcancel:el=>{if(UI.w&&UI.w.edit){wClear();back();return}
     if(UI.w&&UI.w.it.some(x=>x.k==='ex'?x.sets.some(s=>s.done):x.ok.some(Boolean))&&!el.classList.contains('arm')){el.classList.add('arm');el.textContent='Verwerfen?';el.style.background='var(--crit)';el.style.color='#fff';return}
     wClear();UI.page=null;UI.stack=[];render('enter');window.scrollTo(0,0);toast('Training verworfen')},
-  wfinish:()=>{if(!UI.w)return;if(!UI.w.it.some(x=>x.k==='ex'?x.sets.some(s=>s.done):x.ok.some(Boolean))){toast('Hake mindestens einen Satz ab.');return}UI.rest=null;restbar();go({t:'wdone'})},
-  wfeel:el=>{UI.w.feel=UI.w.feel===+el.dataset.v?null:+el.dataset.v;wPersist();render()},
+  wfinish:()=>{if(!UI.w)return;if(!UI.w.it.some(x=>x.k==='ex'?x.sets.some(s=>s.done):x.ok.some(Boolean))){toast('Hake mindestens einen Satz ab.');return}UI.rest=null;restbar();if(UI.w.feel==null||UI.w.feelAuto){const f=feelFromRir(UI.w);if(f!=null){UI.w.feel=f;UI.w.feelAuto=true}else if(UI.w.feelAuto){UI.w.feel=null;UI.w.feelAuto=false}}wPersist();go({t:'wdone'})},
+  wfeel:el=>{UI.w.feel=UI.w.feel===+el.dataset.v?null:+el.dataset.v;UI.w.feelAuto=false;wPersist();render()},
+  wrir:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s||!s.done)return;const v=+el.dataset.v;s.q=s.q===v?null:v;wPersist();render()},
   wsave:()=>{wSave()},
-  wset:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s)return;s.done=!s.done;if(s.done&&!UI.w.edit){acUnlock();wakeOn()}
+  wset:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s)return;s.done=!s.done;if(s.done){if(s.q==null){const j=+el.dataset.j,pv=x.sets.slice(0,j).reverse().find(t=>t.done&&t.q!=null),ls=x.last&&!x.sw?(x.last[j]||x.last[x.last.length-1]):null,q0=pv?pv.q:ls&&ls.q!=null?ls.q:null;if(q0!=null)s.q=q0}}else delete s.q;if(s.done&&!UI.w.edit){acUnlock();wakeOn()}
     if(s.done&&!UI.w.edit&&x.rest>0)UI.rest={end:NOW()+x.rest*1000,total:x.rest};else if(!s.done)UI.rest=null;wPersist();render()},
   waddset:el=>{const x=curW(el);if(!x)return;const l=x.sets[x.sets.length-1];x.sets.push({k:l?l.k:null,r:l?l.r:x.lo,done:false});wPersist();render()},
   wdelset:el=>{const x=curW(el);if(!x||x.sets.length<2)return;x.sets.pop();wPersist();render()},
@@ -636,7 +644,7 @@ Object.assign(ACT,{
   hseg:el=>{UI.hseg=el.dataset.v;render()},
   stattab:()=>{S.settings.statTab=!S.settings.statTab;if(!S.settings.statTab&&UI.tab==='statistik')UI.tab='habits';touch('state',200);render()}});
 // nur kleine Abhak-Elemente und Schalter – auf Zeilen/Karten würde der Schalter das Scrollen blockieren
-['wset','wsave','wfinish','wemdot','restp','restm','restskip','cexsave','blksave','runsave','thr','stattab'].forEach(a=>HAPTIC.add(a));
+['wset','wsave','wfinish','wrir','wemdot','restp','restm','restskip','cexsave','blksave','runsave','thr','stattab'].forEach(a=>HAPTIC.add(a));
 
 /* ---------- Habits sortieren: am Griff ziehen ---------- */
 const GRIP='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>';

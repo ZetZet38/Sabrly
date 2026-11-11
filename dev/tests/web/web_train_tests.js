@@ -134,6 +134,58 @@ await step('second workout uses history',async()=>{
   ok('suggestion',/→/.test(q('.tsug').textContent));
   click('.ptopbar [data-a="wcancel"]');ok('cancel without sets',!UI.w);
 });
+await step('rir per set',async()=>{
+  // Progression mit RIR (reine Logik): dips = bw, 2,5-kg-Schritte bei Maschinen
+  const S3=(r,q)=>[0,1,2].map(i=>({k:20,r,...(q&&q[i]!=null?{q:q[i]}:{})}));
+  ok('suggest without rir unchanged',suggest(8,12,'brustpresse',S3(12))==='25 kg · wieder ab 8',suggest(8,12,'brustpresse',S3(12)));ok('big step doubles',suggest(8,12,'brustpresse',S3(12,[4,4,4]))==='30 kg (viel Luft) · wieder ab 8',suggest(8,12,'brustpresse',S3(12,[4,4,4])));
+  ok('rir 0 at top → hold',/halten/.test(suggest(8,12,'brustpresse',S3(12,[2,1,0])))&&/RIR 0/.test(suggest(8,12,'brustpresse',S3(12,[2,1,0]))),suggest(8,12,'brustpresse',S3(12,[2,1,0])));
+  ok('lots of air → bigger step',suggest(8,12,'brustpresse',S3(12,[4,4,4]))!==suggest(8,12,'brustpresse',S3(12,[2,2,2]))&&/viel Luft/.test(suggest(8,12,'brustpresse',S3(12,[4,4,4]))),suggest(8,12,'brustpresse',S3(12,[4,4,4])));
+  ok('mid rir normal step',suggest(8,12,'brustpresse',S3(12,[2,2,2]))===suggest(8,12,'brustpresse',S3(12)));
+  ok('reps not at top + air → +2',/\+2 Wdh/.test(suggest(8,12,'brustpresse',S3(10,[3,3,4]))),suggest(8,12,'brustpresse',S3(10,[3,3,4])));
+  ok('reps not at top + rir 0 → hold reps',/halten/.test(suggest(8,12,'brustpresse',S3(10,[1,1,0]))),suggest(8,12,'brustpresse',S3(10,[1,1,0])));
+  ok('reps not at top normal +1',/\+1 Wdh/.test(suggest(8,12,'brustpresse',S3(10,[2,2,2]))));
+  ok('hard feel still holds',/hart/.test(suggest(8,12,'brustpresse',S3(12,[4,4,4]),2)));
+  // Training: RIR-Reihe erscheint erst nach dem Abhaken
+  const d0=t;ACT.wstart({dataset:{day:PU().id,d:d0}});
+  ok('no rir row before done',!q('.trir'));
+  click('[data-a="wset"][data-i="0"][data-j="0"]');
+  ok('rir row after done',qa('.trir').length===1&&qa('.trir button').length===5&&qa('.trir button')[4].textContent==='4+');
+  ok('no preselect without history',UI.w.it[0].sets[0].q==null&&!q('.trir button.on'));
+  click('.trir [data-a="wrir"][data-v="2"]');ok('rir 2 set',UI.w.it[0].sets[0].q===2&&q('.trir button.on').textContent==='2'&&q('.trir button.on').getAttribute('aria-pressed')==='true');
+  click('[data-a="wset"][data-i="0"][data-j="1"]');ok('next set preselected with last value',UI.w.it[0].sets[1].q===2);
+  click(qa('.trir [data-a="wrir"][data-v="1"]')[1]);ok('rir changed on set 2',UI.w.it[0].sets[1].q===1&&UI.w.it[0].sets[0].q===2);
+  click(qa('.trir [data-a="wrir"][data-v="1"]')[1]);ok('tap again clears',UI.w.it[0].sets[1].q==null);
+  click(qa('.trir [data-a="wrir"][data-v="4"]')[1]);ok('4+ stored as 4',UI.w.it[0].sets[1].q===4);
+  click('[data-a="wset"][data-i="0"][data-j="1"]');ok('undone clears rir',UI.w.it[0].sets[1].q===undefined&&qa('.trir').length===1);
+  ok('rir persisted locally',JSON.parse(localStorage.getItem(lsKey()+':wo')).it[0].sets[0].q===2);
+  click('[data-a="wset"][data-i="0"][data-j="1"]');click('[data-a="wset"][data-i="0"][data-j="2"]');
+  ok('third preselected from set 2',UI.w.it[0].sets[2].q===2);
+  // Gefühl aus RIR vorschlagen: alle RIR 0 → hart
+  for(const x of UI.w.it)for(const st of x.sets)if(st.done)st.q=0;
+  click('.ptopbar [data-a="wfinish"]');ok('feel suggested hard',UI.w.feel===2&&UI.w.feelAuto&&q('#view').textContent.includes('Vorschlag aus deiner Reserve'));
+  ok('hard button on',q('[data-a="wfeel"][data-v="2"]').classList.contains('on'));
+  ok('next-time suggestion holds',/halten/.test(qa('.tnxt div b')[0].textContent),qa('.tnxt div b')[0].textContent);
+  click('[data-a="wfeel"][data-v="0"]');ok('manual feel overrides',UI.w.feel===0&&!UI.w.feelAuto);
+  click('.ptopbar [data-a="back"]');for(const st of UI.w.it[0].sets)st.q=4;click('.ptopbar [data-a="wfinish"]');
+  ok('manual feel kept on re-finish',UI.w.feel===0);
+  click('[data-a="wfeel"][data-v="0"]');ok('feel cleared',UI.w.feel===null);click('.ptopbar [data-a="back"]');click('.ptopbar [data-a="wfinish"]');
+  ok('avg rir 4 → easy suggested',UI.w.feel===0&&UI.w.feelAuto);
+  click('.ptopbar [data-a="wsave"]');await wait(600);
+  const sv=sessOf(d0).find(x=>x.day===PU().id);
+  ok('saved with q',sv&&sv.x[0].s.every(z=>z.q===4)&&sv.feel===0&&!('feelAuto' in sv),JSON.stringify(sv&&sv.x[0].s));
+  ok('sets without rir have no q key',sv.x.slice(1).every(o=>o.s.every(z=>!('q' in z))));
+  ok('no undefined in cloud',!JSON.stringify(cloud(mk)).includes('undefined'));
+  ok('claude text has RIR',/RIR 4\+/.test(sessText(d0,sv)),sessText(d0,sv));
+  // nächstes Mal: Letzter Wert vorbelegt, Bearbeiten zeigt RIR
+  ACT.wstart({dataset:{day:PU().id,d:d0}});click('[data-a="wset"][data-i="0"][data-j="0"]');
+  ok('preselect from last session',UI.w.it[0].sets[0].q===4&&q('.trir button.on').textContent==='4+');
+  click('.ptopbar [data-a="wcancel"]');click('.ptopbar [data-a="wcancel"]');
+  ACT.wedit({dataset:{d:d0,id:sv.id}});ok('edit shows rir rows',qa('.trir').length===sv.x[0].s.length&&UI.w.it[0].sets[0].q===4);
+  click(qa('.trir [data-a="wrir"][data-v="0"]')[0]);click('.ptopbar [data-a="wsave"]');await wait(400);
+  ok('edit changes rir',sessOf(d0).find(x=>x.id===sv.id).x[0].s[0].q===0);
+  // Aufräumen: Test-Einheit entfernen
+  const e0=dayEnsure(d0);e0.tr=e0.tr.filter(z=>z.id!==sv.id);touch(mkey(d0));UI.page=null;UI.stack=[];render();
+});
 await step('emom tag C',async()=>{
   ACT.wstart({dataset:{day:C().id,d:t}});ok('emom card',!!q('.temom')&&qa('.tdots button').length===10);
   click('[data-a="wemset"][data-i="0"]');ok('blk page emom',UI.page.t==='blk'&&UI.page.b.k==='emom');
