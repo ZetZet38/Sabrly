@@ -75,6 +75,7 @@ rep("""  if(e.key==='Escape'&&UI.page)back();""","""  if(e.key==='Escape'){if($(
 rep("""document.addEventListener('input',e=>{const el=e.target;
   if(el.dataset.af){""","""let wpT=null;const wPersistSoon=()=>{clearTimeout(wpT);wpT=setTimeout(wPersist,400)};
 function trInput(el,commit){const P=UI.page;
+  if(el.dataset.wn&&UI.w){const x=UI.w.it[+el.dataset.i];if(x)x.nt=String(el.value).slice(0,200);wPersistSoon();return true}
   if(el.dataset.ws&&UI.w){const x=UI.w.it[+el.dataset.i],q=x&&x.sets[+el.dataset.j];if(q){const v=String(el.value).trim();q[el.dataset.ws]=v===''?null:el.dataset.ws==='k'?pnum(v):clampI(v,0,9999,null)}wPersistSoon();return true}
   if(el.dataset.tw){const v=twVal(el.value);if(v==null)return true;const b=el.parentElement.querySelector('b');if(b)b.textContent=msx(v);const k=el.dataset.tw;
     if(k==='rest'&&UI.w){const x=UI.w.it[+el.dataset.i];if(x){x.rest=v;wPersistSoon();if(commit){const bl=blockOf(UI.w.day,x.b);if(bl&&bl.rest!==v){bl.rest=v;touch('state')}}}}

@@ -1,7 +1,7 @@
 /* ---------- Training: Datenmodell ----------
    S.training: {days:[{id,name,sub,col,blocks}], ex:{eigene Übungen}, weeks:{Montag:{d:{0..6:[ids]},s:{0..6:'F'|'S'|'N'}}}, habit, rhabit, hr}
    Baustein: {k:'ex',id,e,p:[{k,r}],lo,hi,rest,note} oder {k:'emom',id,v(Sek.),n(Runden),it:[{e,r,k}],note}
-   Pro Tag in LOGS: tr:[{id,day,n,st,en,feel,x:[{b,e,s:[{k,r,q?}]} | {b,em:{v,n,it,ok}}]}], run:[{id,t,dur,km,hr,max,iv,g}]
+   Pro Tag in LOGS: tr:[{id,day,n,st,en,feel,wu?:{m?,t:[…]},x:[{b,e,s:[{k,r,q?}],ws?:[{k,r}],nq?:[Index],n?:Text} | {b,em:{v,n,it,ok}}]}]  (ws = Aufwärmsätze, zählen nirgends mit; wu = Aufwärmen: Minuten bis zum 1. Arbeitssatz + was gemacht wurde; nq/n = Notiz zur Übung), run:[{id,t,dur,km,hr,max,iv,g}]
    Garmin (vom Widget): run[].g = Werte der Uhr (km-Splits, Zonen …), ga:[{id,k:'str'|'oth',n,st,ts,dur,hr,max,kcal,te,z}], gdel:[gelöschte Garmin-IDs]
    Firestore kennt keine Arrays in Arrays – darum überall Objekte in Listen. */
 const TCOL={g:'#46E0AE',b:'#6FA4FF',o:'#FF9F4A',p:'#B48CFF',r:'#FF7A85',y:'#E3D26F'};
@@ -138,7 +138,7 @@ function suggest(lo,hi,e,sets,feel){const D=EXD(e);if(!sets||!sets.length)return
   if(air)return D.t==='time'?`${fk(top)} kg · +10 s (viel Luft)`:`${fk(top)} kg · +2 Wdh. (viel Luft)`;
   return D.t==='time'?`${fk(top)} kg · +5 s`:`${fk(top)} kg · +1 Wdh.`}
 // „Wie schwer war's?“ aus RIR: Ø ≤ 1 → hart, Ø ≥ 3 → leicht, sonst okay (null ohne RIR)
-function feelFromRir(W){const q=[];for(const x of W.it)if(x.k==='ex')for(const s of x.sets)if(s.done&&s.q!=null)q.push(+s.q);if(!q.length)return null;const a=q.reduce((u,v)=>u+v,0)/q.length;return a<=1?2:a>=3?0:1}
+function feelFromRir(W){const q=[];for(const x of W.it)if(x.k==='ex')for(const s of x.sets)if(wDone(s)&&s.q!=null)q.push(+s.q);if(!q.length)return null;const a=q.reduce((u,v)=>u+v,0)/q.length;return a<=1?2:a>=3?0:1}
 // Plateau: mindestens 5 Einheiten, die letzten 5 ohne Fortschritt
 function plateau(b,e){const H=histFor(e,b).slice(0,5);if(H.length<5)return '';const sc=H.map(h=>{const t=topOf(h.s);return t.k*1000+h.s.filter(s=>(+s.k||0)===t.k).reduce((a,s)=>a+(+s.r||0),0)});
   if(Math.max(...sc.slice(0,4))>sc[4])return '';const t=topOf(H[0].s);
@@ -235,29 +235,47 @@ function heuteTraining(sel){if(!TR())return '';wRestore();const t=today(),fut=se
 
 /* ---------- Trainingsmodus ---------- */
 function blockOf(dayId,bid){const D=TDAY(dayId);return D?D.blocks.find(b=>b.id===bid)||null:null}
+const NQ=['Pause verlängert','links/rechts ungleich','Technik unsauber'];
+const WUK={rad:'Rad',band:'Laufband',mob:'Mobility',sets:'Aufwärmsätze'};
+const noteTxt=(q,t)=>[...(Array.isArray(q)?q:[]).map(i=>NQ[i]).filter(Boolean),String(t||'').trim()].filter(Boolean).join(' · ');
+const wuTxt=(m,t)=>[m>0?m+' min':'',...(Array.isArray(t)?t:[]).map(k=>WUK[k]).filter(Boolean)].filter(Boolean).join(' · ');
+const wDone=s=>s.done&&!s.w;                    // abgehakter Arbeitssatz (Aufwärmsätze zählen nicht)
+const wNo=(x,j)=>x.sets.slice(0,j).filter(s=>!s.w).length;   // Index unter den Arbeitssätzen
+// Zeit bis zum ersten abgehakten Arbeitssatz = Aufwärmzeit
+function wFs(W){if(W.edit)return;const any=W.it.some(x=>x.k==='ex'&&x.sets.some(wDone));if(any&&!W.fs)W.fs=NOW();else if(!any)W.fs=null}
 function wItemFromBlock(b,skip){if(b.k==='emom')return {k:'emom',b:b.id,v:b.v,n:b.n,its:clone(b.it),ok:Array(b.n).fill(false),r:0,run:false,end:0,left:null,note:b.note};
   const L=lastFor(b.id,b.e,skip),src=j=>(L?(L.x.s[j]||L.x.s[L.x.s.length-1]):null)||b.p[j]||b.p[b.p.length-1]||{k:null,r:b.lo};
-  return {k:'ex',b:b.id,e:b.e,orig:b.e,sets:b.p.map((_,j)=>({k:src(j).k,r:src(j).r,done:false})),rest:b.rest,lo:b.lo,hi:b.hi,note:b.note,last:L?L.x.s:null,lf:L?L.f:null,plat:plateau(b.id,b.e)}}
+  return {k:'ex',b:b.id,e:b.e,orig:b.e,sets:b.p.map((_,j)=>({k:src(j).k,r:src(j).r,done:false})),rest:b.rest,lo:b.lo,hi:b.hi,note:b.note,last:L?L.x.s:null,lf:L?L.f:null,plat:plateau(b.id,b.e),nq:[],nt:'',ln:L?noteTxt(L.x.nq,L.x.n):''}}
 function wStart(dayId,d){const D=TDAY(dayId);if(!D)return;if(!D.blocks.length){toast('Dieser Tag hat noch keine Übungen.');go({t:'dayed',id:dayId});return}
-  UI.w={d,day:dayId,n:D.name+(D.sub?' · '+D.sub:''),st:NOW(),edit:null,feel:null,it:D.blocks.map(b=>wItemFromBlock(b))};UI.rest=null;wPersist();acUnlock();wakeOn();go({t:'work'})}
+  UI.w={d,day:dayId,n:D.name+(D.sub?' · '+D.sub:''),st:NOW(),edit:null,feel:null,wt:[],wm:null,fs:null,it:D.blocks.map(b=>wItemFromBlock(b))};UI.rest=null;wPersist();acUnlock();wakeOn();go({t:'work'})}
 function wEdit(d,id){const s=sessOf(d).find(x=>x.id===id);if(!s)return;
-  UI.w={d,day:s.day,n:s.n,st:s.st||NOW(),en:s.en||null,edit:s.id,feel:s.feel??null,it:(s.x||[]).map(x=>{const b=blockOf(s.day,x.b);
+  UI.w={d,day:s.day,n:s.n,st:s.st||NOW(),en:s.en||null,edit:s.id,feel:s.feel??null,wt:s.wu&&Array.isArray(s.wu.t)?s.wu.t.slice():[],wm:s.wu&&s.wu.m!=null?s.wu.m:null,fs:null,it:(s.x||[]).map(x=>{const b=blockOf(s.day,x.b);
     if(x.em)return {k:'emom',b:x.b,v:x.em.v,n:x.em.n,its:clone(x.em.it),ok:x.em.ok.slice(),r:x.em.n,run:false,end:0,left:null,note:''};
-    return {k:'ex',b:x.b,e:x.e,orig:x.e,sets:(x.s||[]).map(q=>({k:q.k,r:q.r,done:true,...(q.q!=null?{q:q.q}:{})})),rest:b?b.rest:90,lo:b?b.lo:8,hi:b?b.hi:12,note:'',last:null}})};UI.rest=null;go({t:'work'})}
+    return {k:'ex',b:x.b,e:x.e,orig:x.e,sets:[...(x.ws||[]).map(q=>({k:q.k,r:q.r,done:true,w:1})),...(x.s||[]).map(q=>({k:q.k,r:q.r,done:true,...(q.q!=null?{q:q.q}:{})}))],rest:b?b.rest:90,lo:b?b.lo:8,hi:b?b.hi:12,note:'',last:null,nq:Array.isArray(x.nq)?x.nq.slice():[],nt:x.n||'',ln:''}})};UI.rest=null;go({t:'work'})}
 const WKEY=()=>lsKey()+':wo';
 function wPersist(){try{if(UI.w&&!UI.w.edit)localStorage.setItem(WKEY(),JSON.stringify(UI.w));else localStorage.removeItem(WKEY())}catch(e){}}
-function wRestore(){if(UI.w||UI.wTried===lsKey())return;UI.wTried=lsKey();try{const w=JSON.parse(localStorage.getItem(WKEY())||'null');if(w&&w.it&&w.d>=addDays(today(),-1)){w.it.forEach(x=>{if(x.k==='emom'&&x.run){x.left=Math.max(1,Math.ceil((x.end-NOW())/1000));x.run=false}});UI.w=w}}catch(e){}}
+function wRestore(){if(UI.w||UI.wTried===lsKey())return;UI.wTried=lsKey();try{const w=JSON.parse(localStorage.getItem(WKEY())||'null');if(w&&w.it&&w.d>=addDays(today(),-1)){if(!Array.isArray(w.wt))w.wt=[];w.it.forEach(x=>{if(x.k==='ex'&&!Array.isArray(x.nq)){x.nq=[];x.nt=x.nt||''}if(x.k==='emom'&&x.run){x.left=Math.max(1,Math.ceil((x.end-NOW())/1000));x.run=false}});UI.w=w}}catch(e){}}
 function wClear(){UI.w=null;UI.rest=null;try{localStorage.removeItem(WKEY())}catch(e){}restbar();wakeOff()}
+function notePanel(x,i){const t=noteTxt(x.nq,x.nt),open=UI.wno===i;
+  if(open)return `<div class="tnp" role="group" aria-label="Notiz zur Übung"><div class="twc">${NQ.map((q,k)=>`<button type="button" class="chip${(x.nq||[]).includes(k)?' on':''}" data-a="wnq" data-i="${i}" data-k="${k}" aria-pressed="${(x.nq||[]).includes(k)}">${q}</button>`).join('')}</div>
+    <input class="tinput" value="${esc(x.nt||'')}" placeholder="Eigene Notiz …" maxlength="200" autocomplete="off" enterkeyhint="done" data-wn="1" data-i="${i}" aria-label="Notiz"><button type="button" class="link" data-a="wnote" data-i="${i}" style="align-self:flex-start;font-size:13.5px">Notiz schließen</button></div>`;
+  return t?`<button type="button" class="tnl" data-a="wnote" data-i="${i}" aria-label="Notiz bearbeiten"><span>📝</span> ${esc(t)}</button>`:''}
+function warmCard(W){const ed=!!W.edit,retro=W.d<today(),t=Array.isArray(W.wt)?W.wt:[];
+  const tm=ed?(W.wm>0?W.wm+' min':''):retro?'':msx(((W.fs||NOW())-W.st)/1000);
+  return `<div class="card glass stack twu" style="gap:10px"><div class="row between"><span class="label">Aufwärmen</span>${tm?`<span class="num tclock" id="wwu">${tm}</span>`:''}</div>
+    <div class="twc">${Object.entries(WUK).map(([k,v])=>`<button type="button" class="chip${t.includes(k)?' on':''}" data-a="wwu" data-k="${k}" aria-pressed="${t.includes(k)}">${v}</button>`).join('')}</div>
+    ${ed||retro?'':`<span class="hint">${W.fs?'Aufwärmzeit gemessen – bis zu deinem ersten Arbeitssatz.':'Die Zeit läuft bis zu deinem ersten abgehakten Arbeitssatz. Satznummer antippen = Aufwärmsatz.'}</span>`}</div>`}
 function exCard(x,i,cur,ed){const D=EXD(x.e),R=D.t==='time'?'s':'Wdh.';
   let h=`<div class="texc glass${cur?' cur':''}"><div class="texh"><button type="button" class="nm" data-a="exd" data-e="${esc(x.e)}">${esc(D.n)}${x.sw?' <small>· heute getauscht</small>':''}</button><button type="button" class="tib" data-a="exinfo" data-e="${esc(x.e)}" aria-label="Ausführung und Tipps">i</button><button type="button" class="tib" data-a="wswap" data-i="${i}" aria-label="Alternative">⇄</button></div>`;
   if(!ed){if(x.last)h+=`<span class="tlast">Letztes Mal: ${esc(setsTxt(x.last,x.e))}</span>`;else h+=`<span class="tlast">${x.sw?'Neu für dich – noch keine Werte':'Noch keine Einheit – Startwerte aus dem Plan'}</span>`;
     const sg=x.last&&!x.sw?suggest(x.lo,x.hi,x.e,x.last,x.lf):'';if(sg)h+=`<span class="tsug">→ ${esc(sg)}</span>`;else if(!x.last)h+=`<span class="tsug">→ Ziel ${x.lo}${x.hi>x.lo?'–'+x.hi:''} ${R}${D.sd?' je Seite':''}</span>`;
-    if(x.note)h+=`<span class="tnote">${esc(x.note)}</span>`;if(x.plat&&!x.sw)h+=`<div class="tplat">⚠︎ ${esc(x.plat)}</div>`}
-  h+=`<div class="tsets">${x.sets.map((s,j)=>`<div class="tsrow${s.done?' done':''}"><span class="no num">${j+1}</span>
-    <label>${D.t==='bw'?'<span>+</span>':''}<input inputmode="decimal" value="${fk(s.k)}" placeholder="0" data-ws="k" data-i="${i}" data-j="${j}" aria-label="Gewicht Satz ${j+1}" enterkeyhint="done"><span>kg${D.du?' ×2':''}</span></label>
-    <label><input inputmode="numeric" value="${s.r??''}" placeholder="0" data-ws="r" data-i="${i}" data-j="${j}" aria-label="${R} Satz ${j+1}" enterkeyhint="done"><span>${R}${D.sd?' / Seite':''}</span></label>
-    <button type="button" class="ck" data-a="wset" data-i="${i}" data-j="${j}" aria-label="Satz ${j+1} erledigt" aria-pressed="${!!s.done}">${CHECK}</button></div>${s.done?`<div class="trir" role="group" aria-label="Reserve Satz ${j+1}"><span>Reserve</span>${[0,1,2,3,4].map(v=>`<button type="button" class="${s.q===v?'on':''}" data-a="wrir" data-i="${i}" data-j="${j}" data-v="${v}" aria-pressed="${s.q===v}" aria-label="${v>=4?'4 oder mehr':v} Wiederholungen übrig">${v>=4?'4+':v}</button>`).join('')}</div>`:''}`).join('')}</div>
-    <div class="texf"><span class="row" style="gap:16px"><button type="button" class="link" data-a="waddset" data-i="${i}">+ Satz</button>${x.sets.length>1?`<button type="button" class="link muted" data-a="wdelset" data-i="${i}">− Satz</button>`:''}</span>${ed?'':`<span class="trctl">Pause ${twheel(x.rest,`data-tw="rest" data-i="${i}"`)}</span>`}</div></div>`;
+    if(x.ln&&!x.sw)h+=`<span class="tlast">Notiz letztes Mal: ${esc(x.ln)}</span>`;if(x.note)h+=`<span class="tnote">${esc(x.note)}</span>`;if(x.plat&&!x.sw)h+=`<div class="tplat">⚠︎ ${esc(x.plat)}</div>`}
+  h+=`<div class="tsets">${x.sets.map((s,j)=>`<div class="tsrow${s.done?' done':''}${s.w?' warm':''}"><button type="button" class="no num" data-a="wwarm" data-i="${i}" data-j="${j}" aria-pressed="${!!s.w}" aria-label="${s.w?'Aufwärmsatz':'Satz '+(wNo(x,j)+1)} – antippen: Aufwärmsatz ein oder aus">${s.w?'A':wNo(x,j)+1}</button>
+    <label>${D.t==='bw'?'<span>+</span>':''}<input inputmode="decimal" value="${fk(s.k)}" placeholder="0" data-ws="k" data-i="${i}" data-j="${j}" aria-label="Gewicht ${s.w?'Aufwärmsatz':'Satz '+(wNo(x,j)+1)}" enterkeyhint="done"><span>kg${D.du?' ×2':''}</span></label>
+    <label><input inputmode="numeric" value="${s.r??''}" placeholder="0" data-ws="r" data-i="${i}" data-j="${j}" aria-label="${R} ${s.w?'Aufwärmsatz':'Satz '+(wNo(x,j)+1)}" enterkeyhint="done"><span>${R}${D.sd?' / Seite':''}</span></label>
+    <button type="button" class="ck" data-a="wset" data-i="${i}" data-j="${j}" aria-label="${s.w?'Aufwärmsatz':'Satz '+(wNo(x,j)+1)} erledigt" aria-pressed="${!!s.done}">${CHECK}</button></div>${s.done&&!s.w?`<div class="trir" role="group" aria-label="Reserve Satz ${wNo(x,j)+1}"><span>Reserve</span>${[0,1,2,3,4].map(v=>`<button type="button" class="${s.q===v?'on':''}" data-a="wrir" data-i="${i}" data-j="${j}" data-v="${v}" aria-pressed="${s.q===v}" aria-label="${v>=4?'4 oder mehr':v} Wiederholungen übrig">${v>=4?'4+':v}</button>`).join('')}</div>`:''}`).join('')}</div>
+    ${notePanel(x,i)}
+    <div class="texf"><span class="row" style="gap:6px 16px;flex-wrap:wrap"><button type="button" class="link" data-a="waddset" data-i="${i}">+ Satz</button><button type="button" class="link" data-a="waddwu" data-i="${i}">+ Aufwärmsatz</button>${!noteTxt(x.nq,x.nt)&&UI.wno!==i?`<button type="button" class="link" data-a="wnote" data-i="${i}">+ Notiz</button>`:''}${x.sets.length>1?`<button type="button" class="link muted" data-a="wdelset" data-i="${i}">− Satz</button>`:''}</span>${ed?'':`<span class="trctl">Pause ${twheel(x.rest,`data-tw="rest" data-i="${i}"`)}</span>`}</div></div>`;
   return h}
 function emomCard(x,i,cur,ed){const done=x.ok.filter(Boolean).length,fin=x.r>=x.n,its=x.its,ci=its.length?its[Math.min(x.r,x.n-1)%its.length]:null;
   const left=x.run?Math.max(0,Math.ceil((x.end-NOW())/1000)):(x.left??x.v),names=its.map(t=>EXD(t.e).n).join(' / ');
@@ -273,32 +291,39 @@ function pWork(){const W=UI.w;if(!W){UI.page=null;UI.stack=[];return vTraining()
   const ed=!!W.edit;
   let h=`<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="wcancel">Abbrechen</button><h2>${esc(W.n)}${ed?'':` · <span class="num tclock" id="wtime">${msx((NOW()-W.st)/1000)}</span>`}</h2><button type="button" class="r txtbtn pri" data-a="${ed?'wsave':'wfinish'}">${ed?'Sichern':'Fertig'}</button></div>`;
   if(ed)h+=`<span class="hint" style="text-align:center;margin-top:-10px">${fmtLong(W.d)} · nachträglich ändern</span><button type="button" class="btn" data-a="copysess" data-d="${W.d}" data-id="${esc(W.edit)}">📋 Für Claude kopieren</button>`;
+  h+=warmCard(W);
   const cur=ed?-1:W.it.findIndex(x=>x.k==='ex'?x.sets.some(s=>!s.done):x.r<x.n);
   W.it.forEach((x,i)=>{h+=x.k==='ex'?exCard(x,i,i===cur,ed):emomCard(x,i,i===cur,ed)});
   h+=`<button type="button" class="btn" data-a="waddex">+ Übung für heute</button>`;
   h+=ed?`<button type="button" class="btn danger" data-a="wdel" data-d="${W.d}" data-id="${esc(W.edit)}">Training löschen</button>`:`<button type="button" class="btn pri" data-a="wfinish">Training beenden</button>`;
   return h}
-function wStats(W){let sets=0,vol=0;for(const x of W.it){if(x.k==='emom'){sets+=x.ok.filter(Boolean).length;continue}for(const s of x.sets)if(s.done){sets++;vol+=(+s.k||0)*(EXD(x.e).t==='time'?0:(+s.r||0))*(EXD(x.e).du?2:1)}}return {sets,vol}}
-function wPRs(W){const out=[];for(const x of W.it){if(x.k!=='ex')continue;const D=EXD(x.e),S2=x.sets.filter(s=>s.done);if(!S2.length||D.t==='time')continue;const t=topOf(S2);if(!t||!t.k)continue;
+function wStats(W){let sets=0,vol=0;for(const x of W.it){if(x.k==='emom'){sets+=x.ok.filter(Boolean).length;continue}for(const s of x.sets)if(wDone(s)){sets++;vol+=(+s.k||0)*(EXD(x.e).t==='time'?0:(+s.r||0))*(EXD(x.e).du?2:1)}}return {sets,vol}}
+function wPRs(W){const out=[];for(const x of W.it){if(x.k!=='ex')continue;const D=EXD(x.e),S2=x.sets.filter(wDone);if(!S2.length||D.t==='time')continue;const t=topOf(S2);if(!t||!t.k)continue;
     const H=histFor(x.e);if(!H.length)continue;let best=null;for(const h of H){const b=topOf(h.s);if(!best||b.k>best.k||(b.k===best.k&&b.r>best.r))best=b}
     if(t.k>best.k||(t.k===best.k&&t.r>best.r))out.push(`${D.n} ${fk(t.k)} kg × ${t.r}`)}return out}
 function wMins(W){const D=TDAY(W.day);return W.d<today()?(D?dayMin(D):60):Math.max(1,Math.round((NOW()-W.st)/60000))}
 function pWDone(){const W=UI.w;if(!W){UI.page=null;UI.stack=[];return vTraining()}
   const st=wStats(W),mins=wMins(W),pr=wPRs(W),hb=trHabit('tr');
-  const N=W.it.filter(x=>x.k==='ex'&&x.sets.some(s=>s.done)).map(x=>[EXD(x.e).n,suggest(x.lo,x.hi,x.e,x.sets.filter(s=>s.done),W.feel)]);
+  const N=W.it.filter(x=>x.k==='ex'&&x.sets.some(wDone)).map(x=>[EXD(x.e).n,suggest(x.lo,x.hi,x.e,x.sets.filter(wDone),W.feel)]),
+    NT=W.it.filter(x=>x.k==='ex'&&noteTxt(x.nq,x.nt)&&x.sets.some(wDone)).map(x=>[EXD(x.e).n,noteTxt(x.nq,x.nt)]),wu=wuTxt(W.edit||W.d<today()?0:Math.round(((W.fs||NOW())-W.st)/60000),W.wt);
   return `<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Zurück</button><h2>${esc(W.n)}</h2><button type="button" class="r txtbtn pri" data-a="wsave">Speichern</button></div>
    <div class="kpis"><div class="kpi glass"><b>${mins}</b><span>${W.d<today()?'Minuten (geschätzt)':'Minuten'}</span></div><div class="kpi glass"><b>${st.sets}</b><span>Sätze</span></div><div class="kpi glass"><b>${fk(Math.round(st.vol/100)/10)}</b><span>Tonnen bewegt</span></div></div>
    ${pr.map(p=>`<div class="banner good"><b>🏆 Neuer Bestwert:</b> ${esc(p)}</div>`).join('')}
    <div class="card glass stack" style="gap:10px"><span class="label">Wie schwer war's?</span><div class="seg">${['Leicht','Okay','Hart'].map((t,i)=>`<button type="button" class="${W.feel===i?'on':''}" data-a="wfeel" data-v="${i}">${t}</button>`).join('')}</div>
    <span class="hint">${W.feelAuto?'Vorschlag aus deiner Reserve (RIR) – antippen zum Ändern. ':''}„Hart“ hält beim nächsten Mal das Gewicht, statt zu steigern.</span></div>
+   ${wu?`<div class="card glass stack" style="gap:6px"><span class="label">Aufwärmen</span><span style="font-size:14.5px">${esc(wu)}</span></div>`:''}
+   ${NT.length?`<div class="card glass stack" style="gap:10px"><span class="label">Notizen</span><div class="tnxt">${NT.map(([n,v])=>`<div><span>${esc(n)}</span><b>${esc(v)}</b></div>`).join('')}</div></div>`:''}
    ${N.length?`<div class="card glass stack" style="gap:10px"><span class="label">Vorschlag fürs nächste Mal</span><div class="tnxt">${N.map(([n,v])=>`<div><span>${esc(n)}</span><b>${esc(v)}</b></div>`).join('')}</div></div>`:''}
    <span class="hint">${hb?`Dein Habit „${esc(hb.name)}“ wird beim Speichern abgehakt.`:'Tipp: Leg einen Habit „Training“ an, dann wird er nach jedem Training automatisch abgehakt.'}</span>
    <button type="button" class="btn pri" data-a="wsave">Training speichern</button><button type="button" class="btn" data-a="wsavecopy">Speichern und für Claude kopieren</button>`}
 function wSave(){const W=UI.w;if(!W)return;
-  const x=W.it.map(it=>it.k==='ex'?{b:it.b,e:it.e,s:it.sets.filter(s=>s.done).map(s=>({k:pnum(s.k)||0,r:clampI(s.r,0,9999,0),...(s.q!=null?{q:clampI(s.q,0,4,0)}:{})}))}
+  const x=W.it.map(it=>it.k==='ex'?{b:it.b,e:it.e,s:it.sets.filter(wDone).map(s=>({k:pnum(s.k)||0,r:clampI(s.r,0,9999,0),...(s.q!=null?{q:clampI(s.q,0,4,0)}:{})})),
+      ...(it.sets.some(s=>s.done&&s.w)?{ws:it.sets.filter(s=>s.done&&s.w).map(s=>({k:pnum(s.k)||0,r:clampI(s.r,0,9999,0)}))}:{}),
+      ...((it.nq&&it.nq.length)||String(it.nt||'').trim()?{nq:(it.nq||[]).filter(i=>NQ[i]),n:String(it.nt||'').trim().slice(0,200)}:{})}
     :{b:it.b,em:{v:it.v,n:it.n,it:it.its.map(t=>({e:t.e,r:t.r,k:+t.k||0})),ok:Array.from({length:it.n},(_,k)=>!!it.ok[k])}}).filter(o=>o.em?o.em.ok.some(Boolean):o.s.length);
   if(!x.length){toast('Hake mindestens einen Satz ab.');return false}
-  const sess={id:W.edit||'s-'+newId(),day:W.day,n:W.n,st:W.st,en:W.edit?(W.en||W.st):W.st+wMins(W)*60000,feel:W.feel??null,x};
+  const wm=W.edit?W.wm:(W.fs&&W.d>=today()?Math.max(0,Math.round((W.fs-W.st)/60000)):null),wt=(W.wt||[]).filter(k=>WUK[k]);
+  const sess={id:W.edit||'s-'+newId(),day:W.day,n:W.n,st:W.st,en:W.edit?(W.en||W.st):W.st+wMins(W)*60000,feel:W.feel??null,...(wm!=null||wt.length?{wu:{...(wm!=null?{m:wm}:{}),t:wt}}:{}),x};
   const e=dayEnsure(W.d);if(!Array.isArray(e.tr))e.tr=[];const k=e.tr.findIndex(s=>s.id===sess.id);if(k>=0)e.tr[k]=sess;else e.tr.push(sess);
   const hb=W.edit?null:tickHabit(W.d,'tr');touch(mkey(W.d));const ed=!!W.edit;wClear();UI.page=null;UI.stack=[];render('enter');window.scrollTo(0,0);
   toast(ed?'Training geändert':hb?`Training gespeichert · „${hb.name}“ abgehakt`:'Training gespeichert');return sess}
@@ -308,7 +333,7 @@ function restbar(){const b=$('#restbar');if(!b)return;const R=UI.rest;if(!R||!UI
   const html=`<div class="trest"><span class="rt num">${msx(left)}</span><div class="rb"><i style="width:${Math.min(100,left/R.total*100)}%"></i></div><button type="button" data-a="restm">−10 s</button><button type="button" data-a="restp">+10 s</button><button type="button" data-a="restskip">Weiter</button></div>`;
   const rt=b.querySelector('.rt');if(rt&&b.querySelector('.trest')){rt.textContent=msx(left);b.querySelector('.rb i').style.width=Math.min(100,left/R.total*100)+'%'}else{b.innerHTML=html;decorateHaptics(b)}}
 setInterval(()=>{if(!UI.w||UI.w.edit)return;const onW=UI.page&&UI.page.t==='work';
-  if(onW){const t=$('#wtime');if(t)t.textContent=msx((NOW()-UI.w.st)/1000);restbar()}
+  if(onW){const t=$('#wtime');if(t)t.textContent=msx((NOW()-UI.w.st)/1000);const wu=$('#wwu');if(wu&&!UI.w.fs)wu.textContent=msx((NOW()-UI.w.st)/1000);restbar()}
   let ch=false;UI.w.it.forEach((x,i)=>{if(x.k!=='emom'||!x.run)return;
     while(x.run&&NOW()>=x.end){x.ok[x.r]=true;x.r++;ch=true;if(x.r>=x.n){x.run=false;x.left=null;break}x.end+=x.v*1000}
     if(!ch&&onW){const el=document.getElementById('em-'+i);if(el)el.textContent=msx(Math.ceil((x.end-NOW())/1000))}});
@@ -355,8 +380,8 @@ function pickApply(e){const f=UI.page,m=f.m;
   if(m==='blkex'&&P&&P.t==='blk'){P.b.e=e;render();return}
   if(m==='blkemom'&&P&&P.t==='blk'){if(P.b.it.length>=6){toast('Höchstens 6 Übungen pro EMOM.');return}P.b.it.push({e,r:6,k:0});render();return}
   if(m==='swap'&&UI.w){const x=UI.w.it[f.i];if(!x)return;swapTo(x,e,f.perm);render();return}
-  if(m==='wadd'&&UI.w){const X=EXD(e),tm=X.t==='time';UI.w.it.push({k:'ex',b:'w-'+newId(),e,orig:e,sets:TP(3,tm?0:null,tm?40:10).map(s=>({...s,done:false})),rest:90,lo:tm?40:8,hi:tm?60:12,note:'',last:(()=>{const L=lastFor('',e);return L?L.x.s:null})()});wPersist();render();window.scrollTo(0,document.body.scrollHeight);toast(`${X.n} für heute hinzugefügt`)}}
-function swapTo(x,e,perm){const L=lastFor(x.b,e);x.e=e;x.sw=e!==x.orig;x.last=L?L.x.s:null;x.lf=L?L.f:null;x.plat='';
+  if(m==='wadd'&&UI.w){const X=EXD(e),tm=X.t==='time';UI.w.it.push({k:'ex',b:'w-'+newId(),e,orig:e,sets:TP(3,tm?0:null,tm?40:10).map(s=>({...s,done:false})),rest:90,lo:tm?40:8,hi:tm?60:12,note:'',nq:[],nt:'',ln:(()=>{const L=lastFor('',e);return L?noteTxt(L.x.nq,L.x.n):''})(),last:(()=>{const L=lastFor('',e);return L?L.x.s:null})()});wPersist();render();window.scrollTo(0,document.body.scrollHeight);toast(`${X.n} für heute hinzugefügt`)}}
+function swapTo(x,e,perm){const L=lastFor(x.b,e);x.sets=x.sets.filter(s=>!s.w);x.ln=L?noteTxt(L.x.nq,L.x.n):'';x.e=e;x.sw=e!==x.orig;x.last=L?L.x.s:null;x.lf=L?L.f:null;x.plat='';
   x.sets.forEach((s,j)=>{s.done=false;delete s.q;const src=L?(L.x.s[j]||L.x.s[L.x.s.length-1]):null;s.k=src?src.k:null;s.r=src?src.r:x.lo});
   if(perm){const b=blockOf(UI.w.day,x.b);if(b){b.e=e;x.orig=e;x.sw=false;touch('state')}}wPersist();toast(perm?'Im Plan dauerhaft ersetzt':'Für heute getauscht')}
 // eigene Übung anlegen/bearbeiten
@@ -566,12 +591,19 @@ Object.assign(ACT,{
   wcancel:el=>{if(UI.w&&UI.w.edit){wClear();back();return}
     if(UI.w&&UI.w.it.some(x=>x.k==='ex'?x.sets.some(s=>s.done):x.ok.some(Boolean))&&!el.classList.contains('arm')){el.classList.add('arm');el.textContent='Verwerfen?';el.style.background='var(--crit)';el.style.color='#fff';return}
     wClear();UI.page=null;UI.stack=[];render('enter');window.scrollTo(0,0);toast('Training verworfen')},
-  wfinish:()=>{if(!UI.w)return;if(!UI.w.it.some(x=>x.k==='ex'?x.sets.some(s=>s.done):x.ok.some(Boolean))){toast('Hake mindestens einen Satz ab.');return}UI.rest=null;restbar();if(UI.w.feel==null||UI.w.feelAuto){const f=feelFromRir(UI.w);if(f!=null){UI.w.feel=f;UI.w.feelAuto=true}else if(UI.w.feelAuto){UI.w.feel=null;UI.w.feelAuto=false}}wPersist();go({t:'wdone'})},
+  wfinish:()=>{if(!UI.w)return;if(!UI.w.it.some(x=>x.k==='ex'?x.sets.some(wDone):x.ok.some(Boolean))){toast('Hake mindestens einen Satz ab.');return}UI.rest=null;restbar();if(UI.w.feel==null||UI.w.feelAuto){const f=feelFromRir(UI.w);if(f!=null){UI.w.feel=f;UI.w.feelAuto=true}else if(UI.w.feelAuto){UI.w.feel=null;UI.w.feelAuto=false}}wPersist();go({t:'wdone'})},
   wfeel:el=>{UI.w.feel=UI.w.feel===+el.dataset.v?null:+el.dataset.v;UI.w.feelAuto=false;wPersist();render()},
   wrir:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s||!s.done)return;const v=+el.dataset.v;s.q=s.q===v?null:v;wPersist();render()},
   wsave:()=>{wSave()},
-  wset:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s)return;s.done=!s.done;if(s.done){if(s.q==null){const j=+el.dataset.j,pv=x.sets.slice(0,j).reverse().find(t=>t.done&&t.q!=null),ls=x.last&&!x.sw?(x.last[j]||x.last[x.last.length-1]):null,q0=pv?pv.q:ls&&ls.q!=null?ls.q:null;if(q0!=null)s.q=q0}}else delete s.q;if(s.done&&!UI.w.edit){acUnlock();wakeOn()}
+  wset:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s)return;s.done=!s.done;if(s.done&&!s.w){if(s.q==null){const j=+el.dataset.j,pv=x.sets.slice(0,j).reverse().find(t=>t.done&&t.q!=null),ls=x.last&&!x.sw?(x.last[wNo(x,j)]||x.last[x.last.length-1]):null,q0=pv?pv.q:ls&&ls.q!=null?ls.q:null;if(q0!=null)s.q=q0}}else delete s.q;wFs(UI.w);if(s.done&&!UI.w.edit){acUnlock();wakeOn()}
     if(s.done&&!UI.w.edit&&x.rest>0)UI.rest={end:NOW()+x.rest*1000,total:x.rest};else if(!s.done)UI.rest=null;wPersist();render()},
+  wwarm:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s)return;
+    if(s.w){delete s.w}else{s.w=1;delete s.q;if(!(UI.w.wt||(UI.w.wt=[])).includes('sets'))UI.w.wt.push('sets')}wFs(UI.w);wPersist();render()},
+  waddwu:el=>{const x=curW(el);if(!x)return;const D=EXD(x.e),f=x.sets.find(s=>!s.w),st=D.i||2.5,k=f&&+f.k>0?Math.max(st,Math.round(f.k*.5/st)*st):null;
+    x.sets.splice(x.sets.filter(s=>s.w).length,0,{k:D.t==='time'?0:k,r:D.t==='time'?20:8,done:false,w:1});if(!(UI.w.wt||(UI.w.wt=[])).includes('sets'))UI.w.wt.push('sets');wPersist();render()},
+  wwu:el=>{const W=UI.w;if(!W)return;const t=W.wt||(W.wt=[]),k=el.dataset.k,i=t.indexOf(k);if(i>=0)t.splice(i,1);else t.push(k);wPersist();render()},
+  wnote:el=>{const i=+el.dataset.i;UI.wno=UI.wno===i?null:i;render();if(UI.wno===i){const f=document.querySelector('[data-wn]');if(f&&!noteTxt(UI.w.it[i].nq,UI.w.it[i].nt))try{f.focus({preventScroll:true})}catch(e){}}},
+  wnq:el=>{const x=curW(el);if(!x)return;const k=+el.dataset.k,q=x.nq||(x.nq=[]),j=q.indexOf(k);if(j>=0)q.splice(j,1);else q.push(k);q.sort((a,b)=>a-b);wPersist();render()},
   waddset:el=>{const x=curW(el);if(!x)return;const l=x.sets[x.sets.length-1];x.sets.push({k:l?l.k:null,r:l?l.r:x.lo,done:false});wPersist();render()},
   wdelset:el=>{const x=curW(el);if(!x||x.sets.length<2)return;x.sets.pop();wPersist();render()},
   restp:()=>{if(UI.rest){UI.rest.end+=10000;UI.rest.total+=10}restbar()},
@@ -644,7 +676,7 @@ Object.assign(ACT,{
   hseg:el=>{UI.hseg=el.dataset.v;render()},
   stattab:()=>{S.settings.statTab=!S.settings.statTab;if(!S.settings.statTab&&UI.tab==='statistik')UI.tab='habits';touch('state',200);render()}});
 // nur kleine Abhak-Elemente und Schalter – auf Zeilen/Karten würde der Schalter das Scrollen blockieren
-['wset','wsave','wfinish','wrir','wemdot','restp','restm','restskip','cexsave','blksave','runsave','thr','stattab'].forEach(a=>HAPTIC.add(a));
+['wset','wsave','wfinish','wrir','wwarm','wwu','wnq','wemdot','restp','restm','restskip','cexsave','blksave','runsave','thr','stattab'].forEach(a=>HAPTIC.add(a));
 
 /* ---------- Habits sortieren: am Griff ziehen ---------- */
 const GRIP='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>';

@@ -41,9 +41,11 @@ function weekCardHeute(t){const w=wd(t),ws=w===6?weekStart(t):w===0?addDays(week
 const dmy=d=>{const x=pdate(d);return `${DN[wd(d)]} ${x.getDate()}.${x.getMonth()+1}.`};
 function setLine(e,sets){const D=EXD(e);return (sets||[]).map(s=>`${D.t==='bw'?(+s.k?'+'+fk(s.k)+' kg':'KG'):fk(+s.k||0)+' kg'} × ${s.r}${D.t==='time'?' s':''}${s.q!=null?` (RIR ${s.q>=4?'4+':s.q})`:''}`).join(' · ')+(D.sd?' (je Seite)':'')+(D.du?' (Gewicht je Hand)':'')}
 function sessText(d,s){const mins=s.en&&s.st?Math.round((s.en-s.st)/60000):0,L=[`${dmy(d)} – ${s.n}${mins>0&&mins<400?' · '+mins+' min':''}${s.feel!=null?' · Gefühl: '+['leicht','okay','hart'][s.feel]:''}`];
+  const wu=s.wu?wuTxt(s.wu.m,s.wu.t):'';if(wu)L.push('  Aufwärmen: '+wu);
   for(const x of s.x||[]){const b=blockOf(s.day,x.b);
     if(x.em){const em=x.em;L.push(`  EMOM alle ${msx(em.v)} min, ${em.n} Runden (${em.it.map(t=>`${t.r} ${EXD(t.e).n}${t.k?' +'+fk(t.k)+' kg':''}`).join(' / ')}): ${em.ok.filter(Boolean).length}/${em.n} Runden geschafft`);continue}
-    L.push(`  ${EXD(x.e).n}: ${setLine(x.e,x.s)}${b&&b.e===x.e?` (Ziel ${b.lo}${b.hi>b.lo?'–'+b.hi:''}${EXD(x.e).t==='time'?' s':''})`:''}`)}
+    const nt=noteTxt(x.nq,x.n);
+    L.push(`  ${EXD(x.e).n}: ${setLine(x.e,x.s)}${b&&b.e===x.e?` (Ziel ${b.lo}${b.hi>b.lo?'–'+b.hi:''}${EXD(x.e).t==='time'?' s':''})`:''}${Array.isArray(x.ws)&&x.ws.length?' · Aufwärmsätze: '+setLine(x.e,x.ws):''}${nt?' · Notiz: '+nt:''}`)}
   const gx=gaPair(d).bySess.get(s.id);if(gx)L.push('  '+gaLine(gx));
   return L.join('\n')}
 // Garmin-Werte als Text: Dauer, Puls, Kalorien, Trainingseffekt, Zonen

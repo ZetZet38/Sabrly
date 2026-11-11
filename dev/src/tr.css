@@ -224,3 +224,13 @@ body:has(.trest) .wrap{padding-bottom:70px}
 .glap>div{grid-template-columns:74px 64px 48px minmax(0,1fr) 34px}
 .gside{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:10px;border:1px dashed rgba(255,255,255,.12);font-size:13px;color:var(--muted)}
 .gside b{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+/* Notiz pro Übung, Aufwärmen */
+.twc{display:flex;flex-wrap:wrap;gap:6px}
+.twc .chip{padding:8px 12px;min-height:36px}
+.tnp{display:flex;flex-direction:column;gap:8px}
+.tnl{display:flex;align-items:flex-start;gap:6px;text-align:left;font-size:13px;color:#B9C2C0;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:11px;padding:8px 10px}
+.tsrow{grid-template-columns:28px 1fr 1fr 44px}
+.tsrow .no{min-height:36px;border-radius:9px;touch-action:manipulation}
+.tsrow.warm .no{background:rgba(111,164,255,.18);color:#9DBFFF;font-weight:700}
+.tsrow.warm.done label{background:rgba(111,164,255,.08);border-color:rgba(111,164,255,.25)}
+.tsrow.warm.done .ck{background:#6FA4FF;border-color:#6FA4FF}
