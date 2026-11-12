@@ -229,6 +229,10 @@ h2{font-size:23px;font-weight:700;letter-spacing:-.015em;margin:0;text-wrap:bala
 .chip{position:relative;overflow:hidden;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .chip .pb{position:absolute;left:0;bottom:0;height:3px;background:#E3BE76;border-radius:0 3px 3px 0}
 .chip .pe{position:absolute;top:1px;right:4px;font-size:9px;font-style:normal;color:#E3BE76}
+.chip .pm{width:10px;height:7.5px}.pmq svg{width:13px;height:10px}.chip .pm,.pmq svg{color:#E3BE76;fill:currentColor}
+.chip .pm{position:absolute;top:2px;left:3px;opacity:.85}
+.pmq{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-style:normal;color:#E3BE76;font-weight:600}
+.pmrow{display:flex;align-items:center;justify-content:space-between;gap:12px}.pmrow>span{display:inline-flex;align-items:center;gap:8px;font-size:16px}.pmrow svg{width:22px;height:17px;color:#E3BE76;fill:currentColor}
 .chip.plock{opacity:.38}
 .chip.pmiss{border-color:color-mix(in srgb,var(--crit) 45%,var(--line));color:color-mix(in srgb,var(--crit) 70%,var(--muted))}
 .pstat{font-size:12.5px;font-weight:600;color:#E3BE76;margin-top:-2px}
@@ -785,8 +789,8 @@ function habitRow(x,d,locked){
   if(x.freq==='daily'&&x.labels?.length){const on=Array.isArray(raw)?raw:[];
     below=`<div class="chips">${x.labels.map((l,i)=>{const it=pd&&pd.items[i],wait=it&&it.st==='wait'&&!on.includes(i);
       const cls=(on.includes(i)?' on':'')+(wait?' plock':'')+(it&&it.st==='miss'?' pmiss':'');
-      const extra=it?` data-p="1"${wait?` data-from="${it.s}"`:''} aria-label="${esc(l)}${it.sc!=null&&it.tk?', '+it.sc+' %':''}${wait?', ab '+hm(it.s):''}"`:'';
-      return `<button type="button" class="chip${cls}" data-a="lab" data-h="${x.id}" data-d="${d}" data-i="${i}" aria-pressed="${on.includes(i)}"${extra} ${dis||(wait?'disabled':'')}>${esc(l)}${it&&it.tk?`<span class="pb" style="width:${it.sc}%"></span>${it.ed?'<i class="pe">✎</i>':''}`:''}</button>`}).join('')}</div>`;
+      const extra=it?` data-p="1"${wait?` data-from="${it.s}"`:''} aria-label="${esc(l)}${it.sc!=null&&it.tk?', '+it.sc+' %':''}${it.pm?', in der Moschee':''}${wait?', ab '+hm(it.s):''}"`:'';
+      return `<button type="button" class="chip${cls}" data-a="lab" data-h="${x.id}" data-d="${d}" data-i="${i}" aria-pressed="${on.includes(i)}"${extra} ${dis||(wait?'disabled':'')}>${esc(l)}${it&&it.tk?`<span class="pb" style="width:${it.sc}%"></span>${it.ed?'<i class="pe">✎</i>':''}${it.pm?MOSQ.replace('<svg','<svg class="pm"'):''}`:''}</button>`}).join('')}</div>`;
     if(pd&&d===today()){const st=prayerStatus(d),py=prayerDay(addDays(d,-1));
       if(st)below+=`<div class="pstat" data-pd="${d}">${esc(st)}</div>`;
       if(py&&py.items[4].st==='now')below+=`<button type="button" class="link pyest" data-a="lab" data-h="${x.id}" data-d="${addDays(d,-1)}" data-i="4">${esc(pLabel(4))} von gestern abhaken</button>`}
@@ -1000,6 +1004,8 @@ function setH(x,d,val){if(!x||lockedMsg(d))return;
 const H=id=>S.habits.find(x=>x.id===id);
 /* ---------- Gebet: Zeiten (Diyanet), Wertung nach Uhrzeit, goldener Ring ---------- */
 const PN=['Fajr','Dhuhr','Asr','Maghrib','Isha'],GOLD='#E3BE76';
+// Moschee: e.pm = {Index:true}; kleines Kuppel-Symbol
+const MOSQ='<svg viewBox="0 0 16 12" aria-hidden="true"><path d="M7.6 0h.8v1.5h-.8zM8 1.6c0 1.3 4 2.2 4 5.9H4c0-3.7 4-4.6 4-5.9zM3.2 8h9.6v3.4H3.2zM.5 3.4l1-1.9 1 1.9v8H.5zM13.5 3.4l1-1.9 1 1.9v8h-2z"/></svg>';
 const PDEF={on:false,habit:'',city:null,travel:null,buf:30,notify:true,since:''};
 function PS(){const p=S.settings.prayer;if(!p||typeof p!=='object'){S.settings.prayer={...PDEF};return S.settings.prayer}
   for(const k of Object.keys(PDEF))if(!(k in p))p[k]=PDEF[k];return p}
@@ -1039,10 +1045,10 @@ function pScore(z,i,m,buf){
     if(m<N)return Math.round(lin(m,z.I,N,100,20));if(m<L)return 20;return 10}
   const [s,e]=pWin(z,i,buf);if(m<s)return null;if(m>=e)return 10;return Math.round(lin(m,s,e,100,20))}
 function prayerDay(d){const P=PS();if(!P.on||!P.since||d<P.since)return null;const x=prayerHabit();if(!x||x.created>d||!scheduled(x,d))return null;
-  const z=pzFor(d);if(!z)return null;const e=dayGet(d)||{},on=labelsOf(hraw(x,d)),pt=e.pt||{},pe=e.pe||{},nm=nowMin(d);
+  const z=pzFor(d);if(!z)return null;const e=dayGet(d)||{},on=labelsOf(hraw(x,d)),pt=e.pt||{},pe=e.pe||{},pm=e.pm||{},nm=nowMin(d);
   const items=[0,1,2,3,4].map(i=>{const [s,end]=pWin(z,i,P.buf),tk=on.includes(i);let sc=null,st;
     if(tk){const m=pt[i];sc=m==null?10:(pScore(z,i,m,P.buf)??10);st='done'}else if(nm<s)st='wait';else if(nm<end)st='now';else{sc=0;st='miss'}
-    return {i,s,end,sc,st,tk,m:pt[i],ed:!!pe[i]}});
+    return {i,s,end,sc,st,tk,m:pt[i],ed:!!pe[i],pm:tk&&!!pm[i]}});
   const sc=items.filter(it=>it.sc!=null);return {x,z,items,avg:sc.length?sc.reduce((a,b)=>a+b.sc,0)/sc.length/100:null}}
 function prayerStatus(d){const pd=prayerDay(d);if(!pd)return '';const nm=nowMin(d),z=pd.z,cur=pd.items.find(it=>it.st==='now');
   if(cur){const i=cur.i,L=pLabel(i);
@@ -1054,8 +1060,8 @@ function prayerStatus(d){const pd=prayerDay(d);if(!pd)return '';const nm=nowMin(
 // beim Abhaken: Uhrzeit merken (Minuten ab Mitternacht des Tages, nach Mitternacht > 1440) und Zeiten des Tages festhalten
 function prayerSync(d,before,after){const e=dayEnsure(d);e.pt=e.pt&&typeof e.pt==='object'?e.pt:{};const nm=nowMin(d);
   for(const i of after)if(!before.includes(i)){e.pt[i]=nm;if(e.pe)delete e.pe[i]}
-  for(const i of before)if(!after.includes(i)){delete e.pt[i];if(e.pe)delete e.pe[i]}
-  if(!Object.keys(e.pt).length)delete e.pt;if(e.pe&&!Object.keys(e.pe).length)delete e.pe;
+  for(const i of before)if(!after.includes(i)){delete e.pt[i];if(e.pe)delete e.pe[i];if(e.pm)delete e.pm[i]}
+  if(!Object.keys(e.pt).length)delete e.pt;if(e.pe&&!Object.keys(e.pe).length)delete e.pe;if(e.pm&&!Object.keys(e.pm).length)delete e.pm;
   if(!e.pz){const t=timesFor(d);if(t){e.pz=t.s;e.pc=t.c}}}
 // vor Beginn gesperrt (gilt für jeden Tag: Minuten seit Mitternacht des Tages)
 function prayerLock(d,i){const P=PS();if(!P.on||!P.since||d<P.since)return '';const z=pzFor(d);if(!z)return '';const s=pWin(z,i,P.buf)[0];
@@ -1098,10 +1104,15 @@ const ACT={
     if(m==null){toast('Bitte eine Uhrzeit eingeben.');return}
     if(pScore(pd.z,i,m,PS().buf)==null){toast(`${pLabel(i)} beginnt erst um ${hm(pWin(pd.z,i,PS().buf)[0])}.`);return}
     if(m>nowMin(d)){toast('Diese Uhrzeit liegt in der Zukunft.');return}
-    const e=dayEnsure(d);if(!e.h||typeof e.h!=='object')e.h={};const on=labelsOf(e.h[x.id]).slice();if(!on.includes(i))on.push(i);e.h[x.id]=on.sort((p,q)=>p-q);
-    e.pt=e.pt&&typeof e.pt==='object'?e.pt:{};e.pt[i]=m;e.pe=e.pe&&typeof e.pe==='object'?e.pe:{};e.pe[i]=true;
+    const it=pd.items[i],same=f.v===f.v0,e=dayEnsure(d);if(!e.h||typeof e.h!=='object')e.h={};const on=labelsOf(e.h[x.id]).slice();if(!on.includes(i))on.push(i);e.h[x.id]=on.sort((p,q)=>p-q);
+    // Uhrzeit nur ändern (✎), wenn sie geändert wurde; neu abgehakt zur jetzigen Zeit = normal abgehakt
+    e.pt=e.pt&&typeof e.pt==='object'?e.pt:{};
+    if(!(it.tk&&same)){e.pt[i]=m;e.pe=e.pe&&typeof e.pe==='object'?e.pe:{};if(!it.tk&&same&&it.st==='now'){e.pt[i]=nowMin(d);delete e.pe[i]}else e.pe[i]=true;if(!Object.keys(e.pe).length)delete e.pe}
+    e.pm=e.pm&&typeof e.pm==='object'?e.pm:{};if(f.pm)e.pm[i]=true;else delete e.pm[i];if(!Object.keys(e.pm).length)delete e.pm;
     if(!e.pz){const tz=timesFor(d);if(tz){e.pz=tz.s;e.pc=tz.c}}
-    if(d<x.created){x.created=d;touch('state')}touch(mkey(d));back();toast(`${pLabel(i)} um ${hm(m)} eingetragen`)},
+    if(d<x.created){x.created=d;touch('state')}touch(mkey(d));back();
+    toast(it.tk&&same?(f.pm!==it.pm?(f.pm?`${pLabel(i)} in der Moschee eingetragen`:`${pLabel(i)}: Moschee entfernt`):'Gespeichert'):`${pLabel(i)} um ${hm(e.pt[i])}${f.pm?' in der Moschee':''} eingetragen`)},
+  ptmosq:()=>{const f=UI.page;if(!f||f.t!=='ptime')return;f.pm=!f.pm;const b=$('#pt-mosq');if(b){b.classList.toggle('on',f.pm);b.setAttribute('aria-checked',f.pm)}haptic()},
   ptdel:()=>{const f=UI.page,x=prayerHabit();if(!x)return;const on=labelsOf(hraw(x,f.d)).filter(q=>q!==f.i);setH(x,f.d,on);back()},
   dstep:el=>{const dir=+el.dataset.dir,n=addDays(curSel(),dir);UI.sel=n===today()?null:n;render();slideIn(dir,false)},
   openday:el=>openDay(el.dataset.d),
@@ -1212,7 +1223,7 @@ const shiftMonth=(M,dir)=>{const[y,m]=M.split('-').map(Number),d=new Date(y,m-1+
 
 /* --- Gebet: Seiten (Uhrzeit ändern, Stadt wählen) --- */
 function openPTime(d,i){const pd=prayerDay(d);if(!pd){toast('Für diesen Tag gibt es keine Gebetszeiten.');return}
-  const it=pd.items[i],v=it.m!=null?hm(it.m):hm(Math.min(nowMin(d),it.end-1));go({t:'ptime',d,i,v})}
+  const it=pd.items[i],v=it.m!=null?hm(it.m):hm(Math.min(nowMin(d),it.end-1));go({t:'ptime',d,i,v,v0:v,pm:it.pm})}
 function ptMin(){const f=UI.page,pd=f&&prayerDay(f.d),v=String(f&&f.v||'');if(!pd||!/^\d\d:\d\d$/.test(v))return null;
   let m=+v.slice(0,2)*60+ +v.slice(3,5);if(f.i===4&&m<pd.z.I-120)m+=1440;return m}
 function ptPreview(){const f=UI.page,pd=prayerDay(f.d),m=ptMin();if(m==null||!pd)return '–';const s=pScore(pd.z,f.i,m,PS().buf);return s==null?'vor Beginn':s+' %'}
@@ -1224,9 +1235,10 @@ function pPTime(){const f=UI.page,d=f.d,i=f.i,pd=prayerDay(d),L=pLabel(i);
   return top+`<div class="card glass stack" style="gap:12px">
     <span class="label">${esc(dayTitle(d))} · ${fmtMid(d)}</span>
     <span class="hint">Zeitfenster: ${win}</span>
+    <div class="pmrow"><span>${MOSQ} In der Moschee</span><button type="button" class="switch${f.pm?' on':''}" id="pt-mosq" data-a="ptmosq" role="switch" aria-checked="${!!f.pm}" aria-label="In der Moschee gebetet"></button></div>
     <div class="fgroup"><label class="label" for="pt-time">Wann hast du gebetet?</label><input class="tinput" type="time" id="pt-time" data-pt="1" value="${esc(f.v)}"></div>
     <div class="pprev">Wertung <b id="pt-prev">${ptPreview()}</b></div>
-    <span class="hint">Nur ändern, wenn du wirklich zu einer anderen Uhrzeit gebetet hast. Geänderte Zeiten bekommen ein ✎.</span>
+    <span class="hint">Uhrzeit nur ändern, wenn du wirklich zu einer anderen Zeit gebetet hast. Geänderte Zeiten bekommen ein ✎.</span>
     ${it.tk?`<button type="button" class="btn danger" data-a="ptdel">Abhaken entfernen</button>`:''}</div>`}
 function pCity(){const f=UI.page,tr=f.mode==='travel';
   return `<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Zurück</button><h2>${tr?'Unterwegs':'Stadt'}</h2><span></span></div>
@@ -1254,7 +1266,7 @@ function vGebet(){const P=PS(),x=prayerHabit(),t=today(),L=S.habits.filter(h=>!h
   const tr=P.travel&&P.travel.until>=t?P.travel:null,tz=P.on?timesFor(t):null,z=tz&&pzParse(tz.s);
   const open=!!FOLD.g;
   return `<section class="sec"><div class="sec-h">${foldBtn('g','Gebet')}<button type="button" class="switch${P.on?' on':''}" data-a="pon" role="switch" aria-checked="${P.on}" aria-label="Gebetszeiten nutzen"></button></div>${open?`<div class="card glass stack" style="gap:14px">
-    <span class="hint">Je früher im Zeitfenster du abhakst, desto mehr Prozent. Bei Fajr zählen die letzten 40 Minuten vor Sonnenaufgang am meisten. Die Pünktlichkeit siehst du als goldenen Ring. Offizielle Diyanet-Zeiten.</span>
+    <span class="hint">Je früher im Zeitfenster du abhakst, desto mehr Prozent. Bei Fajr zählen die letzten 40 Minuten vor Sonnenaufgang am meisten. Die Pünktlichkeit siehst du als goldenen Ring. Lange auf ein Gebet drücken: Uhrzeit ändern oder „In der Moschee“ eintragen. Offizielle Diyanet-Zeiten.</span>
     ${P.on?`
     ${!x?`<span class="hint" style="color:var(--crit)">Lege einen täglichen Habit mit 5 Teilen an, z. B. Beten: Fajr, Dhuhr, Asr, Maghrib, Isha.</span>`:''}
     ${L.length>1?`<div class="fgroup"><label class="label" for="p-hab">Gebets-Habit</label><select class="tinput" id="p-hab" data-pset="habit">${L.map(h=>`<option value="${h.id}"${x===h?' selected':''}>${esc(h.emoji||'')} ${esc(h.name)}</option>`).join('')}</select></div>`:''}
@@ -1273,12 +1285,14 @@ function vPStats(){const P=PS(),t=today();if(!P.on||!prayerHabit())return '';
   const a7=avg(days.filter(x=>x.d>addDays(t,-7)).map(x=>x.pd.avg*100)),a30=avg(days.map(x=>x.pd.avg*100));
   const per=[0,1,2,3,4].map(i=>avg(days.map(x=>x.pd.items[i].sc).filter(v=>v!=null)));
   const ed=days.reduce((n,x)=>n+x.pd.items.filter(it=>it.ed).length,0);
+  const mq=[0,1,2,3,4].map(i=>days.filter(x=>x.pd.items[i].pm).length),mq30=mq.reduce((a,b)=>a+b,0),mq7=days.filter(x=>x.d>addDays(t,-7)).reduce((n,x)=>n+x.pd.items.filter(it=>it.pm).length,0);
   let bars='';for(let k=6;k>=0;k--){const d=addDays(t,-k),pd=prayerDay(d),v=pd&&pd.avg!=null?Math.round(pd.avg*100):null;
     bars+=`<div class="pbcol"><div class="pbt"><i style="height:${v??0}%"></i></div><small>${DN[wd(d)]}</small></div>`}
   return `<section class="sec"><div class="sec-h"><h2>Gebet</h2><span class="pill num" style="color:${GOLD}">Ø ${a7??'–'} %</span></div><div class="card glass stack" style="gap:14px">
     <div class="pbars">${bars}</div>
-    <div class="ptimes">${per.map((v,i)=>`<span><small>${esc(pLabel(i))}</small><b class="num">${v??'–'}${v==null?'':' %'}</b></span>`).join('')}</div>
-    <span class="hint">Pünktlichkeit: 7 Tage Ø ${a7??'–'} % · 30 Tage Ø ${a30??'–'} %${ed?` · ${ed}× Uhrzeit geändert ✎`:''}</span></div></section>`}
+    <div class="ptimes">${per.map((v,i)=>`<span><small>${esc(pLabel(i))}</small><b class="num">${v??'–'}${v==null?'':' %'}</b>${mq[i]?`<i class="pmq" title="in der Moschee">${MOSQ}${mq[i]}</i>`:''}</span>`).join('')}</div>
+    <span class="hint">Pünktlichkeit: 7 Tage Ø ${a7??'–'} % · 30 Tage Ø ${a30??'–'} %${ed?` · ${ed}× Uhrzeit geändert ✎`:''}</span>
+    ${mq30?`<span class="hint pmstat"><i class="pmq">${MOSQ}</i> In der Moschee: ${mq7}× in 7 Tagen · ${mq30}× in 30 Tagen</span>`:''}</div></section>`}
 
 /* --- Einklappen (Sätze & Verse, Situations-Sätze) --- */
 const FOLD=(()=>{try{return JSON.parse(localStorage.getItem('sabrly-fold')||'{}')}catch(e){return {}}})();

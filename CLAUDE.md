@@ -75,6 +75,9 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
   (`normalize`, `normTraining`) – **unbekannte Felder in `training` gehen dabei verloren**, neue Felder dort in `normTraining` aufnehmen.
 - `m-YYYY-MM`: `days.{YYYY-MM-DD}` mit `h` (Habit-Werte), Stimmung, Aufgaben, `tr` (Krafttrainings), `run` (Läufe), `ga` (Garmin-Einheiten),
   `gdel` (gelöschte Garmin-IDs). Monatsdokumente werden **nicht** normalisiert.
+- Gebet je Tag (Monatsdokument): `pt` (Minute des Abhakens), `pe` (Uhrzeit von Hand geändert, ✎), `pm` (in der Moschee, `{Index:true}`),
+  `pz`/`pc` (Zeiten/Stadt des Tages). Abhaken zurücknehmen löscht `pt`/`pe`/`pm` (`prayerSync`). Moschee eintragen: Gebet lange drücken → Seite `ptime`
+  (Schalter `#pt-mosq`, Aktion `ptmosq`); unveränderte Uhrzeit bleibt beim Sichern erhalten. Anzeige: Kuppel `MOSQ` auf dem Chip, Statistik `vPStats`, Wochenrückblick `R.mq`.
 - `garmin`: Status vom Widget (`at`, `err`, `n`, `last`) – die App liest ihn nur (Training → ⚙︎).
 - Sync: lokale Änderungen → `touch(key)` → Flush schreibt das ganze Dokument. Kommt ein Snapshot für ein Dokument mit
   ungespeicherten lokalen Änderungen, gewinnt lokal.

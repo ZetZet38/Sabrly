@@ -16,11 +16,11 @@ function weekReview(ws){const t=today(),end=addDays(ws,6),last=end<t?end:t,days=
   const pct=w=>{const L=[];for(let i=0;i<7;i++){const d=addDays(w,i);if(d>t)break;if(active(d).length)L.push(dayScore(d))}return L.length?Math.round(L.reduce((a,b)=>a+b,0)/L.length*100):null};
   const per=S.habits.filter(x=>!x.archived&&x.created<=last).map(x=>{if(x.freq==='weekly'){const c=weekCount(x,ws,last);return {x,v:c,T:x.target,p:c/x.target}}
     let v=0,T=0;for(const d of days)if(x.created<=d&&scheduled(x,d)){T++;v+=frac(x,d)}return {x,v:Math.round(v*10)/10,T,p:T?v/T:1}}).filter(o=>o.T>0);
-  const pl=days.map(d=>prayerDay(d)).filter(Boolean),pa=pl.map(p=>p.avg).filter(v=>v!=null);
+  const pl=days.map(d=>prayerDay(d)).filter(Boolean),pa=pl.map(p=>p.avg).filter(v=>v!=null),mq=pl.reduce((n,p)=>n+p.items.filter(it=>it.pm).length,0);
   const ms=days.map(d=>dayGet(d)?.mood).filter(Boolean);
   let km=0;for(const d of days)for(const r of runsOf(d))km+=+r.km||0;
   return {ws,days,hp:pct(ws),hpPrev:pct(addDays(ws,-7)),per,good:per.filter(o=>o.p>=1),weak:per.filter(o=>o.p<.6).sort((a,b)=>a.p-b.p).slice(0,3),
-    pr:pa.length?Math.round(pa.reduce((a,b)=>a+b,0)/pa.length*100):null,mood:ms.length?ms.reduce((a,b)=>a+b,0)/ms.length:null,
+    pr:pa.length?Math.round(pa.reduce((a,b)=>a+b,0)/pa.length*100):null,mq,mood:ms.length?ms.reduce((a,b)=>a+b,0)/ms.length:null,
     todos:S.todos.filter(x=>x.done&&x.doneAt&&x.doneAt>=ws&&x.doneAt<=end).length,C:TR()?weekCounts(ws):null,km:Math.round(km*10)/10}}
 function weekCard(ws){const R=weekReview(ws),C=R.C,nws=addDays(ws,7),M=R.mood?MOODS[Math.max(0,Math.min(4,Math.round(R.mood)-1))]:'–';
   const good=R.good.map(o=>o.x.name),weak=R.weak.map(o=>`${o.x.name} ${fk(o.v)}/${o.T}`);
@@ -32,7 +32,7 @@ function weekCard(ws){const R=weekReview(ws),C=R.C,nws=addDays(ws,7),M=R.mood?MO
       ${C?`<div><b class="num">${C.kp?C.kd+'/'+C.kp:C.kd}</b><span>Kraft</span></div><div><b class="num">${fk(R.km)||'0'}<small>km</small></b><span>Laufen</span></div>`:''}<div><b>${M}</b><span>Stimmung</span></div></div>
     ${good.length?`<div class="wrl"><b>👍 Lief gut</b><span>${esc(good.slice(0,5).join(', '))}</span></div>`:''}
     ${weak.length?`<div class="wrl"><b>👎 Ausbaufähig</b><span>${esc(weak.slice(0,4).join(', '))}</span></div>`:''}
-    ${R.pr!=null?`<div class="wrl"><b>🕌 Gebete</b><span>Ø ${R.pr} % pünktlich</span></div>`:''}${R.todos?`<div class="wrl"><b>✅ Aufgaben</b><span>${R.todos} erledigt</span></div>`:''}
+    ${R.pr!=null?`<div class="wrl"><b>🕌 Gebete</b><span>Ø ${R.pr} % pünktlich${R.mq?` · ${R.mq}× in der Moschee`:''}</span></div>`:''}${R.todos?`<div class="wrl"><b>✅ Aufgaben</b><span>${R.todos} erledigt</span></div>`:''}
     <div class="btns">${TR()&&!hasPlan(nws)?`<button type="button" class="btn pri" data-a="tplan" data-ws="${nws}">Nächste Woche planen</button>`:''}<button type="button" class="btn" data-a="copyweek" data-ws="${ws}">Für Claude kopieren</button></div></div></section>`}
 // Sonntag: diese Woche · Montag: die vergangene (bis ausgeblendet)
 function weekCardHeute(t){const w=wd(t),ws=w===6?weekStart(t):w===0?addDays(weekStart(t),-7):null;if(!ws||S.settings.revSeen===ws)return '';if(!S.habits.some(x=>!x.archived)&&!TR())return '';return weekCard(ws)}
@@ -75,7 +75,7 @@ function runText(d,r){const pace=r.km>0&&r.dur?hmsx(r.dur/r.km)+' /km':'';
   return L.join('\n')}
 function weekText(ws){const R=weekReview(ws),end=addDays(ws,6),T=TR(),L=[`Sabrly – Woche KW ${kw(ws)} (${pdate(ws).getDate()}.${pdate(ws).getMonth()+1}.–${pdate(end).getDate()}.${pdate(end).getMonth()+1}.${pdate(end).getFullYear()})`,''];
   if(R.per.length){L.push(`Habits: ${R.hp??'–'} % erfüllt${R.hpPrev!=null?' (Vorwoche '+R.hpPrev+' %)':''}`);R.per.forEach(o=>L.push(`- ${o.x.name}: ${fk(o.v)}/${o.T}${o.x.freq==='weekly'?' (Wochenziel)':''}`))}
-  if(R.pr!=null)L.push(`Gebete pünktlich: Ø ${R.pr} %`);
+  if(R.pr!=null)L.push(`Gebete pünktlich: Ø ${R.pr} %${R.mq?` · ${R.mq}× in der Moschee`:''}`);
   const md=R.days.map(d=>{const m=dayGet(d)?.mood;return m?`${DN[wd(d)]} ${MOODS[m-1]}`:null}).filter(Boolean);if(md.length)L.push(`Stimmung: ${md.join(' · ')} (Ø ${fk(Math.round(R.mood*10)/10)} von 5)`);
   if(R.todos)L.push(`Aufgaben erledigt: ${R.todos}`);
   if(T){const plan=[];for(let i=0;i<7;i++){const P=planDay(ws,i);if(P.length)plan.push(`${DN[i]} ${P.map(itemName).join(' + ')}`)}

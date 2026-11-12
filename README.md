@@ -36,6 +36,8 @@ Kurzbefehl mit der Aktion „Run Script“ (Scriptable): Script `Sabrly`, Parame
 In Sabrly unter Mehr → Gebet einschalten und die Stadt wählen. Je früher im Zeitfenster abgehakt wird, desto mehr Prozent
 (Fajr: am besten in den letzten 40 Minuten vor Sonnenaufgang; Asr endet 30 Minuten vor Maghrib; Isha bis Mitternacht 100 → 20,
 dann 20, im letzten Drittel der Nacht 10; nachgeholt 10). Gesperrt vor Beginn, Uhrzeit ändern per langem Druck (✎).
+In der Moschee gebetet: lange auf das Gebet drücken → Schalter „In der Moschee“ → Sichern. Das Gebet bekommt eine kleine
+goldene Kuppel; die Statistik zeigt pro Gebet und insgesamt (7/30 Tage), wie oft, der Wochenrückblick ebenfalls. Die Pünktlichkeit ändert sich dadurch nicht.
 Adhan-Mitteilungen plant das Scriptable-Skript.
 
 ## Training
