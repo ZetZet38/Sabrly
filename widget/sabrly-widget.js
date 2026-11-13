@@ -1,4 +1,4 @@
-// SABRLY_WIDGET v12
+// SABRLY_WIDGET v13
 // Sabrly-Widget für die App „Scriptable“.
 // Einmal in Scriptable ausführen → anmelden. Danach als Widget hinzufügen.
 // Ein Tipp auf das Widget öffnet kurz Scriptable und trägt direkt in Sabrly ein (ohne Safari).
@@ -370,10 +370,10 @@ function pScore(z, i, m, buf) {
 }
 function prayerDay(d) {
   const P = PS(); if (!P.on || !P.since || d < P.since) return null; const x = prayerHabit(); if (!x || x.created > d || !scheduled(x, d)) return null;
-  const z = pzFor(d); if (!z) return null; const e = dayGet(d) || {}, on = labelsOf(hraw(x, d)), pt = e.pt || {}, nm = nowMin(d);
+  const z = pzFor(d); if (!z) return null; const e = dayGet(d) || {}, on = labelsOf(hraw(x, d)), pt = e.pt || {}, pm = e.pm || {}, nm = nowMin(d);
   const items = [0, 1, 2, 3, 4].map(i => {
     const [s, end] = pWin(z, i, P.buf), tk = on.includes(i); let sc = null, st;
-    if (tk) { const m = pt[i]; sc = m == null ? 10 : (pScore(z, i, m, P.buf) ?? 10); st = 'done'; } else if (nm < s) st = 'wait'; else if (nm < end) st = 'now'; else { sc = 0; st = 'miss'; }
+    if (tk) { const m = pt[i]; sc = pm[i] ? 100 : m == null ? 10 : (pScore(z, i, m, P.buf) ?? 10); st = 'done'; } else if (nm < s) st = 'wait'; else if (nm < end) st = 'now'; else { sc = 0; st = 'miss'; }
     return { i, s, end, sc, st, tk };
   });
   const sc = items.filter(it => it.sc != null); return { x, z, items, avg: sc.length ? sc.reduce((a, b) => a + b.sc, 0) / sc.length / 100 : null };

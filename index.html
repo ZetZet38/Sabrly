@@ -1273,7 +1273,7 @@ function setH(x,d,val){if(!x||lockedMsg(d))return;
 const H=id=>S.habits.find(x=>x.id===id);
 /* ---------- Gebet: Zeiten (Diyanet), Wertung nach Uhrzeit, goldener Ring ---------- */
 const PN=['Fajr','Dhuhr','Asr','Maghrib','Isha'],GOLD='#E3BE76';
-// Moschee: e.pm = {Index:true}; kleines Kuppel-Symbol
+// Moschee: e.pm = {Index:true}; kleines Kuppel-Symbol; in der Moschee gebetet = immer 100 %
 const MOSQ='<svg viewBox="0 0 16 12" aria-hidden="true"><path d="M7.6 0h.8v1.5h-.8zM8 1.6c0 1.3 4 2.2 4 5.9H4c0-3.7 4-4.6 4-5.9zM3.2 8h9.6v3.4H3.2zM.5 3.4l1-1.9 1 1.9v8H.5zM13.5 3.4l1-1.9 1 1.9v8h-2z"/></svg>';
 const PDEF={on:false,habit:'',city:null,travel:null,buf:30,notify:true,since:''};
 function PS(){const p=S.settings.prayer;if(!p||typeof p!=='object'){S.settings.prayer={...PDEF};return S.settings.prayer}
@@ -1316,7 +1316,7 @@ function pScore(z,i,m,buf){
 function prayerDay(d){const P=PS();if(!P.on||!P.since||d<P.since)return null;const x=prayerHabit();if(!x||x.created>d||!scheduled(x,d))return null;
   const z=pzFor(d);if(!z)return null;const e=dayGet(d)||{},on=labelsOf(hraw(x,d)),pt=e.pt||{},pe=e.pe||{},pm=e.pm||{},nm=nowMin(d);
   const items=[0,1,2,3,4].map(i=>{const [s,end]=pWin(z,i,P.buf),tk=on.includes(i);let sc=null,st;
-    if(tk){const m=pt[i];sc=m==null?10:(pScore(z,i,m,P.buf)??10);st='done'}else if(nm<s)st='wait';else if(nm<end)st='now';else{sc=0;st='miss'}
+    if(tk){const m=pt[i];sc=pm[i]?100:m==null?10:(pScore(z,i,m,P.buf)??10);st='done'}else if(nm<s)st='wait';else if(nm<end)st='now';else{sc=0;st='miss'}
     return {i,s,end,sc,st,tk,m:pt[i],ed:!!pe[i],pm:tk&&!!pm[i]}});
   const sc=items.filter(it=>it.sc!=null);return {x,z,items,avg:sc.length?sc.reduce((a,b)=>a+b.sc,0)/sc.length/100:null}}
 function prayerStatus(d){const pd=prayerDay(d);if(!pd)return '';const nm=nowMin(d),z=pd.z,cur=pd.items.find(it=>it.st==='now');
@@ -1381,7 +1381,7 @@ const ACT={
     if(!e.pz){const tz=timesFor(d);if(tz){e.pz=tz.s;e.pc=tz.c}}
     if(d<x.created){x.created=d;touch('state')}touch(mkey(d));back();
     toast(it.tk&&same?(f.pm!==it.pm?(f.pm?`${pLabel(i)} in der Moschee eingetragen`:`${pLabel(i)}: Moschee entfernt`):'Gespeichert'):`${pLabel(i)} um ${hm(e.pt[i])}${f.pm?' in der Moschee':''} eingetragen`)},
-  ptmosq:()=>{const f=UI.page;if(!f||f.t!=='ptime')return;f.pm=!f.pm;const b=$('#pt-mosq');if(b){b.classList.toggle('on',f.pm);b.setAttribute('aria-checked',f.pm)}haptic()},
+  ptmosq:()=>{const f=UI.page;if(!f||f.t!=='ptime')return;f.pm=!f.pm;const b=$('#pt-mosq');if(b){b.classList.toggle('on',f.pm);b.setAttribute('aria-checked',f.pm)}const p=$('#pt-prev');if(p)p.textContent=ptPreview();haptic()},
   ptdel:()=>{const f=UI.page,x=prayerHabit();if(!x)return;const on=labelsOf(hraw(x,f.d)).filter(q=>q!==f.i);setH(x,f.d,on);back()},
   dstep:el=>{const dir=+el.dataset.dir,n=addDays(curSel(),dir);UI.sel=n===today()?null:n;render();slideIn(dir,false)},
   openday:el=>openDay(el.dataset.d),
@@ -1496,7 +1496,7 @@ function openPTime(d,i){const pd=prayerDay(d);if(!pd){toast('Für diesen Tag gib
   const it=pd.items[i],v=it.m!=null?hm(it.m):hm(Math.min(nowMin(d),it.end-1));go({t:'ptime',d,i,v,v0:v,pm:it.pm})}
 function ptMin(){const f=UI.page,pd=f&&prayerDay(f.d),v=String(f&&f.v||'');if(!pd||!/^\d\d:\d\d$/.test(v))return null;
   let m=+v.slice(0,2)*60+ +v.slice(3,5);if(f.i===4&&m<pd.z.I-120)m+=1440;return m}
-function ptPreview(){const f=UI.page,pd=prayerDay(f.d),m=ptMin();if(m==null||!pd)return '–';const s=pScore(pd.z,f.i,m,PS().buf);return s==null?'vor Beginn':s+' %'}
+function ptPreview(){const f=UI.page,pd=prayerDay(f.d),m=ptMin();if(m==null||!pd)return '–';const s=pScore(pd.z,f.i,m,PS().buf);return s==null?'vor Beginn':(f.pm?100:s)+' %'}
 function pPTime(){const f=UI.page,d=f.d,i=f.i,pd=prayerDay(d),L=pLabel(i);
   const top=`<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="back">Abbrechen</button><h2>${esc(L)}</h2><button type="button" class="r txtbtn pri" data-a="ptsave"${pd?'':' disabled'}>Sichern</button></div>`;
   if(!pd)return top+`<span class="hint">Für diesen Tag gibt es keine Gebetszeiten.</span>`;

@@ -409,11 +409,11 @@ await step('gebet',async()=>{
   // In der Moschee (lange drücken → Schalter)
   const lpress=async c=>{c.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:5,clientY:5}));await wait(650);c.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));await wait(450)};
   await lpress(chip(0));ok('mosque switch on time page, off',UI.page&&UI.page.t==='ptime'&&!!q('#pt-mosq')&&!q('#pt-mosq').classList.contains('on'));
-  click('#pt-mosq');ok('mosque switch toggles',UI.page.pm===true&&q('#pt-mosq').classList.contains('on'));
+  const pv0=q('#pt-prev').textContent;click('#pt-mosq');ok('mosque switch toggles, preview 100 %',UI.page.pm===true&&q('#pt-mosq').classList.contains('on')&&pv0==='75 %'&&q('#pt-prev').textContent==='100 %',pv0+' '+q('#pt-prev').textContent);
   click('[data-a="ptsave"]');await wait(800);
   ok('Fajr mosque saved, time untouched',!UI.page&&dayGet(t).pm[0]===true&&dayGet(t).pt[0]===340&&!(dayGet(t).pe&&dayGet(t).pe[0])&&cloud(mk).days[t].pm[0]===true,JSON.stringify(dayGet(t)));
   ok('mosque icon on chip',!!chip(0).querySelector('.pm')&&chip(0).getAttribute('aria-label').includes('Moschee')&&!chip(1).querySelector('.pm'));
-  ok('mosque keeps score',prayerDay(t).items[0].sc===75&&prayerDay(t).items[0].pm===true);
+  ok('mosque = 100 %',prayerDay(t).items[0].sc===100&&prayerDay(t).items[0].pm===true&&chip(0).querySelector('.pb').style.width==='100%');
   await lpress(chip(2));ok('Asr page, switch off',UI.page&&UI.page.i===2&&!UI.page.pm);
   click('#pt-mosq');click('[data-a="ptsave"]');await wait(800);
   ok('Asr ticked now in mosque, no edit mark',labelsOf(hraw(x,t)).includes(2)&&dayGet(t).pt[2]===900&&dayGet(t).pm[2]===true&&!(dayGet(t).pe&&dayGet(t).pe[2]),JSON.stringify(dayGet(t)));
@@ -422,7 +422,7 @@ await step('gebet',async()=>{
   ok('stats: mosque line + per prayer',!!q('.pmstat')&&q('.pmstat').textContent.includes('2× in 7 Tagen')&&qa('.ptimes .pmq').length===2,q('.pmstat')&&q('.pmstat').textContent);
   click('#tab-heute');
   await lpress(chip(0));click('#pt-mosq');click('[data-a="ptsave"]');await wait(300);
-  ok('mosque removed again',!dayGet(t).pm[0]&&dayGet(t).pm[2]===true&&!chip(0).querySelector('.pm'));
+  ok('mosque removed again, score back',!dayGet(t).pm[0]&&dayGet(t).pm[2]===true&&!chip(0).querySelector('.pm')&&prayerDay(t).items[0].sc===75&&prayerDay(t).items[2].sc===100);
   click(chip(2));await wait(300);ok('untick clears mosque',!dayGet(t).pm,JSON.stringify(dayGet(t)));
   // Isha nach Mitternacht: am nächsten Tag vor Fajr für gestern abhaken
   window.__now=at(0,30,1);
