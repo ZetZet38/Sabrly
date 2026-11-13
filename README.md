@@ -59,6 +59,11 @@ oben rechts „Bearbeiten“, nach dem Speichern bist du wieder in der Zusammenf
 Aufwärmsätze zählen nicht für Progression, Bestwerte, Tonnen und Wochensätze.
 **Notiz pro Übung:** „+ Notiz“ unter der Übung – Schnellauswahl (Pause verlängert, links/rechts ungleich, Technik unsauber) und Freitext.
 Die Notiz erscheint in der Zusammenfassung, beim nächsten Training („Notiz letztes Mal“) und im Text für Claude.
+Das Notizfeld wächst mit dem Text (mehrere Zeilen, kein Scrollen zur Seite).
+**⋯ an jeder Übung im Training:** Übung für heute entfernen (mit „Rückgängig“) oder als **Supersatz** mit einer anderen Übung verbinden.
+Im Supersatz stehen beide Übungen in einem Rahmen, du machst abwechselnd je einen Satz – die Pause startet erst, wenn beide dran waren
+(„Pause nach der Runde“ unter der zweiten Übung). Mit „Auch im Trainingstag speichern“ bleibt der Supersatz für die nächsten Trainings;
+im Trainingstag verbindet bzw. trennt das Ketten-Symbol zwischen zwei Übungen den Supersatz.
 Läufe (locker/lang oder Intervalle nach Zeit oder Strecke) mit Auswertung „Pace bei Puls unter …“, Kilometer pro KW und Intervall-Verlauf.
 Nach dem Speichern wird der Habit „Training“ (bzw. „Laufen“) automatisch abgehakt.
 Am Ende der Pause gibt es einen kurzen Ton und der Bildschirm leuchtet grün auf; während des Trainings bleibt der Bildschirm an (beides unter Training → ⚙︎).

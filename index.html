@@ -681,6 +681,18 @@ body:has(.trest) .wrap{padding-bottom:70px}
 .tsrow.warm .no{background:rgba(111,164,255,.18);color:#9DBFFF;font-weight:700}
 .tsrow.warm.done label{background:rgba(111,164,255,.08);border-color:rgba(111,164,255,.25)}
 .tsrow.warm.done .ck{background:#6FA4FF;border-color:#6FA4FF}
+/* Notizfeld wächst mit dem Text */
+.tnta{display:block;resize:none;line-height:1.4;min-height:64px;max-height:190px;padding:10px 12px;font-size:16px;field-sizing:content}
+/* Supersatz: zwei Übungen in einem Rahmen */
+.tss{display:flex;flex-direction:column;gap:8px;padding:10px 6px 6px;border-radius:calc(var(--r-lg) + 6px);border:1px solid rgba(70,224,174,.3);background:rgba(70,224,174,.045)}
+.tssh{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:0 8px;font-size:13px;color:var(--muted)}
+.tssh b{color:var(--accent);font-size:13.5px;font-weight:750;display:inline-flex;align-items:center;gap:5px}
+.iclink{width:14px;height:14px;flex:none;vertical-align:-2px}
+.tnxt em.tssm{color:var(--accent);font-style:normal}
+/* Trainingstag: Verbinder zwischen zwei Übungen */
+.tlinkw{display:flex;justify-content:center;margin:-6px 0;position:relative;z-index:1}
+.tlink{display:inline-flex;align-items:center;gap:5px;height:28px;min-width:40px;justify-content:center;padding:0 12px;border-radius:14px;font-size:13px;font-weight:700;color:#8A9391;background:#121716;border:1px solid rgba(255,255,255,.12)}
+.tlink.on{color:var(--accent);border:1px solid rgba(70,224,174,.45);background:#0f2a22}
 
 .wrk{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px}
 .wrk>div{display:flex;flex-direction:column;gap:2px;padding:10px 10px 9px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line);min-width:0}
@@ -1647,8 +1659,8 @@ const LIB={
 
 /* ---------- Training: Datenmodell ----------
    S.training: {days:[{id,name,sub,col,blocks}], ex:{eigene Übungen}, weeks:{Montag:{d:{0..6:[ids]},s:{0..6:'F'|'S'|'N'}}}, habit, rhabit, hr}
-   Baustein: {k:'ex',id,e,p:[{k,r}],lo,hi,rest,note} oder {k:'emom',id,v(Sek.),n(Runden),it:[{e,r,k}],note}
-   Pro Tag in LOGS: tr:[{id,day,n,st,en,feel,wu?:{m?,t:[…]},x:[{b,e,s:[{k,r,q?}],ws?:[{k,r}],nq?:[Index],n?:Text} | {b,em:{v,n,it,ok}}]}]  (ws = Aufwärmsätze, zählen nirgends mit; wu = Aufwärmen: Minuten bis zum 1. Arbeitssatz + was gemacht wurde; nq/n = Notiz zur Übung), run:[{id,t,dur,km,hr,max,iv,g}]
+   Baustein: {k:'ex',id,e,p:[{k,r}],lo,hi,rest,note,ss?} (ss = Supersatz-Kennung, gilt nur für direkt aufeinanderfolgende Bausteine) oder {k:'emom',id,v(Sek.),n(Runden),it:[{e,r,k}],note}
+   Pro Tag in LOGS: tr:[{id,day,n,st,en,feel,wu?:{m?,t:[…]},x:[{b,e,s:[{k,r,q?}],ws?:[{k,r}],nq?:[Index],n?:Text,ss?} | {b,em:{v,n,it,ok}}]}]  (ws = Aufwärmsätze, zählen nirgends mit; wu = Aufwärmen: Minuten bis zum 1. Arbeitssatz + was gemacht wurde; nq/n = Notiz zur Übung), run:[{id,t,dur,km,hr,max,iv,g}]
    Garmin (vom Widget): run[].g = Werte der Uhr (km-Splits, Zonen …), ga:[{id,k:'str'|'oth',n,st,ts,dur,hr,max,kcal,te,z}], gdel:[gelöschte Garmin-IDs]
    Firestore kennt keine Arrays in Arrays – darum überall Objekte in Listen. */
 const TCOL={g:'#46E0AE',b:'#6FA4FF',o:'#FF9F4A',p:'#B48CFF',r:'#FF7A85',y:'#E3D26F'};
@@ -1669,11 +1681,11 @@ function normBlock(b){b=b&&typeof b==='object'?b:{};
     return {k:'emom',id:String(b.id||'b-'+newId()),v:clampI(b.v,10,900,60),n:clampI(b.n,1,60,10),it:it.length?it:[{e:'chinup',r:6,k:0}],note:String(b.note||'').slice(0,140)}}
   const p=(Array.isArray(b.p)?b.p:[]).filter(x=>x&&typeof x==='object').slice(0,12).map(x=>({k:x.k==null||x.k===''?null:pnum(x.k),r:clampI(x.r,0,999,8)}));
   const lo=clampI(b.lo,1,999,8);
-  return {k:'ex',id:String(b.id||'b-'+newId()),e:String(b.e||'bank'),p:p.length?p:[{k:null,r:lo},{k:null,r:lo},{k:null,r:lo}],lo,hi:Math.max(lo,clampI(b.hi,1,999,12)),rest:clampI(b.rest,0,1800,90),note:String(b.note||'').slice(0,140)}}
+  return {k:'ex',id:String(b.id||'b-'+newId()),e:String(b.e||'bank'),p:p.length?p:[{k:null,r:lo},{k:null,r:lo},{k:null,r:lo}],lo,hi:Math.max(lo,clampI(b.hi,1,999,12)),rest:clampI(b.rest,0,1800,90),note:String(b.note||'').slice(0,140),...(b.ss?{ss:String(b.ss).slice(0,24)}:{})}}
 function normCustom(v,id){const m={};if(v.m&&typeof v.m==='object'){for(const k of MUS)if(+v.m[k]>0)m[k]=Math.min(1,+v.m[k]);if(+v.m.Arme>0&&!m.Bizeps&&!m.Trizeps){m.Bizeps=m.Trizeps=Math.min(1,+v.m.Arme)}}
   return {n:String(v.n||'Übung').slice(0,40),t:['kg','bw','time'].includes(v.t)?v.t:'kg',sd:v.sd?1:0,du:v.du?1:0,m,i:pnum(v.i)||2.5,tp:(Array.isArray(v.tp)?v.tp:[]).map(String).filter(Boolean).slice(0,6),er:String(v.er||'').slice(0,200),vid:String(v.vid||'').slice(0,300),al:(Array.isArray(v.al)?v.al:[]).map(String).slice(0,6),own:1,id}}
 function normTraining(t){if(!t||typeof t!=='object')return null;
-  const days=(Array.isArray(t.days)?t.days:[]).filter(d=>d&&typeof d==='object').slice(0,14).map(d=>({id:String(d.id||'d-'+newId()),name:String(d.name||'Training').slice(0,24),sub:String(d.sub||'').slice(0,30),col:TCOL[d.col]?d.col:'g',blocks:(Array.isArray(d.blocks)?d.blocks:[]).slice(0,24).map(normBlock)}));
+  const days=(Array.isArray(t.days)?t.days:[]).filter(d=>d&&typeof d==='object').slice(0,14).map(d=>({id:String(d.id||'d-'+newId()),name:String(d.name||'Training').slice(0,24),sub:String(d.sub||'').slice(0,30),col:TCOL[d.col]?d.col:'g',blocks:ssClean((Array.isArray(d.blocks)?d.blocks:[]).slice(0,24).map(normBlock))}));
   const ex={};if(t.ex&&typeof t.ex==='object')for(const [k,v] of Object.entries(t.ex))if(v&&typeof v==='object'&&v.n)ex[k]=normCustom(v,k);
   const weeks={},old=addDays(weekStart(iso(new Date())),-7*20);
   if(t.weeks&&typeof t.weeks==='object')for(const [k,v] of Object.entries(t.weeks)){if(!/^\d{4}-\d\d-\d\d$/.test(k)||k<old||!v||typeof v!=='object')continue;
@@ -1765,7 +1777,12 @@ function allSess(kind){const out=[];for(const k of Object.keys(LOGS).sort().reve
 const itemName=id=>RUNK[id]?RUNK[id].n:(TDAY(id)?.name||'Training');
 const itemCol=id=>TCOL[RUNK[id]?RUNK[id].col:(TDAY(id)?.col||'g')];
 const shortName=n=>n.length>6?n.slice(0,5)+'.':n;
-function dayMin(D){let s=0;for(const b of D.blocks)s+=(b.k==='emom'?b.n*b.v:b.p.length*(b.rest+60))+120;return Math.max(5,Math.round(s/300)*5)}
+function dayMin(D){let s=0;D.blocks.forEach((b,i)=>{const r=ssRun(D.blocks,i),mid=r&&i!==r[r.length-1];s+=(b.k==='emom'?b.n*b.v:b.p.length*((mid?15:b.rest)+60))+(r&&i!==r[0]?30:120)});return Math.max(5,Math.round(s/300)*5)}
+const ICLINK='<svg class="iclink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>';
+/* ---------- Supersätze: direkt aufeinanderfolgende Übungen mit gleichem ss ---------- */
+// Indizes des Supersatzes, zu dem L[i] gehört (mindestens 2 hintereinander), sonst null – für Bausteine, Trainingsmodus und gespeicherte Einheiten
+function ssRun(L,i){const x=L[i];if(!x||!x.ss||x.k==='emom'||x.em)return null;let a=i,b=i;while(a>0&&L[a-1]&&L[a-1].ss===x.ss)a--;while(b<L.length-1&&L[b+1]&&L[b+1].ss===x.ss)b++;return b>a?Array.from({length:b-a+1},(_,k)=>a+k):null}
+function ssClean(L){L.forEach((x,i)=>{if(x&&x.ss&&!ssRun(L,i))delete x.ss});return L}
 // jüngste Einheit dieses Bausteins (sonst dieser Übung): {d,x,f}
 function lastFor(b,e,skip){let byE=null;for(const {d,s} of allSess('tr')){if(skip&&s.id===skip)continue;
   for(const x of s.x||[]){if(!Array.isArray(x.s)||!x.s.length)continue;if(x.b===b&&x.e===e)return {d,x,f:s.feel};if(!byE&&x.e===e)byE={d,x,f:s.feel}}}return byE}
@@ -1893,29 +1910,32 @@ const wNo=(x,j)=>x.sets.slice(0,j).filter(s=>!s.w).length;   // Index unter den 
 function wFs(W){if(W.edit)return;const any=W.it.some(x=>x.k==='ex'&&x.sets.some(wDone));if(any&&!W.fs)W.fs=NOW();else if(!any)W.fs=null}
 function wItemFromBlock(b,skip){if(b.k==='emom')return {k:'emom',b:b.id,v:b.v,n:b.n,its:clone(b.it),ok:Array(b.n).fill(false),r:0,run:false,end:0,left:null,note:b.note};
   const L=lastFor(b.id,b.e,skip),src=j=>(L?(L.x.s[j]||L.x.s[L.x.s.length-1]):null)||b.p[j]||b.p[b.p.length-1]||{k:null,r:b.lo};
-  return {k:'ex',b:b.id,e:b.e,orig:b.e,sets:b.p.map((_,j)=>({k:src(j).k,r:src(j).r,done:false})),rest:b.rest,lo:b.lo,hi:b.hi,note:b.note,last:L?L.x.s:null,lf:L?L.f:null,plat:plateau(b.id,b.e),nq:[],nt:'',ln:L?noteTxt(L.x.nq,L.x.n):''}}
+  return {k:'ex',b:b.id,e:b.e,orig:b.e,sets:b.p.map((_,j)=>({k:src(j).k,r:src(j).r,done:false})),rest:b.rest,lo:b.lo,hi:b.hi,note:b.note,last:L?L.x.s:null,lf:L?L.f:null,plat:plateau(b.id,b.e),nq:[],nt:'',ln:L?noteTxt(L.x.nq,L.x.n):'',...(b.ss?{ss:b.ss}:{})}}
 function wStart(dayId,d){const D=TDAY(dayId);if(!D)return;if(!D.blocks.length){toast('Dieser Tag hat noch keine Übungen.');go({t:'dayed',id:dayId});return}
-  UI.w={d,day:dayId,n:D.name+(D.sub?' · '+D.sub:''),st:NOW(),edit:null,lt:d<today()?1:0,feel:null,wt:[],wm:null,fs:null,it:D.blocks.map(b=>wItemFromBlock(b))};UI.rest=null;wPersist();acUnlock();wakeOn();go({t:'work'})}
+  UI.w={d,day:dayId,n:D.name+(D.sub?' · '+D.sub:''),st:NOW(),edit:null,lt:d<today()?1:0,feel:null,wt:[],wm:null,fs:null,it:ssClean(D.blocks.map(b=>wItemFromBlock(b)))};UI.rest=null;wPersist();acUnlock();wakeOn();go({t:'work'})}
 // gespeichertes Training als Arbeitszustand (zum Ändern und für die Zusammenfassung); t = Sekunden seit Start
-function wFromSess(d,s,edit){return {d,day:s.day,n:s.n,id:s.id,st:s.st||NOW(),en:s.en||null,edit:edit?s.id:null,lt:s.lt?1:0,feel:s.feel??null,wt:s.wu&&Array.isArray(s.wu.t)?s.wu.t.slice():[],wm:s.wu&&s.wu.m!=null?s.wu.m:null,fs:null,it:(s.x||[]).map(x=>{const b=blockOf(s.day,x.b);
+function wFromSess(d,s,edit){return {d,day:s.day,n:s.n,id:s.id,st:s.st||NOW(),en:s.en||null,edit:edit?s.id:null,lt:s.lt?1:0,feel:s.feel??null,wt:s.wu&&Array.isArray(s.wu.t)?s.wu.t.slice():[],wm:s.wu&&s.wu.m!=null?s.wu.m:null,fs:null,it:ssClean((s.x||[]).map(x=>{const b=blockOf(s.day,x.b);
     if(x.em)return {k:'emom',b:x.b,v:x.em.v,n:x.em.n,its:clone(x.em.it),ok:x.em.ok.slice(),r:x.em.n,run:false,end:0,left:null,note:''};
-    return {k:'ex',b:x.b,e:x.e,orig:x.e,sets:[...(x.ws||[]).map(q=>({k:q.k,r:q.r,done:true,w:1})),...(x.s||[]).map(q=>({k:q.k,r:q.r,done:true,...(q.q!=null?{q:q.q}:{}),...(q.t!=null?{t:q.t}:{})}))],rest:b?b.rest:90,nb:!b,lo:b?b.lo:8,hi:b?b.hi:12,note:'',last:null,nq:Array.isArray(x.nq)?x.nq.slice():[],nt:x.n||'',ln:''}})}}
+    return {k:'ex',b:x.b,e:x.e,orig:x.e,sets:[...(x.ws||[]).map(q=>({k:q.k,r:q.r,done:true,w:1})),...(x.s||[]).map(q=>({k:q.k,r:q.r,done:true,...(q.q!=null?{q:q.q}:{}),...(q.t!=null?{t:q.t}:{})}))],rest:b?b.rest:90,nb:!b,lo:b?b.lo:8,hi:b?b.hi:12,note:'',last:null,nq:Array.isArray(x.nq)?x.nq.slice():[],nt:x.n||'',ln:'',...(x.ss?{ss:x.ss}:{})}}))}}
 function wEdit(d,id){const s=sessOf(d).find(x=>x.id===id);if(!s)return;UI.w=wFromSess(d,s,true);UI.rest=null;go({t:'work'})}
 const WKEY=()=>lsKey()+':wo';
 function wPersist(){try{if(UI.w&&!UI.w.edit)localStorage.setItem(WKEY(),JSON.stringify(UI.w));else localStorage.removeItem(WKEY())}catch(e){}}
 function wRestore(){if(UI.w||UI.wTried===lsKey())return;UI.wTried=lsKey();try{const w=JSON.parse(localStorage.getItem(WKEY())||'null');if(w&&w.it&&w.d>=addDays(today(),-1)){if(!Array.isArray(w.wt))w.wt=[];w.it.forEach(x=>{if(x.k==='ex'&&!Array.isArray(x.nq)){x.nq=[];x.nt=x.nt||''}if(x.k==='emom'&&x.run){x.left=Math.max(1,Math.ceil((x.end-NOW())/1000));x.run=false}});UI.w=w}}catch(e){}}
 function wClear(){UI.w=null;UI.rest=null;try{localStorage.removeItem(WKEY())}catch(e){}restbar();wakeOff()}
+// Notizfeld wächst mit dem Text (kein Scrollen nach rechts); Zeilen grob vorab, genau per noteFit
+const noteRows=t=>Math.max(2,Math.min(7,Math.ceil(String(t||'').length/30)));
+function noteFit(el){if(!el||el.tagName!=='TEXTAREA')return;el.style.height='auto';el.style.height=Math.max(el.scrollHeight+2,64)+'px'}
 function notePanel(x,i){const t=noteTxt(x.nq,x.nt),open=UI.wno===i;
   if(open)return `<div class="tnp" role="group" aria-label="Notiz zur Übung"><div class="twc">${NQ.map((q,k)=>`<button type="button" class="chip${(x.nq||[]).includes(k)?' on':''}" data-a="wnq" data-i="${i}" data-k="${k}" aria-pressed="${(x.nq||[]).includes(k)}">${q}</button>`).join('')}</div>
-    <input class="tinput" value="${esc(x.nt||'')}" placeholder="Eigene Notiz …" maxlength="200" autocomplete="off" enterkeyhint="done" data-wn="1" data-i="${i}" aria-label="Notiz"><button type="button" class="link" data-a="wnote" data-i="${i}" style="align-self:flex-start;font-size:13.5px">Notiz schließen</button></div>`;
+    <textarea class="tinput tnta" rows="${noteRows(x.nt)}" placeholder="Eigene Notiz …" maxlength="200" autocomplete="off" enterkeyhint="done" data-wn="1" data-i="${i}" aria-label="Notiz">${esc(x.nt||'')}</textarea><button type="button" class="link" data-a="wnote" data-i="${i}" style="align-self:flex-start;font-size:13.5px">Notiz schließen</button></div>`;
   return t?`<button type="button" class="tnl" data-a="wnote" data-i="${i}" aria-label="Notiz bearbeiten"><span>📝</span> ${esc(t)}</button>`:''}
 function warmCard(W){const ed=!!W.edit,retro=W.d<today(),t=Array.isArray(W.wt)?W.wt:[];
   const tm=ed?(W.wm>0?W.wm+' min':''):retro?'':msx(((W.fs||NOW())-W.st)/1000);
   return `<div class="card glass stack twu" style="gap:10px"><div class="row between"><span class="label">Aufwärmen</span>${tm?`<span class="num tclock" id="wwu">${tm}</span>`:''}</div>
     <div class="twc">${Object.entries(WUK).map(([k,v])=>`<button type="button" class="chip${t.includes(k)?' on':''}" data-a="wwu" data-k="${k}" aria-pressed="${t.includes(k)}">${v}</button>`).join('')}</div>
     ${ed||retro?'':`<span class="hint">${W.fs?'Aufwärmzeit gemessen – bis zu deinem ersten Arbeitssatz.':'Die Zeit läuft bis zu deinem ersten abgehakten Arbeitssatz. Satznummer antippen = Aufwärmsatz.'}</span>`}</div>`}
-function exCard(x,i,cur,ed){const D=EXD(x.e),R=D.t==='time'?'s':'Wdh.';
-  let h=`<div class="texc glass${cur?' cur':''}"><div class="texh"><button type="button" class="nm" data-a="exd" data-e="${esc(x.e)}">${esc(D.n)}${x.sw?' <small>· heute getauscht</small>':''}</button><button type="button" class="tib" data-a="exinfo" data-e="${esc(x.e)}" aria-label="Ausführung und Tipps">i</button><button type="button" class="tib" data-a="wswap" data-i="${i}" aria-label="Alternative">⇄</button></div>`;
+function exCard(x,i,cur,ed,ss){const D=EXD(x.e),R=D.t==='time'?'s':'Wdh.',ssLast=!ss||i===ss[ss.length-1];
+  let h=`<div class="texc glass${cur?' cur':''}"><div class="texh"><button type="button" class="nm" data-a="exd" data-e="${esc(x.e)}">${esc(D.n)}${x.sw?' <small>· heute getauscht</small>':''}</button><button type="button" class="tib" data-a="exinfo" data-e="${esc(x.e)}" aria-label="Ausführung und Tipps">i</button><button type="button" class="tib" data-a="wswap" data-i="${i}" aria-label="Alternative">⇄</button><button type="button" class="tib" data-a="wmore" data-i="${i}" aria-label="Mehr: Supersatz, Entfernen">⋯</button></div>`;
   if(!ed){if(x.last)h+=`<span class="tlast">Letztes Mal: ${esc(setsTxt(x.last,x.e))}</span>`;else h+=`<span class="tlast">${x.sw?'Neu für dich – noch keine Werte':'Noch keine Einheit – Startwerte aus dem Plan'}</span>`;
     const sg=x.last&&!x.sw?suggest(x.lo,x.hi,x.e,x.last,x.lf):'';if(sg)h+=`<span class="tsug">→ ${esc(sg)}</span>`;else if(!x.last)h+=`<span class="tsug">→ Ziel ${x.lo}${x.hi>x.lo?'–'+x.hi:''} ${R}${D.sd?' je Seite':''}</span>`;
     if(x.ln&&!x.sw)h+=`<span class="tlast">Notiz letztes Mal: ${esc(x.ln)}</span>`;if(x.note)h+=`<span class="tnote">${esc(x.note)}</span>`;if(x.plat&&!x.sw)h+=`<div class="tplat">⚠︎ ${esc(x.plat)}</div>`}
@@ -1924,11 +1944,11 @@ function exCard(x,i,cur,ed){const D=EXD(x.e),R=D.t==='time'?'s':'Wdh.';
     <label><input inputmode="numeric" value="${s.r??''}" placeholder="0" data-ws="r" data-i="${i}" data-j="${j}" aria-label="${R} ${s.w?'Aufwärmsatz':'Satz '+(wNo(x,j)+1)}" enterkeyhint="done"><span>${R}${D.sd?' / Seite':''}</span></label>
     <button type="button" class="ck" data-a="wset" data-i="${i}" data-j="${j}" aria-label="${s.w?'Aufwärmsatz':'Satz '+(wNo(x,j)+1)} erledigt" aria-pressed="${!!s.done}">${CHECK}</button></div>${s.done&&!s.w?`<div class="trir" role="group" aria-label="Reserve Satz ${wNo(x,j)+1}"><span>Reserve</span>${[0,1,2,3,4].map(v=>`<button type="button" class="${s.q===v?'on':''}" data-a="wrir" data-i="${i}" data-j="${j}" data-v="${v}" aria-pressed="${s.q===v}" aria-label="${v>=4?'4 oder mehr':v} Wiederholungen übrig">${v>=4?'4+':v}</button>`).join('')}</div>`:''}`).join('')}</div>
     ${notePanel(x,i)}
-    <div class="texf"><span class="row" style="gap:6px 16px;flex-wrap:wrap"><button type="button" class="link" data-a="waddset" data-i="${i}">+ Satz</button><button type="button" class="link" data-a="waddwu" data-i="${i}">+ Aufwärmsatz</button>${!noteTxt(x.nq,x.nt)&&UI.wno!==i?`<button type="button" class="link" data-a="wnote" data-i="${i}">+ Notiz</button>`:''}${x.sets.length>1?`<button type="button" class="link muted" data-a="wdelset" data-i="${i}">− Satz</button>`:''}</span>${ed?'':`<span class="trctl">Pause ${twheel(x.rest,`data-tw="rest" data-i="${i}"`)}</span>`}</div></div>`;
+    <div class="texf"><span class="row" style="gap:6px 16px;flex-wrap:wrap"><button type="button" class="link" data-a="waddset" data-i="${i}">+ Satz</button><button type="button" class="link" data-a="waddwu" data-i="${i}">+ Aufwärmsatz</button>${!noteTxt(x.nq,x.nt)&&UI.wno!==i?`<button type="button" class="link" data-a="wnote" data-i="${i}">+ Notiz</button>`:''}${x.sets.length>1?`<button type="button" class="link muted" data-a="wdelset" data-i="${i}">− Satz</button>`:''}</span>${ed||!ssLast?'':`<span class="trctl">${ss?'Pause nach der Runde':'Pause'} ${twheel(x.rest,`data-tw="rest" data-i="${i}"`)}</span>`}</div></div>`;
   return h}
 function emomCard(x,i,cur,ed){const done=x.ok.filter(Boolean).length,fin=x.r>=x.n,its=x.its,ci=its.length?its[Math.min(x.r,x.n-1)%its.length]:null;
   const left=x.run?Math.max(0,Math.ceil((x.end-NOW())/1000)):(x.left??x.v),names=its.map(t=>EXD(t.e).n).join(' / ');
-  let h=`<div class="texc glass${cur?' cur':''}"><div class="texh"><span class="nm">EMOM <small>${esc(names)}</small></span><button type="button" class="tib" data-a="wemset" data-i="${i}" aria-label="EMOM einstellen">✎</button></div>
+  let h=`<div class="texc glass${cur?' cur':''}"><div class="texh"><span class="nm">EMOM <small>${esc(names)}</small></span><button type="button" class="tib" data-a="wemset" data-i="${i}" aria-label="EMOM einstellen">✎</button><button type="button" class="tib" data-a="wmore" data-i="${i}" aria-label="Mehr: Entfernen">⋯</button></div>
     <span class="tlast">Alle ${msx(x.v)} min · ${x.n} Runden · ${its.map(t=>`${t.r} ${esc(EXD(t.e).n)}${t.k?' +'+fk(t.k)+' kg':''}`).join(' / ')}</span>${x.note&&!ed?`<span class="tnote">${esc(x.note)}</span>`:''}`;
   if(!ed)h+=`<div class="temom"><span class="rnd">${fin?'Fertig':`Runde ${x.r+1} von ${x.n}`}</span><span class="big num" id="em-${i}">${fin?done+'/'+x.n:msx(left)}</span>${fin?'':`<span class="cur">${ci?esc(EXD(ci.e).n)+' · '+ci.r+' Wdh.':''}</span>`}</div>`;
   h+=`<div class="tdots">${Array.from({length:x.n},(_,k)=>`<button type="button" class="${x.ok[k]?'on':k<x.r?'miss':''}" data-a="wemdot" data-i="${i}" data-k="${k}" aria-label="Runde ${k+1}${x.ok[k]?' geschafft':''}">${k+1}</button>`).join('')}</div>`;
@@ -1941,11 +1961,29 @@ function pWork(){const W=UI.w;if(!W){UI.page=null;UI.stack=[];return vTraining()
   let h=`<div class="ptopbar"><button type="button" class="txtbtn sec2" data-a="wcancel">Abbrechen</button><h2>${esc(W.n)}${ed?'':` · <span class="num tclock" id="wtime">${msx((NOW()-W.st)/1000)}</span>`}</h2><button type="button" class="r txtbtn pri" data-a="${ed?'wsave':'wfinish'}">${ed?'Sichern':'Fertig'}</button></div>`;
   if(ed)h+=`<span class="hint" style="text-align:center;margin-top:-10px">${fmtLong(W.d)} · nachträglich ändern</span><button type="button" class="btn" data-a="copysess" data-d="${W.d}" data-id="${esc(W.edit)}">📋 Für Claude kopieren</button>`;
   h+=warmCard(W);
-  const cur=ed?-1:W.it.findIndex(x=>x.k==='ex'?x.sets.some(s=>!s.done):x.r<x.n);
-  W.it.forEach((x,i)=>{h+=x.k==='ex'?exCard(x,i,i===cur,ed):emomCard(x,i,i===cur,ed)});
+  const cur=ed?-1:wCur(W);
+  for(let i=0;i<W.it.length;i++){const x=W.it[i],r=ssRun(W.it,i);
+    if(r){h+=`<div class="tss" role="group" aria-label="Supersatz">${ssHead(W,r,cur,ed)}${r.map(j=>exCard(W.it[j],j,j===cur,ed,r)).join('')}</div>`;i=r[r.length-1];continue}
+    h+=x.k==='ex'?exCard(x,i,i===cur,ed):emomCard(x,i,i===cur,ed)}
+  if(!W.it.length)h+=`<span class="hint" style="text-align:center">Keine Übungen mehr. Füge eine für heute hinzu.</span>`;
   h+=`<button type="button" class="btn" data-a="waddex">+ Übung für heute</button>`;
   h+=ed?`<button type="button" class="btn danger" data-a="wdel" data-d="${W.d}" data-id="${esc(W.edit)}">Training löschen</button>`:`<button type="button" class="btn pri" data-a="wfinish">Training beenden</button>`;
   return h}
+/* ---------- Supersatz im Trainingsmodus ---------- */
+const wN=x=>x.sets.filter(wDone).length;
+const wOpen=x=>x.sets.some(s=>!s.done);
+// aktuelle Übung: erste offene; im Supersatz die mit den wenigsten erledigten Arbeitssätzen (abwechselnd)
+function wCur(W){const i=W.it.findIndex(x=>x.k==='ex'?wOpen(x):x.r<x.n);if(i<0)return -1;const r=ssRun(W.it,i);if(!r)return i;
+  let best=i,bn=Infinity;for(const j of r){const y=W.it[j];if(!wOpen(y))continue;const n=wN(y);if(n<bn){bn=n;best=j}}return best}
+// Pause nach einem abgehakten Satz: im Supersatz erst, wenn alle Übungen der Runde dran waren (Pause der letzten Übung)
+function wRestAfter(W,i,s){const x=W.it[i],r=ssRun(W.it,i);if(!r||s.w)return x.rest;const n=wN(x);
+  return r.some(j=>j!==i&&wN(W.it[j])<n&&W.it[j].sets.some(t=>!t.done&&!t.w))?0:W.it[r[r.length-1]].rest}
+function ssHead(W,r,cur,ed){const X=r.map(j=>W.it[j]),max=Math.max(...X.map(x=>x.sets.filter(s=>!s.w).length)),rd=Math.min(max,Math.min(...X.map(wN))+1),done=X.every(x=>!wOpen(x));
+  return `<div class="tssh"><b>${ICLINK} Supersatz</b><span>${ed?'abwechselnd':done?'fertig':`Runde ${rd} von ${max}${r.includes(cur)?' · jetzt '+esc(EXD(W.it[cur].e).n):''}`}</span></div>`}
+// Supersatz auch im Trainingstag speichern (verbinden: Bausteine nebeneinander; id null = trennen)
+function ssPlan(W,X,id){const D=TDAY(W.day);if(!D)return false;const B=X.map(x=>D.blocks.find(b=>b.id===x.b)).filter(Boolean);if(B.length!==X.length)return false;
+  if(id){for(const b of B.slice(1)){const k=D.blocks.indexOf(b);D.blocks.splice(k,1)}D.blocks.splice(D.blocks.indexOf(B[0])+1,0,...B.slice(1));B.forEach(b=>b.ss=id)}
+  else B.forEach(b=>delete b.ss);ssClean(D.blocks);touch('state');return true}
 /* ---------- Zeiten: Zeitstempel je abgehaktem Satz (t = Sekunden seit Start) ---------- */
 const TCAP=900; // Lücken über 15 min (Anruf, Kaffee …) zählen nicht in die Pausen-/Wechsel-Schnitte
 const avgS=L=>L.length?Math.round(L.reduce((a,b)=>a+b,0)/L.length):null;
@@ -1953,8 +1991,8 @@ const avgS=L=>L.length?Math.round(L.reduce((a,b)=>a+b,0)/L.length):null;
 function wTimes(W){const L=[];W.it.forEach((x,i)=>{if(x.k!=='ex')return;for(const s of x.sets)if(wDone(s)&&s.t!=null&&Number.isFinite(+s.t))L.push({i,t:+s.t})});
   if(L.length<2)return null;L.sort((a,b)=>a.t-b.t);
   const by=new Map(),P=[],C=[];let long=0;
-  L.forEach((c,k)=>{let o=by.get(c.i);if(!o){const x=W.it[c.i];o={n:0,dur:0,rest:[],plan:x.nb?null:x.rest};by.set(c.i,o)}o.n++;if(!k)return;const g=c.t-L[k-1].t;o.dur+=g;
-    if(g>TCAP)long++;if(L[k-1].i===c.i){o.rest.push(g);if(g<=TCAP)P.push(g)}else if(g<=TCAP)C.push(g)});
+  L.forEach((c,k)=>{let o=by.get(c.i);const r=ssRun(W.it,c.i);if(!o){const x=W.it[c.i];o={n:0,dur:0,rest:[],plan:x.nb?null:r?W.it[r[r.length-1]].rest:x.rest};by.set(c.i,o)}o.n++;if(!k)return;const g=c.t-L[k-1].t,pi=L[k-1].i;o.dur+=g;
+    if(g>TCAP)long++;if(pi===c.i||(r&&r.includes(pi)&&r.indexOf(c.i)<r.indexOf(pi))){o.rest.push(g);if(g<=TCAP)P.push(g)}else if(r&&r.includes(pi)){/* Wechsel im Supersatz */}else if(g<=TCAP)C.push(g)});
   for(const o of by.values())o.rest=avgS(o.rest.filter(g=>g<=TCAP));
   return {lead:L[0].t,total:L[L.length-1].t,rest:avgS(P),wech:avgS(C),long,by}}
 function timesCard(W){const T=wTimes(W);if(!T)return '';
@@ -1992,15 +2030,15 @@ function pWSum(){const f=UI.page,s=sessOf(f.d).find(x=>x.id===f.id);if(!s){UI.pa
    ${pr.map(p=>`<div class="banner good"><b>🏆 Bestwert:</b> ${esc(p)}</div>`).join('')}
    ${timesCard(W)}
    ${wu?`<div class="card glass stack" style="gap:6px"><span class="label">Aufwärmen</span><span style="font-size:14.5px">${esc(wu)}</span></div>`:''}
-   <div class="card glass stack" style="gap:10px"><span class="label">Übungen</span><div class="tnxt tex">${(s.x||[]).map(x=>x.em?`<div><span>EMOM ${esc(x.em.it.map(t=>EXD(t.e).n).join(' / '))}</span><b>${x.em.ok.filter(Boolean).length}/${x.em.n} Runden</b></div>`:`<div><span>${esc(EXD(x.e).n)}</span><b>${esc(setsTxt(x.s,x.e))}</b>${Array.isArray(x.ws)&&x.ws.length?`<em>Aufwärmen: ${esc(setsTxt(x.ws,x.e))}</em>`:''}${noteTxt(x.nq,x.n)?`<em>📝 ${esc(noteTxt(x.nq,x.n))}</em>`:''}</div>`).join('')}</div></div>
+   <div class="card glass stack" style="gap:10px"><span class="label">Übungen</span><div class="tnxt tex">${(s.x||[]).map((x,xi)=>x.em?`<div><span>EMOM ${esc(x.em.it.map(t=>EXD(t.e).n).join(' / '))}</span><b>${x.em.ok.filter(Boolean).length}/${x.em.n} Runden</b></div>`:`<div><span>${esc(EXD(x.e).n)}</span><b>${esc(setsTxt(x.s,x.e))}</b>${Array.isArray(x.ws)&&x.ws.length?`<em>Aufwärmen: ${esc(setsTxt(x.ws,x.e))}</em>`:''}${noteTxt(x.nq,x.n)?`<em>📝 ${esc(noteTxt(x.nq,x.n))}</em>`:''}${ssRun(s.x,xi)?`<em class="tssm">${ICLINK} Supersatz mit ${esc(ssRun(s.x,xi).filter(j=>j!==xi).map(j=>EXD(s.x[j].e).n).join(' + '))}</em>`:''}</div>`).join('')}</div></div>
    ${gx?`<div class="card glass stack" style="gap:10px"><span class="label">⌚ Garmin${gx.st?' · '+esc(gx.st):''}</span><span>${esc(gaMeta(gx))}${gx.te!=null?' · TE '+fk(gx.te):''}</span>${zoneBar(gx.z)}</div>`:''}
    ${N.length?`<div class="card glass stack" style="gap:10px"><span class="label">Vorschlag fürs nächste Mal</span><div class="tnxt tsg">${N.map(([n,v])=>`<div><span>${esc(n)}</span><b>${esc(v)}</b></div>`).join('')}</div></div>`:''}
    <button type="button" class="btn" data-a="copysess" data-d="${f.d}" data-id="${esc(s.id)}">📋 Für Claude kopieren</button>`}
 function wSave(){const W=UI.w;if(!W)return;
   const x=W.it.map(it=>it.k==='ex'?{b:it.b,e:it.e,s:it.sets.filter(wDone).map(s=>({k:pnum(s.k)||0,r:clampI(s.r,0,9999,0),...(s.q!=null?{q:clampI(s.q,0,4,0)}:{}),...(s.t!=null?{t:clampI(s.t,0,86400,0)}:{})})),
       ...(it.sets.some(s=>s.done&&s.w)?{ws:it.sets.filter(s=>s.done&&s.w).map(s=>({k:pnum(s.k)||0,r:clampI(s.r,0,9999,0)}))}:{}),
-      ...((it.nq&&it.nq.length)||String(it.nt||'').trim()?{nq:(it.nq||[]).filter(i=>NQ[i]),n:String(it.nt||'').trim().slice(0,200)}:{})}
-    :{b:it.b,em:{v:it.v,n:it.n,it:it.its.map(t=>({e:t.e,r:t.r,k:+t.k||0})),ok:Array.from({length:it.n},(_,k)=>!!it.ok[k])}}).filter(o=>o.em?o.em.ok.some(Boolean):o.s.length);
+      ...((it.nq&&it.nq.length)||String(it.nt||'').trim()?{nq:(it.nq||[]).filter(i=>NQ[i]),n:String(it.nt||'').trim().slice(0,200)}:{}),...(it.ss?{ss:it.ss}:{})}
+    :{b:it.b,em:{v:it.v,n:it.n,it:it.its.map(t=>({e:t.e,r:t.r,k:+t.k||0})),ok:Array.from({length:it.n},(_,k)=>!!it.ok[k])}}).filter(o=>o.em?o.em.ok.some(Boolean):o.s.length);ssClean(x);
   if(!x.length){toast('Hake mindestens einen Satz ab.');return false}
   const wm=W.edit?W.wm:(W.fs&&W.d>=today()?Math.max(0,Math.round((W.fs-W.st)/60000)):null),wt=(W.wt||[]).filter(k=>WUK[k]);
   const sess={id:W.edit||'s-'+newId(),day:W.day,n:W.n,st:W.st,en:W.edit?(W.en||W.st):W.st+wMins(W)*60000,...(W.lt?{lt:1}:{}),feel:W.feel??null,...(wm!=null||wt.length?{wu:{...(wm!=null?{m:wm}:{}),t:wt}}:{}),x};
@@ -2093,9 +2131,13 @@ function pDayEd(){const D=TDAY(UI.page.id);if(!D){UI.page=null;UI.stack=[];retur
   <div class="fgroup"><span class="label">Farbe</span><div class="tcols">${Object.entries(TCOL).map(([k,c])=>`<button type="button" class="${D.col===k?'on':''}" style="--c:${c}" data-a="daycol" data-v="${k}" aria-label="Farbe"></button>`).join('')}</div></div>
   <section class="sec"><div class="sec-h"><h2 style="font-size:22px">Übungen</h2><span class="pill num">ca. ${dayMin(D)} min</span></div>
   ${D.blocks.length?D.blocks.map((b,i)=>`<div class="tbrow glass"><button type="button" class="tt" data-a="blked" data-i="${i}"><b>${esc(b.k==='emom'?'EMOM · '+b.it.map(x=>EXD(x.e).n).join(' / '):EXD(b.e).n)}</b><span>${b.k==='emom'?`Alle ${msx(b.v)} · ${b.n} Runden`:`${b.p.length} × ${b.lo}${b.hi>b.lo?'–'+b.hi:''}${EXD(b.e).t==='time'?' s':''} · Pause ${msx(b.rest)}`}${b.note?' · '+esc(b.note):''}</span></button>
-    <span class="tmv"><button type="button" data-a="blkmv" data-i="${i}" data-dir="-1" aria-label="Nach oben" ${i?'':'disabled'}>↑</button><button type="button" data-a="blkmv" data-i="${i}" data-dir="1" aria-label="Nach unten" ${i<D.blocks.length-1?'':'disabled'}>↓</button></span></div>`).join(''):'<span class="hint">Noch leer. Füge Übungen hinzu.</span>'}
+    <span class="tmv"><button type="button" data-a="blkmv" data-i="${i}" data-dir="-1" aria-label="Nach oben" ${i?'':'disabled'}>↑</button><button type="button" data-a="blkmv" data-i="${i}" data-dir="1" aria-label="Nach unten" ${i<D.blocks.length-1?'':'disabled'}>↓</button></span></div>${ssLink(D.blocks,i)}`).join(''):'<span class="hint">Noch leer. Füge Übungen hinzu.</span>'}
+  ${D.blocks.filter(b=>b.k==='ex').length>1?'<span class="hint">Das Ketten-Symbol zwischen zwei Übungen verbindet sie zum Supersatz: im Training abwechselnd, Pause erst nach beiden.</span>':''}
   <div class="btns"><button type="button" class="btn pri" data-a="tpick" data-m="add">+ Übung</button><button type="button" class="btn" data-a="blkemomnew">+ EMOM</button></div></section>
   <button type="button" class="btn danger" data-a="daydel">Tag löschen</button>`}
+// Verbinder zwischen Baustein i und i+1 (nur zwei normale Übungen)
+function ssLink(B,i){const a=B[i],b=B[i+1];if(!a||!b||a.k==='emom'||b.k==='emom')return '';const on=!!a.ss&&a.ss===b.ss;
+  return `<div class="tlinkw"><button type="button" class="tlink${on?' on':''}" data-a="blkss" data-i="${i}" aria-pressed="${on}" aria-label="${on?'Supersatz trennen':'Als Supersatz verbinden'}: ${esc(EXD(a.e).n)} und ${esc(EXD(b.e).n)}">${ICLINK}${on?' Supersatz':''}</button></div>`}
 // Baustein bearbeiten (Kopie in UI.page.b, gesichert mit „Sichern“)
 function pBlk(){const f=UI.page,b=f.b,em=b.k==='emom',X=em?null:EXD(b.e),tm=X&&X.t==='time';
   if(!em&&f.per==null)f.per=!b.p.every(x=>x.k===b.p[0].k&&x.r===b.p[0].r);const per=!em&&f.per;
@@ -2278,13 +2320,13 @@ Object.assign(ACT,{
   wrir:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s||!s.done)return;const v=+el.dataset.v;s.q=s.q===v?null:v;wPersist();render()},
   wsave:()=>{wSave()},
   wset:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s)return;s.done=!s.done;if(s.done&&!UI.w.edit&&!UI.w.lt)s.t=Math.max(0,Math.round((NOW()-UI.w.st)/1000));if(s.done&&!s.w){if(s.q==null){const j=+el.dataset.j,pv=x.sets.slice(0,j).reverse().find(t=>t.done&&t.q!=null),ls=x.last&&!x.sw?(x.last[wNo(x,j)]||x.last[x.last.length-1]):null,q0=pv?pv.q:ls&&ls.q!=null?ls.q:null;if(q0!=null)s.q=q0}}else{delete s.q;if(!s.done)delete s.t}wFs(UI.w);if(s.done&&!UI.w.edit){acUnlock();wakeOn()}
-    if(s.done&&!UI.w.edit&&x.rest>0)UI.rest={end:NOW()+x.rest*1000,total:x.rest};else if(!s.done)UI.rest=null;wPersist();render()},
+    const rs=s.done&&!UI.w.edit?wRestAfter(UI.w,+el.dataset.i,s):0;if(rs>0)UI.rest={end:NOW()+rs*1000,total:rs};else if(!s.done||ssRun(UI.w.it,+el.dataset.i))UI.rest=null;wPersist();render()},
   wwarm:el=>{const x=curW(el);if(!x)return;const s=x.sets[+el.dataset.j];if(!s)return;
     if(s.w){delete s.w}else{s.w=1;delete s.q;if(!(UI.w.wt||(UI.w.wt=[])).includes('sets'))UI.w.wt.push('sets')}wFs(UI.w);wPersist();render()},
   waddwu:el=>{const x=curW(el);if(!x)return;const D=EXD(x.e),f=x.sets.find(s=>!s.w),st=D.i||2.5,k=f&&+f.k>0?Math.max(st,Math.round(f.k*.5/st)*st):null;
     x.sets.splice(x.sets.filter(s=>s.w).length,0,{k:D.t==='time'?0:k,r:D.t==='time'?20:8,done:false,w:1});if(!(UI.w.wt||(UI.w.wt=[])).includes('sets'))UI.w.wt.push('sets');wPersist();render()},
   wwu:el=>{const W=UI.w;if(!W)return;const t=W.wt||(W.wt=[]),k=el.dataset.k,i=t.indexOf(k);if(i>=0)t.splice(i,1);else t.push(k);wPersist();render()},
-  wnote:el=>{const i=+el.dataset.i;UI.wno=UI.wno===i?null:i;render();if(UI.wno===i){const f=document.querySelector('[data-wn]');if(f&&!noteTxt(UI.w.it[i].nq,UI.w.it[i].nt))try{f.focus({preventScroll:true})}catch(e){}}},
+  wnote:el=>{const i=+el.dataset.i;UI.wno=UI.wno===i?null:i;render();if(UI.wno===i){const f=document.querySelector('[data-wn]');noteFit(f);if(f&&!noteTxt(UI.w.it[i].nq,UI.w.it[i].nt))try{f.focus({preventScroll:true})}catch(e){}}},
   wnq:el=>{const x=curW(el);if(!x)return;const k=+el.dataset.k,q=x.nq||(x.nq=[]),j=q.indexOf(k);if(j>=0)q.splice(j,1);else q.push(k);q.sort((a,b)=>a-b);wPersist();render()},
   waddset:el=>{const x=curW(el);if(!x)return;const l=x.sets[x.sets.length-1];x.sets.push({k:l?l.k:null,r:l?l.r:x.lo,done:false});wPersist();render()},
   wdelset:el=>{const x=curW(el);if(!x||x.sets.length<2)return;x.sets.pop();wPersist();render()},
@@ -2296,6 +2338,24 @@ Object.assign(ACT,{
   wemdot:el=>{const x=curW(el);if(!x)return;const k=+el.dataset.k;x.ok[k]=!x.ok[k];if(x.ok[k]&&k>=x.r&&!x.run)x.r=Math.min(x.n,k+1);wPersist();render()},
   wemset:el=>{const i=+el.dataset.i,x=UI.w.it[i],b=blockOf(UI.w.day,x.b);go({t:'blk',day:b?UI.w.day:null,i:b?TDAY(UI.w.day).blocks.indexOf(b):null,wi:i,b:clone(b||{k:'emom',id:x.b,v:x.v,n:x.n,it:x.its,note:x.note})})},
   waddex:()=>go({t:'pick',m:'wadd',q:'',mu:''}),
+  // ⋯ auf einer Übung: Supersatz verbinden/trennen, Übung entfernen
+  wmore:el=>{const W=UI.w,i=+el.dataset.i,x=W&&W.it[i];if(!x)return;UI.ssPerm=false;const r=ssRun(W.it,i),ex=x.k==='ex';
+    const C=ex&&!r?W.it.map((y,j)=>({y,j})).filter(({y,j})=>j!==i&&y.k==='ex'&&!ssRun(W.it,j)):[],inPlan=ex&&!!blockOf(W.day,x.b);
+    sheet(`<h3>${esc(ex?EXD(x.e).n:'EMOM')}</h3>
+      ${r?`<button type="button" class="opt" data-a="wssoff" data-i="${i}"><span class="tx"><b>Supersatz trennen</b><small>${esc(r.map(j=>EXD(W.it[j].e).n).join(' + '))} wieder einzeln, jede mit eigener Pause</small></span>›</button>`:''}
+      ${C.length?`<span class="label">Als Supersatz verbinden mit</span>${C.map(({y,j})=>`<button type="button" class="opt" data-a="wsson" data-i="${i}" data-j="${j}"><span class="tx"><b>${esc(EXD(y.e).n)}</b><small>${Math.abs(j-i)===1?(j>i?'nächste Übung':'vorige Übung'):'wird direkt daneben gestellt'}</small></span>›</button>`).join('')}`:''}
+      ${(r||C.length)&&inPlan?`<div class="row between"><span>Auch im Trainingstag speichern</span><button type="button" class="switch" data-a="ssperm" role="switch" aria-checked="false" aria-label="Auch im Trainingstag speichern"></button></div>`:''}
+      ${r||C.length?'<span class="hint">Supersatz: abwechselnd je ein Satz, die Pause startet erst, wenn beide Übungen dran waren.</span>':''}
+      <button type="button" class="btn danger" data-a="wdelex" data-i="${i}">${W.edit?'Aus diesem Training entfernen':'Übung für heute entfernen'}</button>`)},
+  ssperm:el=>{UI.ssPerm=!UI.ssPerm;el.classList.toggle('on',UI.ssPerm);el.setAttribute('aria-checked',UI.ssPerm)},
+  wsson:el=>{const W=UI.w,i=+el.dataset.i,j=+el.dataset.j;if(!W||!W.it[i]||!W.it[j])return;const a=Math.min(i,j),b=Math.max(i,j),id='ss-'+newId();
+    const [y]=W.it.splice(b,1);W.it.splice(a+1,0,y);W.it[a].ss=id;W.it[a+1].ss=id;ssClean(W.it);UI.wno=null;
+    const pl=UI.ssPerm&&ssPlan(W,[W.it[a],W.it[a+1]],id);sheet('');wPersist();render();
+    toast(`Supersatz: ${EXD(W.it[a].e).n} + ${EXD(W.it[a+1].e).n}${pl?' · auch im Trainingstag':''}`)},
+  wssoff:el=>{const W=UI.w,i=+el.dataset.i,r=W&&ssRun(W.it,i);if(!r)return;const X=r.map(j=>W.it[j]);
+    const pl=UI.ssPerm&&ssPlan(W,X,null);X.forEach(x=>delete x.ss);sheet('');wPersist();render();toast(pl?'Supersatz getrennt · auch im Trainingstag':'Supersatz getrennt')},
+  wdelex:el=>{const W=UI.w,i=+el.dataset.i;if(!W||!W.it[i])return;const old=clone(W.it),fs=W.fs,[x]=W.it.splice(i,1);ssClean(W.it);UI.wno=null;wFs(W);sheet('');wPersist();render();
+    toast(`${x.k==='ex'?EXD(x.e).n:'EMOM'} entfernt`,()=>{if(UI.w!==W)return;W.it=old;W.fs=fs;wPersist();render()})},
   wswap:el=>{const i=+el.dataset.i,x=UI.w.it[i],D=EXD(x.orig),al=(D.al||[]).filter(id=>LIB[id]||TR().ex[id]);UI.swapPerm=false;
     sheet(`<h3>Alternative zu ${esc(D.n)}</h3><span class="hint">Gleiches Bewegungsmuster, gleiche Muskeln.</span>
       ${al.map(id=>`<button type="button" class="opt" data-a="swapto" data-i="${i}" data-e="${id}"><span class="tx"><b>${esc(EXD(id).n)}</b><small>${esc(Object.keys(EXD(id).m||{}).join(', '))}</small></span>›</button>`).join('')}
@@ -2336,7 +2396,11 @@ Object.assign(ACT,{
     const [D]=T.days.splice(i,1);touch('state');back();toast(`„${D.name}“ gelöscht`,()=>{T.days.splice(Math.min(i,T.days.length),0,D);touch('state');render()})},
   blked:el=>{const D=TDAY(UI.page.id),i=+el.dataset.i;go({t:'blk',day:D.id,i,b:clone(D.blocks[i])})},
   blkemomnew:()=>{const D=TDAY(UI.page.id);go({t:'blk',day:D.id,i:null,b:normBlock({k:'emom',v:60,n:10,it:[{e:'chinup',r:6,k:0},{e:'dips',r:6,k:0}]})})},
-  blkmv:el=>{const D=TDAY(UI.page.id),i=+el.dataset.i,j=i+ +el.dataset.dir;if(!D||j<0||j>=D.blocks.length)return;[D.blocks[i],D.blocks[j]]=[D.blocks[j],D.blocks[i]];touch('state');render()},
+  blkmv:el=>{const D=TDAY(UI.page.id),i=+el.dataset.i,j=i+ +el.dataset.dir;if(!D||j<0||j>=D.blocks.length)return;[D.blocks[i],D.blocks[j]]=[D.blocks[j],D.blocks[i]];ssClean(D.blocks);touch('state');render()},
+  blkss:el=>{const D=TDAY(UI.page.id),i=+el.dataset.i,a=D&&D.blocks[i],b=D&&D.blocks[i+1];if(!a||!b||a.k==='emom'||b.k==='emom')return;
+    if(a.ss&&a.ss===b.ss){const id='ss-'+newId();for(let k=i+1;k<D.blocks.length&&D.blocks[k].ss===a.ss;k++)D.blocks[k].ss=id;ssClean(D.blocks);toast('Supersatz getrennt')}
+    else{const id=a.ss||b.ss||'ss-'+newId();a.ss=id;if(b.ss&&b.ss!==id)for(let k=i+1;k<D.blocks.length&&D.blocks[k].ss===b.ss;k++)D.blocks[k].ss=id;b.ss=id;toast(`Supersatz: ${EXD(a.e).n} + ${EXD(b.e).n}`)}
+    touch('state');render()},
   bksets:el=>{const b=UI.page.b,n=Math.max(1,Math.min(12,b.p.length+ +el.dataset.dir));while(b.p.length<n)b.p.push({...b.p[b.p.length-1]});b.p.length=n;render()},
   bidel:el=>{UI.page.b.it.splice(+el.dataset.i,1);render()},
   bkper:el=>{const f=UI.page;f.per=el.dataset.v==='1';if(!f.per){const k=f.b.p[0]?f.b.p[0].k:null,r=f.b.p[0]?f.b.p[0].r:f.b.lo;f.b.p.forEach(x=>{x.k=k;x.r=r})}render()},
@@ -2344,7 +2408,7 @@ Object.assign(ACT,{
     if(D){if(f.i!=null&&D.blocks[f.i]&&D.blocks[f.i].id===b.id)D.blocks[f.i]=b;else if(f.i==null&&!D.blocks.some(x=>x.id===b.id))D.blocks.push(b);else{const k=D.blocks.findIndex(x=>x.id===b.id);if(k>=0)D.blocks[k]=b}touch('state')}
     if(f.wi!=null&&UI.w){const x=UI.w.it[f.wi];if(x&&x.k==='emom'){const ok=x.ok;Object.assign(x,{v:b.v,n:b.n,its:clone(b.it),note:b.note,ok:Array.from({length:b.n},(_,k)=>!!ok[k])});x.r=Math.min(x.r,x.n);if(x.run){x.run=false;x.left=null}wPersist()}}
     back();toast('Gesichert')},
-  blkdel:()=>{const f=UI.page,D=TDAY(f.day);if(!D||f.i==null)return;const [b]=D.blocks.splice(f.i,1);touch('state');back();toast('Entfernt',()=>{D.blocks.splice(Math.min(f.i,D.blocks.length),0,b);touch('state');render()})},
+  blkdel:()=>{const f=UI.page,D=TDAY(f.day);if(!D||f.i==null)return;const [b]=D.blocks.splice(f.i,1);ssClean(D.blocks);touch('state');back();toast('Entfernt',()=>{D.blocks.splice(Math.min(f.i,D.blocks.length),0,b);touch('state');render()})},
   thr:el=>{const T=TR();T.hr=Math.max(100,Math.min(200,T.hr+ +el.dataset.dir));touch('state',600);render()},
   runnew:el=>go({t:'run',od:null,r:runDraft(el.dataset.d||today(),el.dataset.k)}),
   runedit:el=>{const d=el.dataset.d,r=runsOf(d).find(x=>x.id===el.dataset.id);if(r)go({t:'run',od:d,r:runDraft(d,r.t,r)})},
@@ -2359,6 +2423,8 @@ Object.assign(ACT,{
   stattab:()=>{S.settings.statTab=!S.settings.statTab;if(!S.settings.statTab&&UI.tab==='statistik')UI.tab='habits';touch('state',200);render()}});
 // nur kleine Abhak-Elemente und Schalter – auf Zeilen/Karten würde der Schalter das Scrollen blockieren
 ['wset','wsave','wfinish','wrir','wwarm','wwu','wnq','wemdot','restp','restm','restskip','cexsave','blksave','runsave','thr','stattab'].forEach(a=>HAPTIC.add(a));
+
+document.addEventListener('keydown',e=>{const t=e.target;if(e.key==='Enter'&&t&&t.dataset&&t.dataset.wn){e.preventDefault();t.blur()}});
 
 /* ---------- Habits sortieren: am Griff ziehen ---------- */
 const GRIP='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>';
@@ -2424,9 +2490,10 @@ const dmy=d=>{const x=pdate(d);return `${DN[wd(d)]} ${x.getDate()}.${x.getMonth(
 function setLine(e,sets){const D=EXD(e);return (sets||[]).map(s=>`${D.t==='bw'?(+s.k?'+'+fk(s.k)+' kg':'KG'):fk(+s.k||0)+' kg'} × ${s.r}${D.t==='time'?' s':''}${s.q!=null?` (RIR ${s.q>=4?'4+':s.q})`:''}`).join(' · ')+(D.sd?' (je Seite)':'')+(D.du?' (Gewicht je Hand)':'')}
 function sessText(d,s){const W=wFromSess(d,s),TM=wTimes(W),mins=s.en&&s.st?Math.round((s.en-s.st)/60000):0,L=[`${dmy(d)} – ${s.n}${mins>0&&mins<400?' · '+mins+' min':''}${s.feel!=null?' · Gefühl: '+['leicht','okay','hart'][s.feel]:''}`];
   const wu=s.wu?wuTxt(s.wu.m,s.wu.t):'';if(wu)L.push('  Aufwärmen: '+wu);
-  (s.x||[]).forEach((x,xi)=>{const b=blockOf(s.day,x.b),o=TM&&TM.by.get(xi),nt=noteTxt(x.nq,x.n);
+  (s.x||[]).forEach((x,xi)=>{const b=blockOf(s.day,x.b),o=TM&&TM.by.get(xi),nt=noteTxt(x.nq,x.n),r=ssRun(s.x,xi);
+    if(r&&xi===r[0])L.push(`  Supersatz (abwechselnd, Pause erst nach der Runde): ${r.map(j=>EXD(s.x[j].e).n).join(' + ')}`);
     if(x.em){const em=x.em;L.push(`  EMOM alle ${msx(em.v)} min, ${em.n} Runden (${em.it.map(t=>`${t.r} ${EXD(t.e).n}${t.k?' +'+fk(t.k)+' kg':''}`).join(' / ')}): ${em.ok.filter(Boolean).length}/${em.n} Runden geschafft`);return}
-    L.push(`  ${EXD(x.e).n}: ${setLine(x.e,x.s)}${b&&b.e===x.e?` (Ziel ${b.lo}${b.hi>b.lo?'–'+b.hi:''}${EXD(x.e).t==='time'?' s':''})`:''}${o&&o.n>1?` · Zeit ${msx(o.dur)}${o.rest!=null?`, Pause Ø ${msx(o.rest)}${o.plan?' (geplant '+msx(o.plan)+')':''}`:''}`:''}${Array.isArray(x.ws)&&x.ws.length?' · Aufwärmsätze: '+setLine(x.e,x.ws):''}${nt?' · Notiz: '+nt:''}`)});
+    L.push(`${r?'    ':'  '}${EXD(x.e).n}: ${setLine(x.e,x.s)}${b&&b.e===x.e?` (Ziel ${b.lo}${b.hi>b.lo?'–'+b.hi:''}${EXD(x.e).t==='time'?' s':''})`:''}${o&&o.n>1?` · Zeit ${msx(o.dur)}${o.rest!=null?`, Pause Ø ${msx(o.rest)}${o.plan?' (geplant '+msx(o.plan)+')':''}`:''}`:''}${Array.isArray(x.ws)&&x.ws.length?' · Aufwärmsätze: '+setLine(x.e,x.ws):''}${nt?' · Notiz: '+nt:''}`)});
   if(TM)L.push(`  Zeiten: bis erster Satz ${msx(TM.lead)} · erster bis letzter Satz ${msx(TM.total-TM.lead)}${TM.rest!=null?' · Pause Ø '+msx(TM.rest):''}${TM.wech!=null?' · Wechsel Ø '+msx(TM.wech):''}${TM.long?' · '+TM.long+' Lücke(n) über 15 min nicht mitgezählt':''}`);
   const gx=gaPair(d).bySess.get(s.id);if(gx)L.push('  '+gaLine(gx));
   return L.join('\n')}
@@ -2554,7 +2621,7 @@ function commitField(el){const f=el.dataset.f,d=el.dataset.d;if(!f||!d)return nu
   return mkey(d)}
 let wpT=null;const wPersistSoon=()=>{clearTimeout(wpT);wpT=setTimeout(wPersist,400)};
 function trInput(el,commit){const P=UI.page;
-  if(el.dataset.wn&&UI.w){const x=UI.w.it[+el.dataset.i];if(x)x.nt=String(el.value).slice(0,200);wPersistSoon();return true}
+  if(el.dataset.wn&&UI.w){const x=UI.w.it[+el.dataset.i];if(/\n/.test(el.value))el.value=el.value.replace(/\s*\n\s*/g,' ');if(x)x.nt=String(el.value).slice(0,200);noteFit(el);wPersistSoon();return true}
   if(el.dataset.ws&&UI.w){const x=UI.w.it[+el.dataset.i],q=x&&x.sets[+el.dataset.j];if(q){const v=String(el.value).trim();q[el.dataset.ws]=v===''?null:el.dataset.ws==='k'?pnum(v):clampI(v,0,9999,null)}wPersistSoon();return true}
   if(el.dataset.tw){const v=twVal(el.value);if(v==null)return true;const b=el.parentElement.querySelector('b');if(b)b.textContent=msx(v);const k=el.dataset.tw;
     if(k==='rest'&&UI.w){const x=UI.w.it[+el.dataset.i];if(x){x.rest=v;wPersistSoon();if(commit){const bl=blockOf(UI.w.day,x.b);if(bl&&bl.rest!==v){bl.rest=v;touch('state')}}}}

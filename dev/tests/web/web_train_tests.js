@@ -291,6 +291,68 @@ await step('notiz + aufwärmen',async()=>{
   ok('plain session without extras',s3&&!('ws' in s3.x[0])&&!('nq' in s3.x[0])&&!('n' in s3.x[0]),JSON.stringify(s3&&s3.x[0]));
   const e1=dayEnsure(d0);e1.tr=e1.tr.filter(z=>z.id!==s3.id);touch(mkey(d0));UI.page=null;UI.stack=[];render();
 });
+await step('supersatz + entfernen + notizfeld',async()=>{
+  const d0=t,base=Date.now();window.__now=()=>base;
+  ACT.wstart({dataset:{day:P().id,d:d0}});const nm=i=>EXD(UI.w.it[i].e).n,SW=EXD('swings').n,CA=EXD('carry').n;
+  ok('ss: start order',UI.w.it[3].e==='swings'&&UI.w.it[4].e==='carry'&&!q('.tss'));
+  ok('ss: more button per card',qa('[data-a="wmore"]').length===UI.w.it.length);
+  click('[data-a="wmore"][data-i="3"]');ok('ss: sheet offers others + remove',qa('#sheet [data-a="wsson"]').length===5&&!!q('#sheet [data-a="wdelex"]')&&!!q('#sheet [data-a="ssperm"]'));
+  click('#sheet [data-a="ssperm"]');click('#sheet [data-a="wsson"][data-j="4"]');await wait(30);
+  ok('ss: linked in workout',UI.w.it[3].ss&&UI.w.it[3].ss===UI.w.it[4].ss&&qa('.tss').length===1&&qa('.tss .texc').length===2&&!q('#sheet .tsheet'));
+  ok('ss: linked in plan',P().blocks[3].ss&&P().blocks[3].ss===P().blocks[4].ss);
+  ok('ss: one pause wheel for the pair',qa('.tss [data-tw="rest"]').length===1&&q('.tss .trctl').textContent.includes('Pause nach der Runde'));
+  ok('ss: head shows round',q('.tssh').textContent.includes('Runde 1 von 5'),q('.tssh').textContent);
+  for(let i=0;i<3;i++)for(let j=0;j<UI.w.it[i].sets.length;j++)UI.w.it[i].sets[j].done=true;render();
+  ok('ss: cur = first of pair',q('.tss .texc.cur [data-a="wmore"]')?.dataset.i==='3');
+  window.__now=()=>base+60000;click('[data-a="wset"][data-i="3"][data-j="0"]');
+  ok('ss: no rest after first exercise',UI.rest===null,JSON.stringify(UI.rest));
+  ok('ss: cur moves to partner',q('.tss .texc.cur [data-a="wmore"]')?.dataset.i==='4'&&q('.tssh').textContent.includes('jetzt '+CA),q('.tssh').textContent);
+  window.__now=()=>base+120000;click('[data-a="wset"][data-i="4"][data-j="0"]');
+  ok('ss: rest after the round (pair pause)',UI.rest&&UI.rest.total===UI.w.it[4].rest,JSON.stringify(UI.rest));
+  ok('ss: round 2',q('.tssh').textContent.includes('Runde 2')&&q('.tss .texc.cur [data-a="wmore"]')?.dataset.i==='3');
+  window.__now=()=>base+200000;click('[data-a="wset"][data-i="3"][data-j="1"]');ok('ss: rest cleared when going on',UI.rest===null);
+  window.__now=()=>base+250000;click('[data-a="wset"][data-i="4"][data-j="1"]');ok('ss: rest again',!!UI.rest);
+  const TM=wTimes(UI.w);ok('ss: times – return to first = pause, switch inside not counted',TM&&TM.by.get(3).rest===80&&TM.by.get(3).plan===UI.w.it[4].rest,JSON.stringify(TM&&[...TM.by]));
+  // Entfernen + Rückgängig
+  click('[data-a="wmore"][data-i="0"]');click('#sheet [data-a="wdelex"]');await wait(30);
+  ok('del: removed dips',UI.w.it.length===5&&UI.w.it[0].e!=='dips'&&!q('#sheet .tsheet')&&q('#toast').textContent.includes('entfernt'));
+  ok('del: pair keeps link',UI.w.it[2].ss&&UI.w.it[2].ss===UI.w.it[3].ss&&qa('.tss').length===1);
+  click('#toast [data-a="undo"]');ok('del: undo restores',UI.w.it.length===6&&UI.w.it[0].e==='dips'&&UI.w.it[0].sets.every(s=>s.done));
+  click('[data-a="wmore"][data-i="4"]');ok('del: pair member sheet has unlink',!!q('#sheet [data-a="wssoff"]')&&!q('#sheet [data-a="wsson"]'));
+  click('#sheet [data-a="wdelex"]');ok('del: removing partner dissolves pair',UI.w.it.length===5&&!UI.w.it[3].ss&&!q('.tss'));
+  click('#toast [data-a="undo"]');ok('del: undo brings pair back',qa('.tss').length===1&&UI.w.it[4].e==='carry');
+  // EMOM-freier Tag: Notizfeld
+  click('[data-a="wnote"][data-i="3"]');const ta=q('textarea[data-wn]');
+  ok('note: textarea',!!ta&&ta.tagName==='TEXTAREA'&&ta.rows>=2);
+  const long='Griff wurde gegen Ende nass, nächstes Mal Kreide mitnehmen und Hüfte mehr strecken';
+  typeIn('textarea[data-wn]',long+'\nzweite Zeile');ok('note: newline becomes space, full text kept',UI.w.it[3].nt===long+' zweite Zeile',UI.w.it[3].nt);
+  ok('note: field grows (no horizontal scroll)',q('textarea[data-wn]').scrollWidth<=q('textarea[data-wn]').clientWidth+1&&q('textarea[data-wn]').offsetHeight>=64,q('textarea[data-wn]').offsetHeight);
+  click('[data-a="wnote"][data-i="3"]');ok('note: closed line shows whole text',q('.tnl').textContent.includes('Kreide mitnehmen'));
+  click('.ptopbar [data-a="wfinish"]');click('.ptopbar [data-a="wsave"]');await wait(600);
+  const sv=sessOf(d0).filter(x=>x.day===P().id).pop();
+  ok('ss: saved on both',sv&&sv.x[3].ss&&sv.x[3].ss===sv.x[4].ss&&sv.x[3].e==='swings'&&!sv.x[0].ss,JSON.stringify(sv&&sv.x.map(x=>x.ss||'')));
+  ok('ss: cloud ok',!JSON.stringify(cloud(mk)).includes('undefined')&&cloud(mk).days[d0].tr.some(z=>z.id===sv.id&&z.x[3].ss));
+  const TX=sessText(d0,sv);ok('ss: claude text',TX.includes(`Supersatz (abwechselnd, Pause erst nach der Runde): ${SW} + ${CA}`)&&TX.includes(`    ${SW}: `),TX);
+  ACT.wview({dataset:{d:d0,id:sv.id}});ok('ss: summary marks pair',qa('.tssm').length===2&&q('.tssm').textContent.includes('Supersatz mit '+CA));
+  click('.ptopbar [data-a="wedit"]');ok('ss: edit keeps pair',qa('.tss').length===1&&UI.w.it[3].ss===sv.x[3].ss);click('.ptopbar [data-a="wcancel"]');
+  UI.page=null;UI.stack=[];render();
+  // nächstes Training: Supersatz kommt aus dem Plan
+  window.__now=()=>base+3600e3;ACT.wstart({dataset:{day:P().id,d:d0}});
+  ok('ss: next workout linked from plan',qa('.tss').length===1&&UI.w.it[3].ss===UI.w.it[4].ss);
+  click('[data-a="wmore"][data-i="3"]');click('#sheet [data-a="ssperm"]');click('#sheet [data-a="wssoff"]');
+  ok('ss: unlink today + plan',!q('.tss')&&!UI.w.it[3].ss&&!P().blocks[3].ss&&!P().blocks[4].ss);
+  click('.ptopbar [data-a="wcancel"]');if(UI.w)click('.ptopbar [data-a="wcancel"]');
+  // Trainingstag: Verbinder
+  go({t:'dayed',id:P().id});const nEx=P().blocks.filter(b=>b.k==='ex').length;
+  ok('day: link buttons between exercises',qa('[data-a="blkss"]').length===nEx-1&&!q('.tlink.on'));
+  click('[data-a="blkss"][data-i="1"]');ok('day: linked',P().blocks[1].ss&&P().blocks[1].ss===P().blocks[2].ss&&qa('.tlink.on').length===1);
+  ok('day: superset shortens estimate',dayMin(P())<=dayMin({blocks:P().blocks.map(b=>({...b,ss:undefined}))}));
+  click('[data-a="blkmv"][data-i="2"][data-dir="1"]');ok('day: moving apart dissolves',!P().blocks.some(b=>b.ss)&&!q('.tlink.on'));
+  click('[data-a="blkmv"][data-i="3"][data-dir="-1"]');click('[data-a="blkss"][data-i="1"]');click('[data-a="blkss"][data-i="1"]');ok('day: unlink again',!P().blocks.some(b=>b.ss));
+  await wait(900);ok('day: cloud training ok',!JSON.stringify(cloud('state').training).includes('undefined')&&!cloud('state').training.days[0].blocks.some(b=>b.ss));
+  click('[data-a="back"]');
+  window.__now=null;const e0=dayEnsure(d0);e0.tr=e0.tr.filter(z=>z.id!==sv.id);if(!e0.tr.length)delete e0.tr;touch(mkey(d0));UI.page=null;UI.stack=[];render();
+});
 await step('emom tag C',async()=>{
   ACT.wstart({dataset:{day:C().id,d:t}});ok('emom card',!!q('.temom')&&qa('.tdots button').length===10);
   click('[data-a="wemset"][data-i="0"]');ok('blk page emom',UI.page.t==='blk'&&UI.page.b.k==='emom');

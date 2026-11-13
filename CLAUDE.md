@@ -50,7 +50,7 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 
 - Playwright + Chromium sind in Claude-Code-Cloud-Umgebungen vorinstalliert (über `NODE_PATH`) – **nicht** neu installieren.
   Nur wenn `node -e "require('playwright')"` fehlschlägt: `cd dev && npm i -D playwright && npx playwright install chromium`.
-- `test.sh` umfasst (Stand Übergabe): Widget 439 Tests, Garmin-Logik (Erkennung, Tempo, FIT/ZIP 98), Web-App 588 Tests.
+- `test.sh` umfasst (Stand Übergabe): Widget 439 Tests, Garmin-Logik (Erkennung, Tempo, FIT/ZIP 98), Web-App 637 Tests.
 - **Web-Tests:** `dev/tests/web/build_harness.py` baut Testseiten aus `index.html` + `fbmock.js` (Firestore-Nachbau, lehnt wie
   das echte Firestore **Arrays in Arrays** und `undefined` ab). `web_train_tests.js` = Training/Garmin, `web_tests.js` = Basis-App.
 - **Widget-Tests:** `dev/tests/widget/run.js` ist ein strenger Scriptable-Nachbau (unbekannte Eigenschaften werfen Fehler).
@@ -104,6 +104,11 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 - **Zusammenfassung** (`pWSum`, Seite `wsum`, Aktion `wview`): Antippen eines gespeicherten Trainings; „Bearbeiten“ → `wedit` (Swipe „Ändern“ geht direkt dorthin).
   `wFromSess(d,s,edit)` baut den Arbeitszustand aus einer gespeicherten Einheit (für Bearbeiten und Zusammenfassung). Bestwerte dort nur gegen frühere Einheiten (`histFor(e,b,bef)`).
   Nach „Sichern“ im Bearbeiten kehrt man in die Zusammenfassung zurück, wenn man von dort kam.
+- **Supersatz:** `ss` (Kennung) auf Baustein, Trainingsmodus-Eintrag und gespeichertem `x[]` – gilt nur für **direkt aufeinanderfolgende** Einträge mit gleichem `ss`
+  (`ssRun(L,i)` liefert die Indizes, `ssClean(L)` entfernt verwaiste `ss`; nach jedem Umsortieren/Entfernen aufrufen). Im Training: `wCur` wählt abwechselnd die Übung mit den wenigsten
+  erledigten Arbeitssätzen, `wRestAfter` startet die Pause erst nach der Runde (Pause der letzten Übung, nur dort das Pausen-Rad). `wTimes`: Rückkehr zur ersten Übung = Pause, Wechsel im Supersatz zählt nicht als Übungswechsel.
+  Verbinden/Trennen/Entfernen über ⋯ (`wmore` → `wsson`/`wssoff`/`wdelex`, Schalter `ssperm` = auch im Trainingstag, `ssPlan`); im Trainingstag Verbinder `blkss` (`ssLink`).
+- Notizfeld im Training ist ein `<textarea data-wn>` (wächst per `noteFit`, Enter = fertig, Zeilenumbrüche werden zu Leerzeichen).
 - Doppelte Progression; „Hart“ hält das Gewicht; Plateau = 5 Einheiten ohne Fortschritt; Wochensätze je Muskel
   (`MUS`: Brust, Rücken, Schultern, Bizeps, Trizeps, Beine, Core).
 
@@ -142,9 +147,9 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 
 ## Offene Liste
 
-Mit Zeynel besprochen am 11.11.2026, Reihenfolge = Vorschlag (oben zuerst). Gebaut und aus der Liste gestrichen (11.11.2026): „Zeiten automatisch“, „Zusammenfassung wieder ansehen“, „Notiz pro Übung“, „Aufwärmen“. Später möglich: Garmin-Puls je Übung aus der Kraft-Aufzeichnung über die Satz-Zeitstempel `t`.
+Mit Zeynel besprochen am 11.11.2026, Reihenfolge = Vorschlag (oben zuerst). Gebaut und aus der Liste gestrichen (11.11.2026): „Zeiten automatisch“, „Zusammenfassung wieder ansehen“, „Notiz pro Übung“, „Aufwärmen“; (13.11.2026): „Supersätze“, Übung im Training entfernen, größeres Notizfeld. Später möglich: Garmin-Puls je Übung aus der Kraft-Aufzeichnung über die Satz-Zeitstempel `t`.
 
-1. **Supersätze** – zwei Übungen im Trainingstag verbinden (z. B. Swings + Suitcase Carry), im Training abwechselnd, Pause erst nach dem Paar.
+(Liste leer – nächste Wünsche mit Zeynel klären.)
 
 Später / Ideen: alternative Übungen (erst wenn Zeynel regelmäßig im Gym trackt), Trainings-Widget, Körpergewicht/Bauchumfang,
 Intervall-Farbe Pink statt Orange (falls es ihn stört). Aufräumen auf GitHub: Branch „probe“ löschen (macht Zeynel).

@@ -237,3 +237,15 @@ body:has(.trest) .wrap{padding-bottom:70px}
 .tsrow.warm .no{background:rgba(111,164,255,.18);color:#9DBFFF;font-weight:700}
 .tsrow.warm.done label{background:rgba(111,164,255,.08);border-color:rgba(111,164,255,.25)}
 .tsrow.warm.done .ck{background:#6FA4FF;border-color:#6FA4FF}
+/* Notizfeld wächst mit dem Text */
+.tnta{display:block;resize:none;line-height:1.4;min-height:64px;max-height:190px;padding:10px 12px;font-size:16px;field-sizing:content}
+/* Supersatz: zwei Übungen in einem Rahmen */
+.tss{display:flex;flex-direction:column;gap:8px;padding:10px 6px 6px;border-radius:calc(var(--r-lg) + 6px);border:1px solid rgba(70,224,174,.3);background:rgba(70,224,174,.045)}
+.tssh{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:0 8px;font-size:13px;color:var(--muted)}
+.tssh b{color:var(--accent);font-size:13.5px;font-weight:750;display:inline-flex;align-items:center;gap:5px}
+.iclink{width:14px;height:14px;flex:none;vertical-align:-2px}
+.tnxt em.tssm{color:var(--accent);font-style:normal}
+/* Trainingstag: Verbinder zwischen zwei Übungen */
+.tlinkw{display:flex;justify-content:center;margin:-6px 0;position:relative;z-index:1}
+.tlink{display:inline-flex;align-items:center;gap:5px;height:28px;min-width:40px;justify-content:center;padding:0 12px;border-radius:14px;font-size:13px;font-weight:700;color:#8A9391;background:#121716;border:1px solid rgba(255,255,255,.12)}
+.tlink.on{color:var(--accent);border:1px solid rgba(70,224,174,.45);background:#0f2a22}
