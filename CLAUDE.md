@@ -104,6 +104,7 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 - **Zusammenfassung** (`pWSum`, Seite `wsum`, Aktion `wview`): Antippen eines gespeicherten Trainings; „Bearbeiten“ → `wedit` (Swipe „Ändern“ geht direkt dorthin).
   `wFromSess(d,s,edit)` baut den Arbeitszustand aus einer gespeicherten Einheit (für Bearbeiten und Zusammenfassung). Bestwerte dort nur gegen frühere Einheiten (`histFor(e,b,bef)`).
   Nach „Sichern“ im Bearbeiten kehrt man in die Zusammenfassung zurück, wenn man von dort kam.
+- **Letzte Trainings** (Ende von `vTraining`): Krafttrainings (`sessRow`) und Läufe (`runRow(d,r,1)`, mit 🏃) gemischt nach Datum, max. 8. `runRow` nutzt auch „Letzte Läufe“ (`pRuns`).
 - **Supersatz:** `ss` (Kennung) auf Baustein, Trainingsmodus-Eintrag und gespeichertem `x[]` – gilt nur für **direkt aufeinanderfolgende** Einträge mit gleichem `ss`
   (`ssRun(L,i)` liefert die Indizes, `ssClean(L)` entfernt verwaiste `ss`; nach jedem Umsortieren/Entfernen aufrufen). Im Training: `wCur` wählt abwechselnd die Übung mit den wenigsten
   erledigten Arbeitssätzen, `wRestAfter` startet die Pause erst nach der Runde (Pause der letzten Übung, nur dort das Pausen-Rad). `wTimes`: Rückkehr zur ersten Übung = Pause, Wechsel im Supersatz zählt nicht als Übungswechsel.

@@ -129,6 +129,13 @@ await step('history + edit',async()=>{
   click('[data-a="undo"]');ok('undo',sessOf(t).length===1&&sessOf(t)[0].id===id);
   click('.thero [data-a="wview"]');ok('hero opens summary',UI.page.t==='wsum');click('.ptopbar [data-a="wedit"]');click('.ptopbar [data-a="wcancel"]');ok('cancel edit returns to summary',!UI.w&&UI.page.t==='wsum');
   click('.ptopbar [data-a="back"]');ok('back to training',!UI.page);
+  // Läufe stehen mit in „Letzte Trainings“, neueste zuerst
+  const yd=addDays(t,-1),ey=dayEnsure(yd);ey.run=[{id:'r-lt1',t:'easy',dur:1800,km:5,hr:140}];touch(mkey(yd));render();
+  const LT=[...qa('.sec')].find(x=>x.querySelector('h2')&&x.querySelector('h2').textContent==='Letzte Trainings'),LR=LT?[...LT.querySelectorAll('.swipe .tt')]:[];
+  ok('last trainings include runs',LR.length===2&&LR[0].dataset.a==='wview'&&LR[1].dataset.a==='runedit'&&LR[1].textContent.includes('🏃 Lauf')&&LR[1].textContent.includes('5 km'),LR.map(b=>b.textContent).join('|'));
+  ok('run row has delete',!!LT.querySelector('.swipe-actions [data-a="rundelq"][data-id="r-lt1"]'));
+  LR[1].click();await wait(20);ok('run row opens run',UI.page&&UI.page.t==='run'&&UI.page.r.id==='r-lt1');click('.ptopbar [data-a="back"]');
+  ACT.rundelq({dataset:{d:yd,id:'r-lt1'}});await wait(20);ok('run row delete',!runsOf(yd).length&&qa('.swipe .tt[data-a="runedit"]').length===0);
 });
 await step('second workout uses history',async()=>{
   ACT.wstart({dataset:{day:P().id,d:t}});

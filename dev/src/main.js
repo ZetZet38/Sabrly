@@ -203,9 +203,13 @@ function vTraining(){const T=TR();if(!T)return vTSetup();wRestore();
   h+=`<div class="tgrid"><button type="button" class="btn" data-a="tplan" data-ws="${ws}">📅 Woche planen<small>Tage zuweisen</small></button><button type="button" class="btn" data-a="truns">🏃 Laufen<small>Puls &amp; Pace</small></button>
     <button type="button" class="btn" data-a="tdays">🗂️ Trainingstage<small>${T.days.length} ${T.days.length===1?'Tag':'Tage'} bearbeiten</small></button><button type="button" class="btn" data-a="texl">🏋️ Übungen<small>Verlauf &amp; Bestwerte</small></button></div>
     <button type="button" class="btn" data-a="copyweek" data-ws="${ws}">📋 Woche für Claude kopieren</button>`;
-  const L=allSess('tr').slice(0,6);
-  if(L.length)h+=`<section class="sec"><div class="sec-h"><h2>Letzte Trainings</h2></div>${L.map(({d,s})=>sessRow(d,s)).join('')}<span class="hint">Tippen zum Bearbeiten · nach links wischen zum Löschen</span></section>`;
+  // Krafttrainings und Läufe gemischt, neueste zuerst
+  const L=[...allSess('tr').slice(0,8).map(x=>({...x,k:'tr'})),...allSess('run').slice(0,8).map(x=>({...x,k:'run'}))].sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0).slice(0,8);
+  if(L.length)h+=`<section class="sec"><div class="sec-h"><h2>Letzte Trainings</h2></div>${L.map(({d,s,k})=>k==='run'?runRow(d,s,1):sessRow(d,s)).join('')}<span class="hint">Tippen zum Ansehen · nach links wischen zum Löschen</span></section>`;
   return h}
+function runRow(d,r,ic){const T=TR();
+  return swipeRow(`<div class="todo solid"><span class="tdot" style="--c:${TCOL[r.t==='iv'?'o':'b']}"></span><button type="button" class="tt" data-a="runedit" data-d="${d}" data-id="${esc(r.id)}"><b>${ic?'🏃 ':''}${r.t==='iv'?'Intervalle':'Lauf'}${r.t!=='iv'&&r.hr&&T&&r.hr<T.hr?' · locker':''}${r.g?' <span class="gtag">⌚</span>':''}</b><span>${fmtShort(d)} · ${esc(runLine(r))}${r.dur?' · '+hmsx(r.dur):''}</span></button></div>`,
+    sa('sa-del','rundelq',`data-d="${d}" data-id="${esc(r.id)}"`,IC.del,'Löschen')+sa('sa-edit','runedit',`data-d="${d}" data-id="${esc(r.id)}"`,IC.edit,'Ändern'))}
 function sessRow(d,s){const D=TDAY(s.day),sets=(s.x||[]).reduce((n,x)=>n+(x.em?x.em.ok.filter(Boolean).length:(x.s||[]).length),0),mins=s.en&&s.st?Math.round((s.en-s.st)/60000):0,gx=gaPair(d).bySess.get(s.id);
   return swipeRow(`<div class="todo solid"><span class="tdot" style="--c:${TCOL[D?.col||'g']}"></span><button type="button" class="tt" data-a="wview" data-d="${d}" data-id="${esc(s.id)}"><b>${esc(s.n||D?.name||'Training')}</b><span>${fmtShort(d)} · ${(s.x||[]).length} Übungen · ${sets} Sätze${mins>0&&mins<400?' · '+mins+' min':''}${gx&&gx.hr?' · ⌚ Ø '+gx.hr:''}</span></button></div>`,
     sa('sa-del','wdel',`data-d="${d}" data-id="${esc(s.id)}"`,IC.del,'Löschen')+sa('sa-edit','wedit',`data-d="${d}" data-id="${esc(s.id)}"`,IC.edit,'Ändern'))}
@@ -606,8 +610,7 @@ function pRuns(){const T=TR(),t=today(),tw=weekStart(t),all=allSess('run');
     const avg=r=>{const L=r.iv.r.filter(x=>x.v),p=L.map(x=>ivPace(r.iv,x.v)).filter(Boolean),hh=r.iv.r.map(x=>+x.h).filter(Boolean);return {p:p.length?p.reduce((a,b)=>a+b,0)/p.length:0,h:hh.length?Math.round(hh.reduce((a,b)=>a+b,0)/hh.length):0,last:hh.length?hh[hh.length-1]:0}};
     h+=`<div class="card glass stack" style="gap:8px"><span class="label">Intervalle ${esc(k0)}</span>${same.map(x=>{const a=avg(x.s);return `<div class="row between tlh"><span>${fmtShort(x.d)}</span><span class="num">${a.p?msx(a.p)+' /km':'–'} · Ø ${a.h||'–'}${a.last?' · letztes '+a.last:''}</span></div>`}).join('')}
       ${same.length>1?(()=>{const a=avg(same[0].s),b=avg(same[same.length-1].s);return a.h&&b.h&&a.p&&b.p?`<span class="hint">Ø-Puls ${b.h} → ${a.h} bei ${msx(b.p)} → ${msx(a.p)} /km. ${a.h<b.h&&a.p<=b.p+3?'Gleiche Arbeit, weniger Puls – du wirst fitter.':''}</span>`:''})():''}</div>`}
-  h+=`<section class="sec"><div class="sec-h"><h2>Letzte Läufe</h2></div>${all.slice(0,12).map(({d,s:r})=>swipeRow(`<div class="todo solid"><span class="tdot" style="--c:${TCOL[r.t==='iv'?'o':'b']}"></span><button type="button" class="tt" data-a="runedit" data-d="${d}" data-id="${esc(r.id)}"><b>${r.t==='iv'?'Intervalle':'Lauf'}${r.t!=='iv'&&r.hr&&r.hr<T.hr?' · locker':''}${r.g?' <span class="gtag">⌚</span>':''}</b><span>${fmtShort(d)} · ${esc(runLine(r))}${r.dur?' · '+hmsx(r.dur):''}</span></button></div>`,
-    sa('sa-del','rundelq',`data-d="${d}" data-id="${esc(r.id)}"`,IC.del,'Löschen')+sa('sa-edit','runedit',`data-d="${d}" data-id="${esc(r.id)}"`,IC.edit,'Ändern'))).join('')}<span class="hint">Tippen zum Ändern · nach links wischen zum Löschen</span></section>`;
+  h+=`<section class="sec"><div class="sec-h"><h2>Letzte Läufe</h2></div>${all.slice(0,12).map(({d,s:r})=>runRow(d,r)).join('')}<span class="hint">Tippen zum Ändern · nach links wischen zum Löschen</span></section>`;
   return h}
 
 /* ---------- Bottom-Sheet ---------- */
