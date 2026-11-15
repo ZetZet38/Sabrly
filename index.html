@@ -1783,9 +1783,10 @@ const ICLINK='<svg class="iclink" viewBox="0 0 24 24" fill="none" stroke="curren
 // Indizes des Supersatzes, zu dem L[i] gehört (mindestens 2 hintereinander), sonst null – für Bausteine, Trainingsmodus und gespeicherte Einheiten
 function ssRun(L,i){const x=L[i];if(!x||!x.ss||x.k==='emom'||x.em)return null;let a=i,b=i;while(a>0&&L[a-1]&&L[a-1].ss===x.ss)a--;while(b<L.length-1&&L[b+1]&&L[b+1].ss===x.ss)b++;return b>a?Array.from({length:b-a+1},(_,k)=>a+k):null}
 function ssClean(L){L.forEach((x,i)=>{if(x&&x.ss&&!ssRun(L,i))delete x.ss});return L}
-// jüngste Einheit dieses Bausteins (sonst dieser Übung): {d,x,f}
-function lastFor(b,e,skip){let byE=null;for(const {d,s} of allSess('tr')){if(skip&&s.id===skip)continue;
-  for(const x of s.x||[]){if(!Array.isArray(x.s)||!x.s.length)continue;if(x.b===b&&x.e===e)return {d,x,f:s.feel};if(!byE&&x.e===e)byE={d,x,f:s.feel}}}return byE}
+// letztes Mal, dass diese Übung gemacht wurde – egal an welchem Trainingstag (b bleibt für Aufrufer, zählt nicht): {d,x,f}
+// innerhalb eines Tages: jüngste Einheit zuerst (allSess), in einer Einheit der letzte Eintrag der Übung
+function lastFor(b,e,skip){for(const {d,s} of allSess('tr')){if(skip&&s.id===skip)continue;const L=s.x||[];
+  for(let i=L.length-1;i>=0;i--){const x=L[i];if(x&&x.e===e&&Array.isArray(x.s)&&x.s.length)return {d,x,f:s.feel}}}return null}
 // bef: nur Einheiten vor {d,st} (für Bestwerte einer gespeicherten Einheit)
 function histFor(e,b,bef){const L=[];for(const {d,s} of allSess('tr')){if(bef&&!(d<bef.d||(d===bef.d&&(s.st||0)<(bef.st||0))))continue;for(const x of s.x||[])if(x.e===e&&(!b||x.b===b)&&Array.isArray(x.s)&&x.s.length)L.push({d,s:x.s,f:s.feel})}return L}
 function setsTxt(sets,e){const D=EXD(e);if(!sets||!sets.length)return '';const ks=sets.map(s=>+s.k||0),rs=sets.map(s=>s.r),same=ks.every(k=>k===ks[0]);
@@ -1805,7 +1806,7 @@ function suggest(lo,hi,e,sets,feel){const D=EXD(e);if(!sets||!sets.length)return
 // „Wie schwer war's?“ aus RIR: Ø ≤ 1 → hart, Ø ≥ 3 → leicht, sonst okay (null ohne RIR)
 function feelFromRir(W){const q=[];for(const x of W.it)if(x.k==='ex')for(const s of x.sets)if(wDone(s)&&s.q!=null)q.push(+s.q);if(!q.length)return null;const a=q.reduce((u,v)=>u+v,0)/q.length;return a<=1?2:a>=3?0:1}
 // Plateau: mindestens 5 Einheiten, die letzten 5 ohne Fortschritt
-function plateau(b,e){const H=histFor(e,b).slice(0,5);if(H.length<5)return '';const sc=H.map(h=>{const t=topOf(h.s);return t.k*1000+h.s.filter(s=>(+s.k||0)===t.k).reduce((a,s)=>a+(+s.r||0),0)});
+function plateau(b,e){const H=histFor(e).slice(0,5);if(H.length<5)return '';const sc=H.map(h=>{const t=topOf(h.s);return t.k*1000+h.s.filter(s=>(+s.k||0)===t.k).reduce((a,s)=>a+(+s.r||0),0)});
   if(Math.max(...sc.slice(0,4))>sc[4])return '';const t=topOf(H[0].s);
   return `Seit 5 Einheiten kein Fortschritt (${fk(t.k)} kg × ${t.r}). Tipp: eine Woche etwa 10 % leichter (Deload) oder über ⇄ eine Variante.`}
 function trHabit(kind){const T=TR();if(!T)return null;const hs=S.habits.filter(h=>!h.archived);
@@ -1910,8 +1911,9 @@ const noteTxt=(q,t)=>[...(Array.isArray(q)?q:[]).map(i=>NQ[i]).filter(Boolean),S
 const wuTxt=(m,t)=>[m>0?m+' min':'',...(Array.isArray(t)?t:[]).map(k=>WUK[k]).filter(Boolean)].filter(Boolean).join(' · ');
 const wDone=s=>s.done&&!s.w;                    // abgehakter Arbeitssatz (Aufwärmsätze zählen nicht)
 const wNo=(x,j)=>x.sets.slice(0,j).filter(s=>!s.w).length;   // Index unter den Arbeitssätzen
-// Zeit bis zum ersten abgehakten Arbeitssatz = Aufwärmzeit
-function wFs(W){if(W.edit)return;const any=W.it.some(x=>x.k==='ex'&&x.sets.some(wDone));if(any&&!W.fs)W.fs=NOW();else if(!any)W.fs=null}
+// Zeit bis zum ersten abgehakten Arbeitssatz (oder EMOM-Start) = Aufwärmzeit
+const emBegun=x=>x.k==='emom'&&(x.run||x.r>0||x.left!=null||x.ok.some(Boolean));
+function wFs(W){if(W.edit)return;const any=W.it.some(x=>x.k==='ex'?x.sets.some(wDone):emBegun(x));if(any&&!W.fs)W.fs=NOW();else if(!any)W.fs=null}
 function wItemFromBlock(b,skip){if(b.k==='emom')return {k:'emom',b:b.id,v:b.v,n:b.n,its:clone(b.it),ok:Array(b.n).fill(false),r:0,run:false,end:0,left:null,note:b.note};
   const L=lastFor(b.id,b.e,skip),src=j=>(L?(L.x.s[j]||L.x.s[L.x.s.length-1]):null)||b.p[j]||b.p[b.p.length-1]||{k:null,r:b.lo};
   return {k:'ex',b:b.id,e:b.e,orig:b.e,sets:b.p.map((_,j)=>({k:src(j).k,r:src(j).r,done:false})),rest:b.rest,lo:b.lo,hi:b.hi,note:b.note,last:L?L.x.s:null,lf:L?L.f:null,plat:plateau(b.id,b.e),nq:[],nt:'',ln:L?noteTxt(L.x.nq,L.x.n):'',...(b.ss?{ss:b.ss}:{})}}
@@ -1937,7 +1939,7 @@ function warmCard(W){const ed=!!W.edit,retro=W.d<today(),t=Array.isArray(W.wt)?W
   const tm=ed?(W.wm>0?W.wm+' min':''):retro?'':msx(((W.fs||NOW())-W.st)/1000);
   return `<div class="card glass stack twu" style="gap:10px"><div class="row between"><span class="label">Aufwärmen</span>${tm?`<span class="num tclock" id="wwu">${tm}</span>`:''}</div>
     <div class="twc">${Object.entries(WUK).map(([k,v])=>`<button type="button" class="chip${t.includes(k)?' on':''}" data-a="wwu" data-k="${k}" aria-pressed="${t.includes(k)}">${v}</button>`).join('')}</div>
-    ${ed||retro?'':`<span class="hint">${W.fs?'Aufwärmzeit gemessen – bis zu deinem ersten Arbeitssatz.':'Die Zeit läuft bis zu deinem ersten abgehakten Arbeitssatz. Satznummer antippen = Aufwärmsatz.'}</span>`}</div>`}
+    ${ed||retro?'':`<span class="hint">${W.fs?'Aufwärmzeit gemessen – bis zu deinem ersten Arbeitssatz oder EMOM.':'Die Zeit läuft bis zu deinem ersten abgehakten Arbeitssatz oder dem EMOM-Start. Satznummer antippen = Aufwärmsatz.'}</span>`}</div>`}
 function exCard(x,i,cur,ed,ss){const D=EXD(x.e),R=D.t==='time'?'s':'Wdh.',ssLast=!ss||i===ss[ss.length-1];
   let h=`<div class="texc glass${cur?' cur':''}"><div class="texh"><button type="button" class="nm" data-a="exd" data-e="${esc(x.e)}">${esc(D.n)}${x.sw?' <small>· heute getauscht</small>':''}</button><button type="button" class="tib" data-a="exinfo" data-e="${esc(x.e)}" aria-label="Ausführung und Tipps">i</button><button type="button" class="tib" data-a="wswap" data-i="${i}" aria-label="Alternative">⇄</button><button type="button" class="tib" data-a="wmore" data-i="${i}" aria-label="Mehr: Supersatz, Entfernen">⋯</button></div>`;
   if(!ed){if(x.last)h+=`<span class="tlast">Letztes Mal: ${esc(setsTxt(x.last,x.e))}</span>`;else h+=`<span class="tlast">${x.sw?'Neu für dich – noch keine Werte':'Noch keine Einheit – Startwerte aus dem Plan'}</span>`;
@@ -2341,9 +2343,9 @@ Object.assign(ACT,{
   restp:()=>{if(UI.rest){UI.rest.end+=10000;UI.rest.total+=10}restbar()},
   restm:()=>{if(UI.rest)UI.rest.end-=10000;restbar()},
   restskip:()=>{UI.rest=null;restbar()},
-  wemgo:el=>{const x=curW(el);if(!x)return;if(x.run){x.left=Math.max(1,Math.ceil((x.end-NOW())/1000));x.run=false}else{x.end=NOW()+(x.left??x.v)*1000;x.left=null;x.run=true}wPersist();render()},
-  wemreset:el=>{const x=curW(el);if(!x)return;x.r=0;x.ok=Array(x.n).fill(false);x.run=false;x.left=null;wPersist();render()},
-  wemdot:el=>{const x=curW(el);if(!x)return;const k=+el.dataset.k;x.ok[k]=!x.ok[k];if(x.ok[k]&&k>=x.r&&!x.run)x.r=Math.min(x.n,k+1);wPersist();render()},
+  wemgo:el=>{const x=curW(el);if(!x)return;if(x.run){x.left=Math.max(1,Math.ceil((x.end-NOW())/1000));x.run=false}else{x.end=NOW()+(x.left??x.v)*1000;x.left=null;x.run=true}wFs(UI.w);wPersist();render()},
+  wemreset:el=>{const x=curW(el);if(!x)return;x.r=0;x.ok=Array(x.n).fill(false);x.run=false;x.left=null;wFs(UI.w);wPersist();render()},
+  wemdot:el=>{const x=curW(el);if(!x)return;const k=+el.dataset.k;x.ok[k]=!x.ok[k];if(x.ok[k]&&k>=x.r&&!x.run)x.r=Math.min(x.n,k+1);wFs(UI.w);wPersist();render()},
   wemset:el=>{const i=+el.dataset.i,x=UI.w.it[i],b=blockOf(UI.w.day,x.b);go({t:'blk',day:b?UI.w.day:null,i:b?TDAY(UI.w.day).blocks.indexOf(b):null,wi:i,b:clone(b||{k:'emom',id:x.b,v:x.v,n:x.n,it:x.its,note:x.note})})},
   waddex:()=>go({t:'pick',m:'wadd',q:'',mu:''}),
   // ⋯ auf einer Übung: Supersatz verbinden/trennen, Übung entfernen

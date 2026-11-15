@@ -57,9 +57,10 @@ Nachgetragene Trainings haben keine Zeiten (Minuten sind dann geschätzt).
 Ein gespeichertes Training antippen öffnet die **Zusammenfassung** (Minuten, Sätze, Tonnen, Bestwerte, Zeiten, Übungen, Garmin, Vorschläge);
 oben rechts „Bearbeiten“, nach dem Speichern bist du wieder in der Zusammenfassung. Wischen → „Ändern“ öffnet wie bisher direkt die Bearbeitung.
 Unter „Letzte Trainings“ stehen Krafttrainings und Läufe (🏃) gemeinsam, neueste zuerst; einen Lauf antippen öffnet ihn.
-**Aufwärmen:** Oben im Training läuft die Aufwärmzeit bis zu deinem ersten abgehakten Arbeitssatz; tippe an, was du gemacht hast
+**Aufwärmen:** Oben im Training läuft die Aufwärmzeit bis zu deinem ersten abgehakten Arbeitssatz oder bis du einen EMOM startest; tippe an, was du gemacht hast
 (Rad, Laufband, Mobility, Aufwärmsätze). Die Satznummer antippen macht den Satz zum Aufwärmsatz (blaues „A“), „+ Aufwärmsatz“ fügt einen mit halbem Gewicht ein.
 Aufwärmsätze zählen nicht für Progression, Bestwerte, Tonnen und Wochensätze.
+„Letztes Mal“ und der Vorschlag kommen immer vom letzten Mal, als du die Übung gemacht hast – egal an welchem Trainingstag.
 **Notiz pro Übung:** „+ Notiz“ unter der Übung – Schnellauswahl (Pause verlängert, links/rechts ungleich, Technik unsauber) und Freitext.
 Die Notiz erscheint in der Zusammenfassung, beim nächsten Training („Notiz letztes Mal“) und im Text für Claude.
 Das Notizfeld wächst mit dem Text (mehrere Zeilen, kein Scrollen zur Seite).

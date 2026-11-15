@@ -372,12 +372,27 @@ await step('emom tag C',async()=>{
   typeIn('[data-bi="r"][data-i="1"]','5');click('.ptopbar [data-a="blksave"]');
   ok('template updated',C().blocks[0].n===8&&C().blocks[0].v===90&&C().blocks[0].it[1].r===5);
   ok('workout item updated',UI.page.t==='work'&&UI.w.it[0].n===8&&UI.w.it[0].v===90&&qa('.tdots button').length===8);
+  ok('warmup clock runs before emom',!UI.w.fs);
+  click('[data-a="wemgo"]');ok('emom start stops warmup clock',UI.w.it[0].run&&UI.w.fs>0&&q('.twu .hint').textContent.includes('gemessen'));
+  click('[data-a="wemgo"]');ok('emom pause keeps warmup stopped',!UI.w.it[0].run&&UI.w.fs>0);
+  click('[data-a="wemreset"]');ok('emom reset restarts warmup clock',!UI.w.fs);
   click('[data-a="wemdot"][data-k="0"]');click('[data-a="wemdot"][data-k="1"]');ok('manual rounds',UI.w.it[0].ok.filter(Boolean).length===2&&UI.w.it[0].r===2);
+  ok('emom round stops warmup clock',UI.w.fs>0);
   click('[data-a="wemgo"]');ok('running',UI.w.it[0].run);const base=Date.now();window.__now=()=>base+92000;await wait(800);
   ok('round advanced by timer',UI.w.it[0].r===3&&UI.w.it[0].ok[2],JSON.stringify({r:UI.w.it[0].r,ok:UI.w.it[0].ok}));
   click('[data-a="wemgo"]');ok('paused',!UI.w.it[0].run);window.__now=null;
   click('.ptopbar [data-a="wfinish"]');click('.ptopbar [data-a="wsave"]');await wait(500);
   const s=sessOf(t).find(x=>x.day===C().id);ok('emom saved',s&&s.x[0].em&&s.x[0].em.ok.filter(Boolean).length===3&&s.x[0].em.it.length===2);
+});
+await step('letztes Mal: über alle Trainingstage',async()=>{
+  const cb=C().blocks.find(b=>b.e==='facepull'),pb=PU().blocks.find(b=>b.e==='facepull'),d1=addDays(t,-6),d2=addDays(t,-3);
+  const mk2=(d,id,day,b,k)=>{const e=dayEnsure(d);(e.tr||(e.tr=[])).push({id,day,n:'x',st:1,en:2,feel:null,x:[{b,e:'facepull',s:[{k,r:15}]}]});touch(mkey(d))};
+  mk2(d1,'lf-c',C().id,cb.id,30);mk2(d2,'lf-p',PU().id,pb.id,35);
+  const L=lastFor(cb.id,'facepull');
+  ok('tag C uses newer pull session',L&&L.d===d2&&L.x.s[0].k===35,JSON.stringify(L&&{d:L.d,k:L.x.s[0].k}));
+  ok('pull also sees it',lastFor(pb.id,'facepull').d===d2);
+  ok('skip excludes session',lastFor(cb.id,'facepull','lf-p').d===d1);
+  for(const [d,id] of [[d1,'lf-c'],[d2,'lf-p']]){const e=dayEnsure(d);e.tr=e.tr.filter(z=>z.id!==id);if(!e.tr.length)delete e.tr;touch(mkey(d))}
 });
 await step('day editor + picker + custom',async()=>{
   click('#tab-training');click('[data-a="tdays"]');ok('days page',UI.page.t==='days'&&qa('.tdaycard').length===3);

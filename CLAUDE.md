@@ -90,7 +90,7 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 - Baustein: `{k:'ex',id,e,p:[{k,r}],lo,hi,rest,note}` oder EMOM `{k:'emom',id,v,n,it:[{e,r,k}],note}`.
 - Session pro Tag: `tr:[{id,day,n,st,en,lt?,feel,x:[{b,e,s:[{k,r,q?,t?}]} | {b,em:{v,n,it,ok}}]}]`. `q` = RIR 0–4 (4 = „4+“), fehlt, wenn nicht gewählt.
   `t` = Sekunden seit Start `st`, gesetzt beim Abhaken (nicht beim Nachtragen/Bearbeiten; Abhaken zurücknehmen löscht es). `lt:1` = nachgetragen (Minuten geschätzt).
-- Aufwärmen: `tr[].wu:{m?,t:['rad'|'band'|'mob'|'sets']}` – `m` = Minuten von Trainingsstart bis zum ersten abgehakten Arbeitssatz (`UI.w.fs`, nur für heute;
+- Aufwärmen: `tr[].wu:{m?,t:['rad'|'band'|'mob'|'sets']}` – `m` = Minuten von Trainingsstart bis zum ersten abgehakten Arbeitssatz **oder EMOM-Beginn** (`wFs`/`emBegun`, `UI.w.fs`, nur für heute;
   Uhr `#wwu`), `t` = Auswahl. Aufwärmsätze liegen **getrennt** in `x.ws:[{k,r}]` (im Trainingsmodus `sets[].w=1`, Satznummer antippen = Schalter, „+ Aufwärmsatz“ fügt vorn ein) –
   `x.s` enthält nur Arbeitssätze, darum ignorieren Progression, PRs, Tonnen, Wochensätze, `lastFor`/`histFor` sie automatisch. Im Trainingsmodus überall `wDone(s)` (= erledigt und nicht `w`) und `wNo(x,j)` (Arbeitssatz-Index) benutzen.
 - Notiz pro Übung: `x.nq:[Index in NQ]` (Schnellauswahl) + `x.n` (Freitext, ≤ 200); Trainingsmodus: `nq`/`nt`, `UI.wno` = geöffnetes Feld. `noteTxt()`, `wuTxt()` für Anzeige und Claude-Text. Beim nächsten Training „Notiz letztes Mal“ (`ln`). Nur für normale Übungen, nicht für EMOM-Blöcke.
@@ -111,6 +111,7 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
   erledigten Arbeitssätzen, `wRestAfter` startet die Pause erst nach der Runde (Pause der letzten Übung, nur dort das Pausen-Rad). `wTimes`: Rückkehr zur ersten Übung = Pause, Wechsel im Supersatz zählt nicht als Übungswechsel.
   Verbinden/Trennen/Entfernen über ⋯ (`wmore` → `wsson`/`wssoff`/`wdelex`, Schalter `ssperm` = auch im Trainingstag, `ssPlan`); im Trainingstag Verbinder `blkss` (`ssLink`).
 - Notizfeld im Training ist ein `<textarea data-wn>` (wächst per `noteFit`, Enter = fertig, Zeilenumbrüche werden zu Leerzeichen).
+- „Letztes Mal“ (`lastFor`) = jüngste Einheit mit dieser Übungs-ID, **egal an welchem Trainingstag** (Baustein `b` zählt seit 15.11.2026 nicht mehr), ebenso `plateau`. EMOM-Runden zählen nicht. Verschiedene IDs (z. B. `curls` Maschine vs. `kcurls` Kabel) sind verschiedene Übungen.
 - Doppelte Progression; „Hart“ hält das Gewicht; Plateau = 5 Einheiten ohne Fortschritt; Wochensätze je Muskel
   (`MUS`: Brust, Rücken, Schultern, Bizeps, Trizeps, Beine, Core).
 
