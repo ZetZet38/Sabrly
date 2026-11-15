@@ -46,7 +46,7 @@ function sessText(d,s){const W=wFromSess(d,s),TM=wTimes(W),mins=s.en&&s.st?Math.
     if(r&&xi===r[0])L.push(`  Supersatz (abwechselnd, Pause erst nach der Runde): ${r.map(j=>EXD(s.x[j].e).n).join(' + ')}`);
     if(x.em){const em=x.em;L.push(`  EMOM alle ${msx(em.v)} min, ${em.n} Runden (${em.it.map(t=>`${t.r} ${EXD(t.e).n}${t.k?' +'+fk(t.k)+' kg':''}`).join(' / ')}): ${em.ok.filter(Boolean).length}/${em.n} Runden geschafft`);return}
     L.push(`${r?'    ':'  '}${EXD(x.e).n}: ${setLine(x.e,x.s)}${b&&b.e===x.e?` (Ziel ${b.lo}${b.hi>b.lo?'–'+b.hi:''}${EXD(x.e).t==='time'?' s':''})`:''}${o&&o.n>1?` · Zeit ${msx(o.dur)}${o.rest!=null?`, Pause Ø ${msx(o.rest)}${o.plan?' (geplant '+msx(o.plan)+')':''}`:''}`:''}${Array.isArray(x.ws)&&x.ws.length?' · Aufwärmsätze: '+setLine(x.e,x.ws):''}${nt?' · Notiz: '+nt:''}`)});
-  if(TM)L.push(`  Zeiten: bis erster Satz ${msx(TM.lead)} · erster bis letzter Satz ${msx(TM.total-TM.lead)}${TM.rest!=null?' · Pause Ø '+msx(TM.rest):''}${TM.wech!=null?' · Wechsel Ø '+msx(TM.wech):''}${TM.long?' · '+TM.long+' Lücke(n) über 15 min nicht mitgezählt':''}`);
+  if(TM)L.push(`  Zeiten: bis erster Satz ${msx(TM.lead)} · erster bis letzter Satz ${msx(TM.span)}${TM.rest!=null?' · Pause Ø '+msx(TM.rest):''}${TM.wech!=null?' · Wechsel Ø '+msx(TM.wech):''}${TM.rest!=null||TM.wech!=null?' (Pausen ohne geschätzte Satzdauer)':''}${TM.long?' · '+TM.long+' Lücke(n) über 15 min nicht mitgezählt':''}`);
   const gx=gaPair(d).bySess.get(s.id);if(gx)L.push('  '+gaLine(gx));
   return L.join('\n')}
 // Garmin-Werte als Text: Dauer, Puls, Kalorien, Trainingseffekt, Zonen

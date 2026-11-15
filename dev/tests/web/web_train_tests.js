@@ -203,15 +203,17 @@ await step('times + summary',async()=>{
   done(0,0,240);done(0,1,330);done(0,2,470);done(1,0,560);
   ok('t = seconds since start',UI.w.it[0].sets.slice(0,3).map(s=>s.t).join()==='240,330,470'&&UI.w.it[1].sets[0].t===560,JSON.stringify(UI.w.it.slice(0,2).map(x=>x.sets.map(s=>s.t))));
   click('[data-a="wset"][data-i="0"][data-j="2"]');ok('undo removes t',!('t' in UI.w.it[0].sets[2]));done(0,2,500);
-  const T=wTimes(UI.w);
-  ok('lead',T.lead===240);ok('rest avg',T.rest===130,T.rest);ok('change avg',T.wech===60,T.wech);ok('exercise time',T.by.get(0).dur===260&&T.by.get(0).rest===130&&T.by.get(1).n===1,JSON.stringify([...T.by]));
+  const T=wTimes(UI.w),X0=UI.w.it[0],sd=(x,j)=>setDur(x,x.sets[j]);
+  ok('set duration estimate',setDur({e:X0.e},{r:10})===(EXD(X0.e).t==='time'?10:30)*(EXD(X0.e).sd?2:1)+5&&setDur({e:X0.e},{r:0})===5);
+  const eR=Math.round(((90-sd(X0,1))+(170-sd(X0,2)))/2),eL=240-sd(X0,0),eW=60-sd(UI.w.it[1],0);
+  ok('lead minus set',T.lead===eL,T.lead);ok('rest avg minus set',T.rest===eR&&eR<130,T.rest);ok('change avg minus set',T.wech===eW&&eW<60,T.wech);ok('exercise time',T.by.get(0).dur===260&&T.by.get(0).rest===eR&&T.by.get(1).n===1&&T.span===320,JSON.stringify([...T.by]));
   ok('plan rest known',T.by.get(0).plan>0);
-  off=620;click('.ptopbar [data-a="wfinish"]');ok('done page shows times',q('#view').textContent.includes('Bis zum ersten Satz')&&q('#view').textContent.includes('4:00')&&q('#view').textContent.includes('Pause zwischen Sätzen Ø')&&q('#view').textContent.includes('2:10'),q('#view').textContent.slice(0,500));
+  off=620;click('.ptopbar [data-a="wfinish"]');ok('done page shows times',q('#view').textContent.includes('Bis zum ersten Satz')&&q('#view').textContent.includes(msx(eL))&&q('#view').textContent.includes('Pause zwischen Sätzen Ø')&&q('#view').textContent.includes(msx(eR))&&q('#view').textContent.includes('geschätzte Satzdauer'),q('#view').textContent.slice(0,500));
   click('.ptopbar [data-a="wsave"]');await wait(600);
   const sv=sessOf(t).slice(-1)[0];
   ok('t saved in sets',sv.x[0].s.map(z=>z.t).join()==='240,330,500'&&sv.x[1].s[0].t===560&&!('lt' in sv),JSON.stringify(sv.x[0].s));
   ok('no undefined in cloud',!JSON.stringify(cloud(mk)).includes('undefined'));
-  const tx=sessText(t,sv);ok('claude text has times',tx.includes('Zeiten: bis erster Satz 4:00')&&tx.includes('Pause Ø 2:10')&&tx.includes('Wechsel Ø 1:00')&&/Zeit 4:20, Pause Ø 2:10/.test(tx),tx);
+  const tx=sessText(t,sv);ok('claude text has times',tx.includes('Zeiten: bis erster Satz '+msx(eL)+' · erster bis letzter Satz 5:20')&&tx.includes('Pause Ø '+msx(eR))&&tx.includes('Wechsel Ø '+msx(eW))&&tx.includes('Zeit 4:20, Pause Ø '+msx(eR))&&tx.includes('ohne geschätzte Satzdauer'),tx);
   ok('history before excludes itself',histFor(sv.x[0].e,null,{d:t,st:sv.st}).length<histFor(sv.x[0].e).length);
   // Zusammenfassung ansehen
   ACT.wview({dataset:{d:t,id:sv.id}});
@@ -264,7 +266,7 @@ await step('notiz + aufwärmen',async()=>{
   await wait(500);
   ok('note + warm persisted locally',(()=>{const w=JSON.parse(localStorage.getItem(WKEY()));return w.it[0].nt==='Griff nass'&&w.wt.includes('rad')&&w.fs>0})());
   window.__now=()=>base+9*60000+20000;click('[data-a="wset"][data-i="0"][data-j="2"]');
-  ok('times ignore warm set: lead = first working set',wTimes(UI.w)&&wTimes(UI.w).lead===500&&wTimes(UI.w).by.get(0).n===2,JSON.stringify(wTimes(UI.w)&&wTimes(UI.w).lead));
+  ok('times ignore warm set: lead = first working set',wTimes(UI.w)&&wTimes(UI.w).lead===500-setDur(UI.w.it[0],UI.w.it[0].sets.filter(z=>!z.w).find(z=>z.t===500))&&wTimes(UI.w).by.get(0).n===2,JSON.stringify(wTimes(UI.w)&&wTimes(UI.w).lead));
   click('.ptopbar [data-a="wfinish"]');const txt=q('#view').textContent;
   ok('summary shows warmup + notes',txt.includes('Aufwärmen')&&txt.includes('8 min')&&txt.includes('Rad')&&txt.includes('Notizen')&&txt.includes('Griff nass'),txt.slice(0,300));
   ok('kpi sets = working sets',+qa('.kpi b')[1].textContent===2);
@@ -280,7 +282,7 @@ await step('notiz + aufwärmen',async()=>{
   const L=lastFor(sv.x[0].b,sv.x[0].e);ok('progression history ignores warm sets',L&&L.x.s.length===2);
   ACT.wview({dataset:{d:d0,id:sv.id}});const sm=q('#view').textContent;
   ok('saved summary shows warmup, notes, warm sets',sm.includes('Aufwärmen')&&sm.includes('8 min')&&sm.includes('Rad')&&sm.includes('Griff nass')&&sm.includes('Bis zum ersten Satz')&&/Aufwärmen: .*kg/.test(sm),sm.slice(0,400));
-  ok('claude text keeps times without warm sets',/Zeiten: bis erster Satz 8:20/.test(T),T);
+  ok('claude text keeps times without warm sets',T.includes('Zeiten: bis erster Satz '+msx(wTimes(wFromSess(d0,sv)).lead))&&wTimes(wFromSess(d0,sv)).lead===500-setDur(sv.x[0],sv.x[0].s.find(z=>z.t===500)),T);
   click('.ptopbar [data-a="back"]');
   window.__now=()=>base+30*60000;
   ACT.wstart({dataset:{day:PU().id,d:d0}});ok('note from last time shown',q('#view').textContent.includes('Notiz letztes Mal: links/rechts ungleich · Griff nass'));
@@ -319,7 +321,7 @@ await step('supersatz + entfernen + notizfeld',async()=>{
   ok('ss: round 2',q('.tssh').textContent.includes('Runde 2')&&q('.tss .texc.cur [data-a="wmore"]')?.dataset.i==='3');
   window.__now=()=>base+200000;click('[data-a="wset"][data-i="3"][data-j="1"]');ok('ss: rest cleared when going on',UI.rest===null);
   window.__now=()=>base+250000;click('[data-a="wset"][data-i="4"][data-j="1"]');ok('ss: rest again',!!UI.rest);
-  const TM=wTimes(UI.w);ok('ss: times – return to first = pause, switch inside not counted',TM&&TM.by.get(3).rest===80&&TM.by.get(3).plan===UI.w.it[4].rest,JSON.stringify(TM&&[...TM.by]));
+  const TM=wTimes(UI.w);ok('ss: times – return to first = pause, switch inside not counted',TM&&TM.by.get(3).rest===80-setDur(UI.w.it[3],UI.w.it[3].sets.filter(z=>!z.w)[1])&&TM.by.get(3).plan===UI.w.it[4].rest,JSON.stringify(TM&&[...TM.by]));
   // Entfernen + Rückgängig
   click('[data-a="wmore"][data-i="0"]');click('#sheet [data-a="wdelex"]');await wait(30);
   ok('del: removed dips',UI.w.it.length===5&&UI.w.it[0].e!=='dips'&&!q('#sheet .tsheet')&&q('#toast').textContent.includes('entfernt'));

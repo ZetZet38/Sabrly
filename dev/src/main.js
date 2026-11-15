@@ -332,19 +332,24 @@ function ssPlan(W,X,id){const D=TDAY(W.day);if(!D)return false;const B=X.map(x=>
 /* ---------- Zeiten: Zeitstempel je abgehaktem Satz (t = Sekunden seit Start) ---------- */
 const TCAP=900; // Lücken über 15 min (Anruf, Kaffee …) zählen nicht in die Pausen-/Wechsel-Schnitte
 const avgS=L=>L.length?Math.round(L.reduce((a,b)=>a+b,0)/L.length):null;
-// {lead,total,rest,wech,long,by:Map(Übung→{n,dur,rest,plan})} – null, wenn weniger als 2 Sätze eine Zeit haben
-function wTimes(W){const L=[];W.it.forEach((x,i)=>{if(x.k!=='ex')return;for(const s of x.sets)if(wDone(s)&&s.t!=null&&Number.isFinite(+s.t))L.push({i,t:+s.t})});
+// Haken = Ende des Satzes → Lücke zwischen zwei Haken = Pause + Dauer des nächsten Satzes. Die Satzdauer wird geschätzt und abgezogen:
+// ca. 3 s je Wdh. (bei „auf Zeit“ die eingetragenen Sekunden), je Seite doppelt, plus 5 s zum Ansetzen.
+const SREP=3,SSET=5;
+function setDur(x,s){const D=EXD(x.e),r=Math.max(0,+s.r||0);return Math.round((D.t==='time'?r:r*SREP)*(D.sd?2:1)+SSET)}
+// {lead,span,rest,wech,long,by:Map(Übung→{n,dur,rest,plan})} – null, wenn weniger als 2 Sätze eine Zeit haben.
+// lead/rest/wech = ohne Satzdauer (geschätzt), span/dur = echte Zeit zwischen den Haken
+function wTimes(W){const L=[];W.it.forEach((x,i)=>{if(x.k!=='ex')return;for(const s of x.sets)if(wDone(s)&&s.t!=null&&Number.isFinite(+s.t))L.push({i,t:+s.t,sd:setDur(x,s)})});
   if(L.length<2)return null;L.sort((a,b)=>a.t-b.t);
-  const by=new Map(),P=[],C=[];let long=0;
+  const by=new Map(),P=[],C=[];let long=0;const net=(g,c)=>Math.max(0,g-c.sd);
   L.forEach((c,k)=>{let o=by.get(c.i);const r=ssRun(W.it,c.i);if(!o){const x=W.it[c.i];o={n:0,dur:0,rest:[],plan:x.nb?null:r?W.it[r[r.length-1]].rest:x.rest};by.set(c.i,o)}o.n++;if(!k)return;const g=c.t-L[k-1].t,pi=L[k-1].i;o.dur+=g;
-    if(g>TCAP)long++;if(pi===c.i||(r&&r.includes(pi)&&r.indexOf(c.i)<r.indexOf(pi))){o.rest.push(g);if(g<=TCAP)P.push(g)}else if(r&&r.includes(pi)){/* Wechsel im Supersatz */}else if(g<=TCAP)C.push(g)});
-  for(const o of by.values())o.rest=avgS(o.rest.filter(g=>g<=TCAP));
-  return {lead:L[0].t,total:L[L.length-1].t,rest:avgS(P),wech:avgS(C),long,by}}
+    if(g>TCAP){long++;return}if(pi===c.i||(r&&r.includes(pi)&&r.indexOf(c.i)<r.indexOf(pi))){o.rest.push(net(g,c));P.push(net(g,c))}else if(r&&r.includes(pi)){/* Wechsel im Supersatz */}else C.push(net(g,c))});
+  for(const o of by.values())o.rest=avgS(o.rest);
+  return {lead:net(L[0].t,L[0]),span:L[L.length-1].t-L[0].t,rest:avgS(P),wech:avgS(C),long,by}}
 function timesCard(W){const T=wTimes(W);if(!T)return '';
-  const rows=[['Bis zum ersten Satz',msx(T.lead)],...(T.rest!=null?[['Pause zwischen Sätzen Ø',msx(T.rest)]]:[]),...(T.wech!=null?[['Wechsel zur nächsten Übung Ø',msx(T.wech)]]:[]),['Erster bis letzter Satz',msx(T.total-T.lead)]];
+  const rows=[['Bis zum ersten Satz',msx(T.lead)],...(T.rest!=null?[['Pause zwischen Sätzen Ø',msx(T.rest)]]:[]),...(T.wech!=null?[['Wechsel zur nächsten Übung Ø',msx(T.wech)]]:[]),['Erster bis letzter Satz',msx(T.span)]];
   const ex=[...T.by].map(([i,o])=>`<div><span>${esc(EXD(W.it[i].e).n)}</span><b>${msx(o.dur)}</b>${o.rest!=null?`<em>Pause Ø ${msx(o.rest)}${o.plan?' · geplant '+msx(o.plan):''}</em>`:''}</div>`).join('');
   return `<div class="card glass stack" style="gap:10px"><span class="label">Zeiten</span><div class="tnxt">${rows.map(([a,b])=>`<div><span>${a}</span><b>${b}</b></div>`).join('')}</div>${ex?`<div class="tnxt tex tsep">${ex}</div>`:''}
-    <span class="hint">Aus der Uhrzeit beim Abhaken (Aufwärmsätze zählen nicht mit). „Bis zum ersten Satz“ = Aufwärmen und Aufbau.${T.long?` ${T.long} Lücke${T.long>1?'n':''} über 15 min zählt nicht in die Schnitte.`:''}</span></div>`}
+    <span class="hint">Aus der Uhrzeit beim Abhaken (Aufwärmsätze zählen nicht mit). Pause, Wechsel und „Bis zum ersten Satz“ ohne die geschätzte Satzdauer (ca. 3 s je Wdh.). „Bis zum ersten Satz“ = Aufwärmen und Aufbau.${T.long?` ${T.long} Lücke${T.long>1?'n':''} über 15 min zählt nicht in die Schnitte.`:''}</span></div>`}
 function wStats(W){let sets=0,vol=0;for(const x of W.it){if(x.k==='emom'){sets+=x.ok.filter(Boolean).length;continue}for(const s of x.sets)if(wDone(s)){sets++;vol+=(+s.k||0)*(EXD(x.e).t==='time'?0:(+s.r||0))*(EXD(x.e).du?2:1)}}return {sets,vol}}
 function wPRs(W,bef){const out=[];for(const x of W.it){if(x.k!=='ex')continue;const D=EXD(x.e),S2=x.sets.filter(wDone);if(!S2.length||D.t==='time')continue;const t=topOf(S2);if(!t||!t.k)continue;
     const H=histFor(x.e,null,bef);if(!H.length)continue;let best=null;for(const h of H){const b=topOf(h.s);if(!best||b.k>best.k||(b.k===best.k&&b.r>best.r))best=b}

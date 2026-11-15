@@ -100,7 +100,8 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 - Lauf: `run:[{id,t:'easy'|'iv',dur,km,hr,max,iv,g}]`; Plan-Einträge `@L` (locker) / `@I` (Intervalle).
 - **Zeiten** (`wTimes(W)`, `timesCard(W)` in `main.js`; Text in `sessText`): Sätze mit `t` nach Zeit sortiert, Lücke zwischen zwei Sätzen derselben Übung = Pause,
   zwischen verschiedenen = Wechsel, erster `t` = „bis zum ersten Satz“ (Aufwärmen/Aufbau – Grundlage für Punkt „Aufwärmen“). Lücken > 15 min (`TCAP`) zählen nicht in die Schnitte.
-  Zeit je Übung = Summe der Lücken, die an ihren Sätzen enden. Braucht ≥ 2 Sätze mit `t`; sonst keine Anzeige (alte Einheiten).
+  Zeit je Übung = Summe der Lücken, die an ihren Sätzen enden.
+  Haken = Satz**ende** → Pause/Wechsel/`lead` ziehen die geschätzte Dauer des nächsten Satzes ab (`setDur`: 3 s je Wdh. `SREP`, bei `time` die Sekunden, `sd` ×2, + 5 s `SSET`); `span` und `dur` bleiben echte Zeit (seit 15.11.2026). Braucht ≥ 2 Sätze mit `t`; sonst keine Anzeige (alte Einheiten).
 - **Zusammenfassung** (`pWSum`, Seite `wsum`, Aktion `wview`): Antippen eines gespeicherten Trainings; „Bearbeiten“ → `wedit` (Swipe „Ändern“ geht direkt dorthin).
   `wFromSess(d,s,edit)` baut den Arbeitszustand aus einer gespeicherten Einheit (für Bearbeiten und Zusammenfassung). Bestwerte dort nur gegen frühere Einheiten (`histFor(e,b,bef)`).
   Nach „Sichern“ im Bearbeiten kehrt man in die Zusammenfassung zurück, wenn man von dort kam.
@@ -148,7 +149,7 @@ bash dev/test.sh               # alle Tests – Ziel: „ALLES GRÜN“
 
 ## Offene Liste
 
-Mit Zeynel besprochen am 11.11.2026, Reihenfolge = Vorschlag (oben zuerst). Gebaut und aus der Liste gestrichen (11.11.2026): „Zeiten automatisch“, „Zusammenfassung wieder ansehen“, „Notiz pro Übung“, „Aufwärmen“; (13.11.2026): „Supersätze“, Übung im Training entfernen, größeres Notizfeld. Später möglich: Garmin-Puls je Übung aus der Kraft-Aufzeichnung über die Satz-Zeitstempel `t`.
+Mit Zeynel besprochen am 11.11.2026, Reihenfolge = Vorschlag (oben zuerst). Gebaut und aus der Liste gestrichen (11.11.2026): „Zeiten automatisch“, „Zusammenfassung wieder ansehen“, „Notiz pro Übung“, „Aufwärmen“; (13.11.2026): „Supersätze“, Übung im Training entfernen, größeres Notizfeld; (15.11.2026): Pausen ohne geschätzte Satzdauer. Später möglich: Garmin-Puls je Übung aus der Kraft-Aufzeichnung über die Satz-Zeitstempel `t`.
 
 (Liste leer – nächste Wünsche mit Zeynel klären.)
 

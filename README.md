@@ -51,7 +51,9 @@ Nach dem Abhaken eines Satzes erscheint die Reserve-Reihe (RIR) `0 · 1 · 2 · 
 antippen löscht ihn. RIR 0 hält das Gewicht, viel Luft (überall 3+) steigert stärker; „Wie schwer war's?“ wird aus der RIR vorgeschlagen.
 Sabrly merkt sich automatisch, wann du jeden Satz abhakst. Daraus entstehen nach dem Training **Zeiten**: Zeit bis zum ersten Satz
 (Aufwärmen/Aufbau), echte Pausen zwischen den Sätzen (im Vergleich zur geplanten Pause), Wechselzeit zur nächsten Übung und Zeit pro Übung –
-in der Zusammenfassung und im Text „Für Claude kopieren“. Nachgetragene Trainings haben keine Zeiten (Minuten sind dann geschätzt).
+in der Zusammenfassung und im Text „Für Claude kopieren“. Weil du einen Satz erst an seinem Ende abhakst, zieht Sabrly bei Pause, Wechsel und
+„Bis zum ersten Satz“ die geschätzte Satzdauer ab (ca. 3 s pro Wdh. + 5 s Ansetzen, bei Übungen auf Zeit die Sekunden, je Seite doppelt).
+Nachgetragene Trainings haben keine Zeiten (Minuten sind dann geschätzt).
 Ein gespeichertes Training antippen öffnet die **Zusammenfassung** (Minuten, Sätze, Tonnen, Bestwerte, Zeiten, Übungen, Garmin, Vorschläge);
 oben rechts „Bearbeiten“, nach dem Speichern bist du wieder in der Zusammenfassung. Wischen → „Ändern“ öffnet wie bisher direkt die Bearbeitung.
 Unter „Letzte Trainings“ stehen Krafttrainings und Läufe (🏃) gemeinsam, neueste zuerst; einen Lauf antippen öffnet ihn.
